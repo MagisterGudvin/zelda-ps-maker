@@ -75,6 +75,7 @@ test("wave room: doors shut during waves and open after the last wave", () => {
     waves: [[{ template: "slime", x: 300, y: 300, overrides: { detectRange: 0 } }], [{ template: "slime", x: 320, y: 300, overrides: { detectRange: 0 } }, { template: "slime", x: 340, y: 300, overrides: { detectRange: 0 } }]],
     onCleared: [{ giveItem: { item: "rupees", count: 20, silent: true } }],
   });
+  rig.step(); // autoStart begins on the next tick
   assert.equal(door.objState, "closed");
   const killAll = () => {
     for (const e of rig.session.world.list("enemy")) if (e.alive) (e as unknown as { die(): void }).die();
@@ -119,4 +120,34 @@ test("if action and nested logic", () => {
   rig.session.rules!.execute([{ if: { when: { all: [{ hasItem: "bow" }, { not: { flag: "x" } }] }, then: [{ setFlag: "ok" }], else: [{ setFlag: "bad" }] } }], "t");
   assert.equal(rig.tk.state.flags.ok, true);
   assert.equal(rig.tk.state.flags.bad, undefined);
+});
+
+test("markers replace typed coordinates in rules, waves and patrols", () => {
+  const rig = createRig();
+  const s = rig.session;
+  s.markers.set("spot", { x: 222, y: 111 });
+  s.markers.set("pa", { x: 50, y: 50 });
+  s.markers.set("pb", { x: 90, y: 50 });
+  s.rules!.execute([{ spawnEnemy: { template: "slime", at: "spot", id: "m1", overrides: { detectRange: 0 } } }, { spawnPickup: { item: "heart", at: "spot" } }, { createObject: { type: "chest", at: "spot", id: "mc" } }], "t");
+  const e = s.world.get("m1")!;
+  assert.deepEqual([e.x, e.y], [222, 111]);
+  assert.deepEqual([s.world.get("mc")!.x, s.world.get("mc")!.y], [222, 111]);
+  s.rules!.execute([{ spawnEnemy: { template: "slime", at: "nowhere" } }], "t");
+  assert.ok(rig.logs.some((l) => String(l.args[1]).includes('marker "nowhere" is not placed')));
+  const patrol = spawnEnemy(s, "sentry", 60, 50, { overrides: { patrol: { points: ["pa", "pb"] } } as never })!;
+  assert.equal(patrol.cfg.patrol.mode, "path");
+  assert.deepEqual(patrol.cfg.patrol.points, [{ x: 50, y: 50 }, { x: 90, y: 50 }]);
+});
+
+test("Add Wave Enemy fills waves; autoStart waits until all On-load actions ran", () => {
+  const rig = createRig();
+  const d = rig.session.dungeons!;
+  rig.session.markers.set("w1", { x: 300, y: 300 });
+  d.addWaveRoom({ id: "r", autoStart: true });
+  d.addWaveSpawn("r", 1, { template: "slime", at: "w1", overrides: { detectRange: 0 } });
+  d.addWaveSpawn("r", 2, { template: "slime", x: 310, y: 300, overrides: { detectRange: 0 } });
+  assert.equal(rig.session.world.count("enemy"), 0);
+  rig.step();
+  assert.equal(rig.session.world.list("enemy").filter((e) => e.alive).length, 1, "wave 1 spawned on the first tick");
+  assert.deepEqual([rig.session.world.list("enemy")[0].x, rig.session.world.list("enemy")[0].y], [300, 300]);
 });

@@ -249,6 +249,15 @@ await check("dungeon: key from the chest opens the locked door", async () => {
   assert(r.door === "unlocked" && r.keys === 0, JSON.stringify(r));
 });
 
+await check("arena trigger starts waves at points picked on the map (Add Wave Enemy)", async () => {
+  await teleport(224, 120);
+  await sleep(300);
+  const pts = await ev(() => window.ZeldaMakerToolkit.session.world.list("enemy").filter((e) => e.alive).map((e) => [Math.round(e.x), Math.round(e.y), e.cfg.template]));
+  assert(pts.length === 2, `enemies ${JSON.stringify(pts)}`);
+  assert(pts.every(([, , t]) => t === "slime"), JSON.stringify(pts));
+  return JSON.stringify(pts);
+});
+
 await page.screenshot({ path: `${ARTIFACTS}dungeon.png` });
 
 await check("progress persists across maps (opened chests stay open)", async () => {

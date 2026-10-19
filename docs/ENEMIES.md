@@ -1,6 +1,8 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position **или** Use NPC, ID, Group, Overrides JSON.
+`Zelda: Create Enemy` — Template, Position (выбор на карте) **или** Use NPC, ID, Group, Patrol markers, Overrides JSON.
+
+**Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.
 
 ## Встроенные шаблоны
 
@@ -34,7 +36,7 @@
 | `stunImmune` | не оглушается |
 | `drops` | таблица дропа (null — общая `enemies.defaultDrops`) |
 | `projectile` | `{ speed, damage, range, type, blockable, sprite, count }` |
-| `patrol` | `{ mode: "wander" \| "path", points: [{x,y}], radius, pauseMs, chase }` |
+| `patrol` | `{ mode: "wander" \| "path", points: ["p1","p2"] (маркеры) или [{x,y}], radius, pauseMs, chase }` |
 | `guard` | `{ upMs, downMs, frontalDot, breakers: [типы урона, пробивающие щит] }` |
 | `phases` | `[{ hpBelow, speedMultiplier, cooldownMultiplier, pattern: "chase" \| "burst" \| "summon", burstCount, summonTemplate, summonMax }]` |
 | `boss` | победа = `zelda:boss:defeated`, завершение подземелья |

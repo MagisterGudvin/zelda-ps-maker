@@ -7,7 +7,7 @@ import { withActionsAlias } from "./editor/pluginShape.ts";
 const plugin = definePlugin({
   name: "Zelda Maker Toolkit",
   description: "Real-time action-adventure toolkit (sword, items, enemies, puzzles, dungeons, HUD, saves) in the style of classic top-down adventures.",
-  version: "0.1.0",
+  version: "0.2.0",
   events: ZELDA_ACTIONS,
 });
 

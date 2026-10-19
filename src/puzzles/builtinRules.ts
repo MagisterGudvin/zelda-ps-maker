@@ -1,6 +1,5 @@
 import type { FlagValue } from "../core/events.ts";
 import { getDungeon } from "../core/state.ts";
-import { toWorld } from "../core/units.ts";
 import type { Session } from "../core/session.ts";
 import { aliveInGroup, spawnEnemy } from "../enemies/spawn.ts";
 import { Enemy } from "../enemies/enemy.ts";
@@ -144,8 +143,10 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
   });
   reg.registerAction("createObject", (arg, ctx) => {
     const o = asObj(arg);
-    const { type, x, y, id, ...rest } = o;
-    createObject(ctx.session, String(type), toWorld(ctx.session.config, num(x, 0)), toWorld(ctx.session.config, num(y, 0)), {
+    const { type, x, y, at, id, ...rest } = o;
+    const pt = ctx.session.resolvePoint({ at, x, y }, "createObject");
+    if (!pt) return;
+    createObject(ctx.session, String(type), pt.x, pt.y, {
       id: id ? String(id) : undefined,
       overrides: rest as Partial<ObjectConfig>,
     });
@@ -169,7 +170,9 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
   reg.registerAction("spawnEnemy", (arg, ctx) => {
     const o = asObj(arg);
     const s = ctx.session;
-    spawnEnemy(s, String(o.template ?? "slime"), toWorld(s.config, num(o.x, 0)), toWorld(s.config, num(o.y, 0)), {
+    const pt = s.resolvePoint(o, "spawnEnemy");
+    if (!pt) return;
+    spawnEnemy(s, String(o.template ?? "slime"), pt.x, pt.y, {
       id: o.id ? String(o.id) : undefined,
       group: o.group ? String(o.group) : "",
       overrides: asObj(o.overrides) as Partial<EnemyConfig>,
@@ -199,7 +202,8 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
   reg.registerAction("spawnPickup", (arg, ctx) => {
     const o = asObj(arg);
     const s = ctx.session;
-    placePickup(s, String(o.item), num(o.count, 1), toWorld(s.config, num(o.x, 0)), toWorld(s.config, num(o.y, 0)), o.id ? String(o.id) : undefined);
+    const pt = s.resolvePoint(o, "spawnPickup");
+    if (pt) placePickup(s, String(o.item), num(o.count, 1), pt.x, pt.y, o.id ? String(o.id) : undefined);
   });
   reg.registerAction("enableAbility", (arg, ctx) => {
     const o = typeof arg === "string" ? { ability: arg, enabled: true } : asObj(arg);
@@ -214,9 +218,9 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
     p.applyDamage(num(arg, 1), { type: "script", sourceId: "script", originX: p.box.x, originY: p.box.y, knockback: 0 });
   });
   reg.registerAction("setRespawn", (arg, ctx) => {
-    const o = asObj(arg);
     const s = ctx.session;
-    s.player.setRespawnPoint(toWorld(s.config, num(o.x, s.player.box.x)), toWorld(s.config, num(o.y, s.player.box.y)));
+    const pt = s.resolvePoint(arg, "setRespawn", { x: s.player.box.x, y: s.player.box.y })!;
+    s.player.setRespawnPoint(pt.x, pt.y);
   });
 
   reg.registerAction("message", (arg, ctx) => {

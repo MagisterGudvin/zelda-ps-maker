@@ -13,6 +13,8 @@ import { DungeonSystem } from "../dungeons/dungeonSystem.ts";
 import { HudSystem } from "../ui/hud.ts";
 import { DebugSystem } from "../debug/debug.ts";
 import type { FeatureId } from "./config.ts";
+import type { Vec2 } from "./math.ts";
+import { toWorld } from "./units.ts";
 import { Interactable } from "../interactions/interactable.ts";
 import { Enemy } from "../enemies/enemy.ts";
 
@@ -39,6 +41,12 @@ export class Session {
   readonly world: World;
   readonly rng: Rng;
   readonly subs = new Subscriptions();
+  /**
+   * Named points placed with `Zelda: Place Marker` (PS Maker position picker).
+   * Rules, waves and patrols refer to them with `"at": "<marker>"` instead of
+   * typed coordinates.
+   */
+  readonly markers = new Map<string, Vec2>();
 
   readonly player: PlayerSystem;
   readonly sword: SwordSystem | null;
@@ -183,6 +191,24 @@ export class Session {
     }
   }
 
+  /**
+   * Resolves a point given as `{ at: "marker" }`, `"marker"` or `{ x, y }`
+   * (pixels or tiles per `world.positionUnits`). Unknown markers are logged.
+   */
+  resolvePoint(spec: unknown, what: string, fallback: Vec2 | null = null): Vec2 | null {
+    const markerId = typeof spec === "string" ? spec : spec && typeof spec === "object" && typeof (spec as { at?: unknown }).at === "string" ? (spec as { at: string }).at : null;
+    if (markerId !== null) {
+      const m = this.markers.get(markerId);
+      if (m) return { x: m.x, y: m.y };
+      this.logger.warn(`${what}: marker "${markerId}" is not placed on map "${this.mapId}" (use Zelda: Place Marker before it).`);
+      return fallback;
+    }
+    const o = (spec ?? {}) as { x?: unknown; y?: unknown };
+    if (typeof o.x === "number" && typeof o.y === "number") return { x: toWorld(this.config, o.x), y: toWorld(this.config, o.y) };
+    if (!fallback) this.logger.warn(`${what}: no position (give "at": "<marker>" or "x"/"y").`);
+    return fallback;
+  }
+
   /** A save was loaded: re-sync persistent objects on this map with the new state. */
   onStateReplaced(): void {
     for (const e of this.world.list("object")) if (e instanceof Interactable) e.syncWithState();
@@ -211,6 +237,7 @@ export class Session {
     this.debug?.dispose();
     this.subs.releaseAll();
     this.world.clear();
+    this.markers.clear();
     this.pauseReasons.clear();
   }
 }

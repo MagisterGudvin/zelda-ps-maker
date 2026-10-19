@@ -2,6 +2,17 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.2.0] — 2026-10-19
+
+### Добавлено
+- `Zelda: Place Marker` — именованная точка, выбираемая штатным выбором позиции PS Maker. Правила (`spawnEnemy`, `spawnPickup`, `createObject`, `setRespawn`), волны и маршруты патруля ссылаются на неё через `"at": "<маркер>"` вместо ввода координат.
+- `Zelda: Add Wave Enemy` — враг волны с точкой появления, выбранной на карте.
+- Параметр *Patrol markers* у `Zelda: Create Enemy`.
+
+### Изменено
+- `Zelda: Create Wave Room` вместо одного JSON получил отдельные поля (Room ID, Doors to lock, Start at once, On cleared, Advanced JSON); волны заполняются через `Add Wave Enemy`. Автостарт происходит на следующем тике, чтобы учесть все On-load действия.
+- Демо-проект больше не содержит координат в JSON.
+
 ## [0.1.0] — 2026-10-19
 
 Первый MVP.

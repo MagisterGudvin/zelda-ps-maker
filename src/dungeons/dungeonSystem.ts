@@ -1,21 +1,23 @@
 import type { Session } from "../core/session.ts";
 import { getDungeon } from "../core/state.ts";
-import { toWorld } from "../core/units.ts";
 import { aliveInGroup, spawnEnemy } from "../enemies/spawn.ts";
 import type { EnemyConfig } from "../enemies/templates.ts";
 import type { RuleAction } from "../puzzles/ruleTypes.ts";
 import { Interactable } from "../interactions/interactable.ts";
 
+/** One enemy of a wave: position by marker (`at`) or coordinates (`x`, `y`). */
 export interface WaveSpawn {
   template: string;
-  x: number;
-  y: number;
+  at?: string;
+  x?: number;
+  y?: number;
   overrides?: Partial<EnemyConfig>;
 }
 
 export interface WaveRoomSpec {
   id: string;
-  waves: WaveSpawn[][];
+  /** Optional here: waves can be filled with `Zelda: Add Wave Enemy`. */
+  waves?: WaveSpawn[][];
   /** Start immediately when created (default) or wait for `startWaves`. */
   autoStart?: boolean;
   /** Doors closed while the fight is on and opened when it ends. */
@@ -26,9 +28,12 @@ export interface WaveRoomSpec {
 
 interface WaveRoomEntry {
   spec: WaveRoomSpec;
+  waves: WaveSpawn[][];
   wave: number;
   running: boolean;
   delayMs: number;
+  /** autoStart waits one tick so later On-load "Add Wave Enemy" actions are included. */
+  pendingStart: boolean;
 }
 
 /**
@@ -83,14 +88,32 @@ export class DungeonSystem {
   }
 
   addWaveRoom(spec: WaveRoomSpec): void {
-    if (!spec.id || !Array.isArray(spec.waves) || spec.waves.length === 0) throw new Error("Wave room needs an id and at least one wave");
-    const entry: WaveRoomEntry = { spec, wave: -1, running: false, delayMs: 0 };
+    if (!spec.id) throw new Error("Wave room needs an id");
+    if (spec.waves !== undefined && !Array.isArray(spec.waves)) throw new Error(`Wave room "${spec.id}": "waves" must be an array of waves`);
+    // Enemies added with Add Wave Enemy before the room existed are kept.
+    const existing = this.rooms.get(spec.id);
+    const waves = existing ? existing.waves : [];
+    (spec.waves ?? []).forEach((w, i) => {
+      waves[i] = [...(waves[i] ?? []), ...w];
+    });
+    const entry: WaveRoomEntry = { spec, waves, wave: -1, running: false, delayMs: 0, pendingStart: false };
     this.rooms.set(spec.id, entry);
     if (this.s.state.flags[`waves:${spec.id}`]) {
       this.setDoors(spec, true);
       return;
     }
-    if (spec.autoStart !== false) this.startWaves(spec.id);
+    entry.pendingStart = spec.autoStart !== false;
+  }
+
+  /** Adds one enemy to wave `wave` (1-based) of a room; creates the room entry if needed. */
+  addWaveSpawn(roomId: string, wave: number, spawn: WaveSpawn): void {
+    let room = this.rooms.get(roomId);
+    if (!room) {
+      room = { spec: { id: roomId, autoStart: false }, waves: [], wave: -1, running: false, delayMs: 0, pendingStart: false };
+      this.rooms.set(roomId, room);
+    }
+    const i = Math.max(0, Math.round(wave) - 1);
+    (room.waves[i] ??= []).push(spawn);
   }
 
   startWaves(roomId: string): void {
@@ -100,6 +123,11 @@ export class DungeonSystem {
       return;
     }
     if (room.running || this.s.state.flags[`waves:${roomId}`]) return;
+    room.pendingStart = false;
+    if (room.waves.filter(Boolean).length === 0) {
+      this.s.logger.warn(`startWaves: wave room "${roomId}" has no enemies (add them with Zelda: Add Wave Enemy).`);
+      return;
+    }
     room.running = true;
     room.wave = -1;
     this.setDoors(room.spec, false);
@@ -109,7 +137,8 @@ export class DungeonSystem {
   private nextWave(room: WaveRoomEntry): void {
     room.wave++;
     const spec = room.spec;
-    if (room.wave >= spec.waves.length) {
+    while (room.wave < room.waves.length && !room.waves[room.wave]) room.wave++;
+    if (room.wave >= room.waves.length) {
       room.running = false;
       this.s.toolkit.setFlag(`waves:${spec.id}`, true);
       this.setDoors(spec, true);
@@ -119,10 +148,11 @@ export class DungeonSystem {
     }
     const group = `wave:${spec.id}`;
     let spawned = 0;
-    for (const w of spec.waves[room.wave]) {
-      if (spawnEnemy(this.s, w.template, toWorld(this.s.config, w.x), toWorld(this.s.config, w.y), { group, overrides: w.overrides })) spawned++;
+    for (const w of room.waves[room.wave]) {
+      const pt = this.s.resolvePoint(w, `wave room ${spec.id}`);
+      if (pt && spawnEnemy(this.s, w.template, pt.x, pt.y, { group, overrides: w.overrides })) spawned++;
     }
-    this.s.bus.emit("zelda:wave:started", { roomId: spec.id, wave: room.wave + 1, total: spec.waves.length });
+    this.s.bus.emit("zelda:wave:started", { roomId: spec.id, wave: room.wave + 1, total: room.waves.length });
     // An empty/failed wave must not stall the room.
     if (spawned === 0) room.delayMs = 1;
   }
@@ -138,6 +168,7 @@ export class DungeonSystem {
 
   tick(dtMs: number): void {
     for (const room of this.rooms.values()) {
+      if (room.pendingStart) this.startWaves(room.spec.id);
       if (!room.running || room.delayMs <= 0) continue;
       room.delayMs -= dtMs;
       if (room.delayMs <= 0) this.nextWave(room);

@@ -2,6 +2,15 @@
 
 Ветвить события PS Maker по состоянию плагина нельзя (API не даёт регистрировать условия), поэтому логика уровней собирается из **правил Toolkit**: «когда условие станет истинным — выполнить действия».
 
+## Позиции: выбор на карте вместо координат
+
+Везде, где нужна точка карты, используйте штатный выбор позиции PS Maker (кнопка **Set position** / **Locate in map**):
+
+- в действиях с параметром *Position* (`Create Enemy`, `Create Object`, `Create Chest`, `Create Door`, `Place Item`, `Add Wave Enemy`, `Set Respawn Point`) точка выбирается прямо на карте;
+- для правил, маршрутов патруля и JSON поставьте **`Zelda: Place Marker`** (Marker ID + Position) и ссылайтесь на точку по имени: `"at": "boss_spot"`.
+
+Маркеры принадлежат карте, поэтому ставьте их в On-load событиях **до** действий, которые на них ссылаются. Числовые `"x"`/`"y"` по-прежнему принимаются (для опытных авторов).
+
 ## Правило
 
 `Zelda: Add Rule`:
@@ -50,16 +59,16 @@
 | `destroyObject` / `resetObject` / `removeObject` | id или массив |
 | `setState` | `{"id":"lever_1","state":"on"}` |
 | `activateSwitch` | `"switch_a"` или `{"id":"switch_a","on":false}` |
-| `createObject` | `{"type":"chest","id":"c2","x":100,"y":60,"contents":{"item":"key","count":1}}` (+ любые поля ObjectConfig) |
+| `createObject` | `{"type":"chest","id":"c2","at":"reward_spot","contents":{"item":"key","count":1}}` (+ любые поля ObjectConfig) |
 | `setFlag` / `clearFlag` / `toggleFlag` | `"name"` или `{"name":"stage","value":2}` |
-| `spawnEnemy` | `{"template":"slime","x":80,"y":40,"id":"s9","group":"room2","overrides":{"hp":4}}` |
+| `spawnEnemy` | `{"template":"slime","at":"m1","id":"s9","group":"room2","overrides":{"hp":4}}` |
 | `killEnemy` / `killGroup` | id / группа |
 | `giveItem` | `"bow"` или `{"item":"bombs","count":5,"silent":true}` |
 | `spendResource` | `{"id":"rupees","count":20}` |
-| `spawnPickup` | `{"item":"heart","x":120,"y":90,"id":"optional_persistent_id"}` |
+| `spawnPickup` | `{"item":"heart","at":"m2","id":"optional_persistent_id"}` |
 | `enableAbility` | `{"ability":"sword","enabled":false}` |
 | `heal` / `damagePlayer` | число |
-| `setRespawn` | `{"x":40,"y":200}` |
+| `setRespawn` | `"start_spot"` или `{"at":"start_spot"}` |
 | `message` | `"Текст"` или `{"text":{"en":"...","ru":"..."},"durationMs":3000}` |
 | `emit` | `"cutscene_done"` → событие `zelda:custom:cutscene_done` |
 | `enterDungeon` / `completeDungeon` | id |
@@ -67,7 +76,7 @@
 | `save` | `true` |
 | `if` | `{"when":{...},"then":[...],"else":[...]}` |
 
-Координаты в действиях — пиксели или тайлы (`world.positionUnits`).
+Точка в действиях — `"at": "<маркер>"`; запасной вариант — `"x"`, `"y"` в пикселях или тайлах (`world.positionUnits`).
 
 ## Последовательность переключателей
 
@@ -75,21 +84,11 @@
 
 ## Комнаты с волнами
 
-`Zelda: Create Wave Room`, JSON:
-```json
-{
-  "id": "arena",
-  "autoStart": false,
-  "lockDoors": ["arena_door"],
-  "delayMs": 600,
-  "waves": [
-    [{"template":"slime","x":300,"y":80},{"template":"slime","x":320,"y":160}],
-    [{"template":"soldier","x":340,"y":120,"overrides":{"hp":6}}]
-  ],
-  "onCleared": [{"reveal":"arena_chest"}]
-}
-```
-Двери из `lockDoors` закрываются на время боя и открываются после последней волны. С `autoStart: false` волны запускает `Zelda: Start Waves` (например, из триггерной зоны PS Maker на входе). Зачищенная комната запоминается флагом `waves:<id>`.
+1. `Zelda: Create Wave Room`: Room ID `arena`, Doors to lock `arena_door`, Start at once `false`, On cleared `[{"reveal":"arena_chest"}]`.
+2. Для каждого врага — `Zelda: Add Wave Enemy`: Room ID `arena`, Wave `1`/`2`/…, Template, **Position — выбрать на карте**, Overrides (необязательно).
+3. На входе в комнату — триггерная зона PS Maker с действием `Zelda: Start Waves` (`arena`). С *Start at once* = `true` волны начнутся сразу после загрузки карты (после всех On-load действий).
+
+Двери из списка закрываются на время боя и открываются после последней волны. Зачищенная комната запоминается флагом `waves:<id>`. Поле *Advanced JSON* принимает `{"delayMs":1000}` или целые волны `{"waves":[[{"template":"slime","at":"m1"}]]}`.
 
 ## Подземелья
 

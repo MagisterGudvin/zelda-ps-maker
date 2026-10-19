@@ -41,7 +41,10 @@ export const MAPS = {
       ["Zelda: Create Enemy", { template: "slime", position: { x: 230, y: 120 }, id: "slime_1", group: "field", overrides: "" }],
       ["Zelda: Create Enemy", { template: "slime", position: { x: 260, y: 160 }, id: "slime_2", group: "field", overrides: "" }],
       ["Zelda: Create Enemy", { template: "soldier", position: { x: 300, y: 205 }, id: "soldier_1", group: "field", overrides: "" }],
-      ["Zelda: Create Enemy", { template: "sentry", position: { x: 200, y: 84 }, id: "sentry_1", group: "", overrides: '{"patrol":{"mode":"path","points":[{"x":150,"y":84},{"x":250,"y":84}],"pauseMs":400,"radius":0,"chase":false}}' }],
+      // Patrol route: two points picked on the map, referenced by name.
+      ["Zelda: Place Marker", { id: "patrol_a", position: { x: 150, y: 84 } }],
+      ["Zelda: Place Marker", { id: "patrol_b", position: { x: 250, y: 84 } }],
+      ["Zelda: Create Enemy", { template: "sentry", position: { x: 200, y: 84 }, id: "sentry_1", group: "", patrol: "patrol_a,patrol_b", overrides: "" }],
       // 6. Ranged enemy to test the shield.
       ["Zelda: Create Enemy", { template: "spitter", position: { x: 350, y: 180 }, id: "spitter_1", group: "field", overrides: "" }],
       // NPC placed in the editor turned into a shielded knight.
@@ -73,7 +76,8 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "pit", position: { x: 372, y: 80 }, id: "", config: "" }],
       ["Zelda: Create Object", { type: "door", position: { x: 392, y: 120 }, id: "gate", config: '{"lock":"switch","height":32}' }],
       ["Zelda: Add Rule", { id: "open_gate", when: '{"switchOn":"gate_switch"}', then: '[{"openDoor":"gate"},{"message":{"en":"The gate opened!","ru":"Ворота открылись!"}}]', else: "", once: true }],
-      ["Zelda: Add Rule", { id: "field_cleared", when: '{"enemiesDefeated":"field"}', then: '[{"spawnPickup":{"item":"rupees","count":20,"x":200,"y":150}},{"message":{"en":"Field cleared!","ru":"Поле зачищено!"}}]', else: "", once: false }],
+      ["Zelda: Place Marker", { id: "field_reward", position: { x: 200, y: 150 } }],
+      ["Zelda: Add Rule", { id: "field_cleared", when: '{"enemiesDefeated":"field"}', then: '[{"spawnPickup":{"item":"rupees","count":20,"at":"field_reward"}},{"message":{"en":"Field cleared!","ru":"Поле зачищено!"}}]', else: "", once: false }],
     ],
     triggers: [{ rect: { x: 396, y: RIGHT_GATE.y, w: 8, h: RIGHT_GATE.h }, transfer: { map: "dungeon", x: 40, y: 200 } }],
   },
@@ -110,14 +114,24 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "torch", position: { x: 150, y: 40 }, id: "torch_1", config: '{"setFlag":"torch_lit"}' }],
       ["Zelda: Create Door", { id: "key_door", position: { x: 200, y: 120 }, lock: "small_key", startOpen: false }],
       // Arena: two waves, then the mini-boss.
+      // Arena: two waves (spawn points picked on the map), then the mini-boss.
+      ["Zelda: Place Marker", { id: "boss_spot", position: { x: 300, y: 120 } }],
+      ["Zelda: Place Marker", { id: "reward_spot", position: { x: 300, y: 60 } }],
       [
         "Zelda: Create Wave Room",
         {
-          config:
-            '{"id":"arena","autoStart":false,"waves":[[{"template":"slime","x":300,"y":80},{"template":"slime","x":320,"y":160}],[{"template":"soldier","x":340,"y":120},{"template":"spitter","x":300,"y":200}]],"onCleared":[{"spawnEnemy":{"template":"ogre","x":300,"y":120,"id":"ogre_boss"}},{"message":{"en":"The guardian awakens!","ru":"Страж пробудился!"}}]}',
+          id: "arena",
+          lockDoors: "",
+          autoStart: false,
+          onCleared: '[{"spawnEnemy":{"template":"ogre","at":"boss_spot","id":"ogre_boss"}},{"message":{"en":"The guardian awakens!","ru":"Страж пробудился!"}}]',
+          advanced: "",
         },
       ],
-      ["Zelda: Add Rule", { id: "boss_reward", when: '{"bossDefeated":"d1"}', then: '[{"createObject":{"type":"chest","id":"boss_chest","x":300,"y":60,"contents":{"item":"rupees","count":50}}}]', else: "", once: false }],
+      ["Zelda: Add Wave Enemy", { roomId: "arena", wave: 1, template: "slime", position: { x: 300, y: 80 }, overrides: "" }],
+      ["Zelda: Add Wave Enemy", { roomId: "arena", wave: 1, template: "slime", position: { x: 320, y: 160 }, overrides: "" }],
+      ["Zelda: Add Wave Enemy", { roomId: "arena", wave: 2, template: "soldier", position: { x: 340, y: 120 }, overrides: "" }],
+      ["Zelda: Add Wave Enemy", { roomId: "arena", wave: 2, template: "spitter", position: { x: 300, y: 200 }, overrides: "" }],
+      ["Zelda: Add Rule", { id: "boss_reward", when: '{"bossDefeated":"d1"}', then: '[{"createObject":{"type":"chest","id":"boss_chest","at":"reward_spot","contents":{"item":"rupees","count":50}}}]', else: "", once: false }],
     ],
     triggers: [
       { rect: { x: 0, y: 184, w: 6, h: 40 }, transfer: { map: "field", x: 370, y: 120 } },

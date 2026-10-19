@@ -158,6 +158,7 @@ const createEnemy = defineEvent({
     npc: npc("Use NPC", "Optional: turn this placed NPC into the enemy (uses its sprite). / Превратить NPC во врага."),
     id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
     group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
+    patrol: str("Patrol markers", "Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1,p2,p3. / Маршрут патруля по маркерам.", ""),
     overrides: str("Overrides JSON", 'Change stats, e.g. {"hp":6,"speed":50,"resistances":{"arrow":0}}', ""),
   },
   execute(params, ctx) {
@@ -165,6 +166,8 @@ const createEnemy = defineEvent({
       const at = where(s, ctx, params.position, params.npc, "Create Enemy");
       if (!at) return;
       const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Create Enemy overrides") ?? {};
+      const route = (params.patrol ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      if (route.length > 0) overrides.patrol = { ...(overrides.patrol ?? {}), mode: "path", points: route as unknown as EnemyConfig["patrol"]["points"] } as EnemyConfig["patrol"];
       spawnEnemy(s, params.template || "slime", at.x, at.y, { id: params.id || undefined, group: params.group, overrides, adopt: at.adopt });
     });
   },
@@ -373,21 +376,86 @@ const switchSequence = defineEvent({
   },
 });
 
+const placeMarker = defineEvent({
+  name: "Zelda: Place Marker",
+  description:
+    'Names a point picked on the map. Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.',
+  parameterDefs: {
+    id: str("Marker ID", "Name of the point, e.g. boss_spot.", "marker_1"),
+    position: pos("Position", "Pick the point on the map."),
+  },
+  execute(params, ctx) {
+    run("Zelda: Place Marker", ctx, (s) => {
+      if (!params.id) {
+        s.logger.warn("Place Marker: Marker ID is empty.");
+        return;
+      }
+      const p = resolvePosition(params.position, s.config);
+      if (!p) {
+        s.logger.warn(`Place Marker "${params.id}": no valid position (got ${JSON.stringify(params.position)}).`);
+        return;
+      }
+      s.markers.set(params.id, p);
+    });
+  },
+});
+
 const waveRoom = defineEvent({
   name: "Zelda: Create Wave Room",
-  description: 'Enemy waves; doors stay shut until all waves are beaten. JSON: {"id":"r1","lockDoors":["d1"],"waves":[[{"template":"slime","x":80,"y":60}]],"onCleared":[{"reveal":"chest_1"}]}',
-  parameterDefs: { config: str("Config JSON", "Wave room definition (see description).", "") },
+  description: "Room with enemy waves: doors stay shut until every wave is beaten. Add enemies with Zelda: Add Wave Enemy. / Комната с волнами врагов.",
+  parameterDefs: {
+    id: str("Room ID", "Unique room id (cleared state is saved).", "arena"),
+    lockDoors: str("Doors to lock", "Comma-separated door ids closed during the fight.", ""),
+    autoStart: bool("Start at once", "Start when the map loads; otherwise use Zelda: Start Waves (e.g. from a trigger area).", false),
+    onCleared: str("On cleared (JSON)", 'Actions after the last wave, e.g. [{"reveal":"arena_chest"}]', "[]"),
+    advanced: str("Advanced JSON", 'Optional: extra fields, e.g. {"delayMs":1000} or whole waves [[{"template":"slime","at":"m1"}]].', ""),
+  },
   execute(params, ctx) {
     run("Zelda: Create Wave Room", ctx, (s) => {
-      const spec = json<WaveRoomSpec>(s, params.config, "Wave room");
-      if (spec && s.dungeons) s.dungeons.addWaveRoom(spec);
+      if (!s.dungeons) return;
+      const extra = json<Partial<WaveRoomSpec>>(s, params.advanced, "Wave room advanced") ?? {};
+      const onCleared = json<RuleAction[]>(s, params.onCleared, "Wave room onCleared");
+      s.dungeons.addWaveRoom({
+        ...extra,
+        id: params.id || extra.id || "arena",
+        autoStart: params.autoStart,
+        lockDoors: params.lockDoors ? params.lockDoors.split(",").map((x) => x.trim()).filter(Boolean) : (extra.lockDoors ?? []),
+        onCleared: onCleared ? (Array.isArray(onCleared) ? onCleared : [onCleared]) : extra.onCleared,
+      });
+    });
+  },
+});
+
+const addWaveEnemy = defineEvent({
+  name: "Zelda: Add Wave Enemy",
+  description: "Adds one enemy to a wave of a wave room; its spawn point is picked on the map. / Добавляет врага в волну (точка выбирается на карте).",
+  parameterDefs: {
+    roomId: str("Room ID", "Wave room id.", "arena"),
+    wave: num("Wave", "Wave number: 1, 2, 3...", 1),
+    template: str("Template", "Enemy template.", "slime"),
+    position: pos("Position", "Spawn point."),
+    overrides: str("Overrides JSON", 'Optional stat changes, e.g. {"hp":4}.', ""),
+  },
+  execute(params, ctx) {
+    run("Zelda: Add Wave Enemy", ctx, (s) => {
+      if (!s.dungeons) return;
+      const p = resolvePosition(params.position, s.config);
+      if (!p) {
+        s.logger.warn(`Add Wave Enemy: no valid position (got ${JSON.stringify(params.position)}).`);
+        return;
+      }
+      const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Add Wave Enemy overrides") ?? undefined;
+      // Store pixels: positions from the picker are already converted.
+      const marker = `__wave_${params.roomId}_${s.markers.size}`;
+      s.markers.set(marker, p);
+      s.dungeons.addWaveSpawn(params.roomId, params.wave || 1, { template: params.template || "slime", at: marker, overrides });
     });
   },
 });
 
 const startWaves = defineEvent({
   name: "Zelda: Start Waves",
-  description: 'Starts a wave room created with "autoStart": false. / Запускает волны врагов.',
+  description: "Starts a wave room (e.g. from a trigger area at the room entrance). / Запускает волны врагов.",
   parameterDefs: { roomId: str("Room ID", "Wave room id.", "") },
   execute(params, ctx) {
     run("Zelda: Start Waves", ctx, (s) => s.dungeons?.startWaves(params.roomId));
@@ -701,7 +769,9 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   ifAction,
   runActions,
   switchSequence,
+  placeMarker,
   waveRoom,
+  addWaveEnemy,
   startWaves,
   enterDungeon,
   leaveDungeon,

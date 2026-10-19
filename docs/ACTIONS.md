@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.1.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.2.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **43**. Все имена начинаются с `Zelda: `.
+Всего действий: **45**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -23,7 +23,9 @@
 - [Zelda: If](#zelda-if)
 - [Zelda: Run Actions](#zelda-run-actions)
 - [Zelda: Create Switch Sequence](#zelda-create-switch-sequence)
+- [Zelda: Place Marker](#zelda-place-marker)
 - [Zelda: Create Wave Room](#zelda-create-wave-room)
+- [Zelda: Add Wave Enemy](#zelda-add-wave-enemy)
 - [Zelda: Start Waves](#zelda-start-waves)
 - [Zelda: Enter Dungeon](#zelda-enter-dungeon)
 - [Zelda: Leave Dungeon](#zelda-leave-dungeon)
@@ -103,6 +105,7 @@ Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre o
 | `npc` (Use NPC) | npc | — | Optional: turn this placed NPC into the enemy (uses its sprite). / Превратить NPC во врага. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses and rules). |
 | `group` (Group) | string | `""` | Group for rules like {"enemiesDefeated":"room1"}. |
+| `patrol` (Patrol markers) | string | `""` | Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1,p2,p3. / Маршрут патруля по маркерам. |
 | `overrides` (Overrides JSON) | string | `""` | Change stats, e.g. {"hp":6,"speed":50,"resistances":{"arrow":0}} |
 
 ## Zelda: Create Object
@@ -220,17 +223,42 @@ Switches must be activated in this order; a wrong one resets them. / Перек�
 | `resetOnWrong` (Reset on wrong) | boolean | `true` | Turn all switches off after a wrong one. |
 | `onSolved` (On solved (JSON)) | string | `"[]"` | Actions, e.g. [{"openDoor":"door_3"}] |
 
-## Zelda: Create Wave Room
+## Zelda: Place Marker
 
-Enemy waves; doors stay shut until all waves are beaten. JSON: {"id":"r1","lockDoors":["d1"],"waves":[[{"template":"slime","x":80,"y":60}]],"onCleared":[{"reveal":"chest_1"}]}
+Names a point picked on the map. Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `config` (Config JSON) | string | `""` | Wave room definition (see description). |
+| `id` (Marker ID) | string | `"marker_1"` | Name of the point, e.g. boss_spot. |
+| `position` (Position) | position | — | Pick the point on the map. |
+
+## Zelda: Create Wave Room
+
+Room with enemy waves: doors stay shut until every wave is beaten. Add enemies with Zelda: Add Wave Enemy. / Комната с волнами врагов.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `id` (Room ID) | string | `"arena"` | Unique room id (cleared state is saved). |
+| `lockDoors` (Doors to lock) | string | `""` | Comma-separated door ids closed during the fight. |
+| `autoStart` (Start at once) | boolean | `false` | Start when the map loads; otherwise use Zelda: Start Waves (e.g. from a trigger area). |
+| `onCleared` (On cleared (JSON)) | string | `"[]"` | Actions after the last wave, e.g. [{"reveal":"arena_chest"}] |
+| `advanced` (Advanced JSON) | string | `""` | Optional: extra fields, e.g. {"delayMs":1000} or whole waves [[{"template":"slime","at":"m1"}]]. |
+
+## Zelda: Add Wave Enemy
+
+Adds one enemy to a wave of a wave room; its spawn point is picked on the map. / Добавляет врага в волну (точка выбирается на карте).
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `roomId` (Room ID) | string | `"arena"` | Wave room id. |
+| `wave` (Wave) | number | `1` | Wave number: 1, 2, 3... |
+| `template` (Template) | string | `"slime"` | Enemy template. |
+| `position` (Position) | position | — | Spawn point. |
+| `overrides` (Overrides JSON) | string | `""` | Optional stat changes, e.g. {"hp":4}. |
 
 ## Zelda: Start Waves
 
-Starts a wave room created with "autoStart": false. / Запускает волны врагов.
+Starts a wave room (e.g. from a trigger area at the room entrance). / Запускает волны врагов.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|

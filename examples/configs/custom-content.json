@@ -41,7 +41,7 @@
     "fire_soldier": { "extends": "soldier", "hp": 6, "tint": 16737860, "resistances": { "fire": 0, "ice": 2 } },
     "triple_spitter": { "extends": "spitter", "projectile": { "count": 3, "speed": 110 } },
     "armored_slime": { "extends": "slime", "hp": 4, "resistances": { "sword": 0.5, "bomb": 2 }, "knockbackResist": 0.6 },
-    "watchman": { "extends": "sentry", "patrol": { "mode": "path", "points": [ { "x": 64, "y": 64 }, { "x": 192, "y": 64 }, { "x": 192, "y": 160 } ], "pauseMs": 300, "radius": 0, "chase": true } }
+    "watchman": { "extends": "sentry", "patrol": { "mode": "path", "points": [], "pauseMs": 300, "radius": 0, "chase": true } }
   },
   "rules": [
     { "id": "torches_open_stairs", "when": { "switchOn": ["torch_1", "torch_2"] }, "then": [ { "reveal": "stairs" }, { "message": { "en": "A staircase appears.", "ru": "Появилась лестница." } } ] },
@@ -54,8 +54,8 @@
     "autoStart": false,
     "lockDoors": ["arena_door"],
     "waves": [
-      [ { "template": "slime", "x": 120, "y": 80 }, { "template": "slime", "x": 200, "y": 80 } ],
-      [ { "template": "fire_soldier", "x": 160, "y": 60 }, { "template": "triple_spitter", "x": 160, "y": 140 } ]
+      [ { "template": "slime", "at": "arena_left" }, { "template": "slime", "at": "arena_right" } ],
+      [ { "template": "fire_soldier", "at": "arena_top" }, { "template": "triple_spitter", "at": "arena_bottom" } ]
     ],
     "onCleared": [ { "reveal": "arena_chest" }, { "setFlag": "arena_done" } ]
   },

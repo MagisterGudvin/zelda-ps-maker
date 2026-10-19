@@ -32,6 +32,7 @@ export function spawnEnemy(s: Session, template: string, x: number, y: number, o
     s.logger.warn(`Enemy "${template}" not spawned: enemies.maxActive (${s.config.enemies.maxActive}) reached.`);
     return null;
   }
+  resolvePatrol(s, cfg);
   const explicitId = !!opts.id;
   const id = opts.id || s.world.nextId(template);
   if (s.world.has(id)) {
@@ -44,6 +45,21 @@ export function spawnEnemy(s: Session, template: string, x: number, y: number, o
   s.world.add(enemy);
   s.bus.emit("zelda:enemy:spawned", { enemyId: id, template, group: enemy.group });
   return enemy;
+}
+
+/** Patrol points given as marker ids (or {at}) become pixel positions; a path implies mode "path". */
+function resolvePatrol(s: Session, cfg: EnemyConfig): void {
+  const raw = cfg.patrol.points as unknown[];
+  if (!Array.isArray(raw) || raw.length === 0) return;
+  const pts = [];
+  let hadMarker = false;
+  for (const p of raw) {
+    if (typeof p === "string" || (p && typeof p === "object" && "at" in p)) hadMarker = true;
+    const pt = s.resolvePoint(p, `enemy ${cfg.template} patrol`);
+    if (pt) pts.push(pt);
+  }
+  cfg.patrol.points = pts;
+  if (hadMarker && pts.length > 0) cfg.patrol.mode = "path";
 }
 
 export function aliveInGroup(s: Session, group: string): number {

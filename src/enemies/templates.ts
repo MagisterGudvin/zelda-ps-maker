@@ -56,6 +56,7 @@ export interface EnemyConfig {
   stunImmune: boolean;
   drops: DropTable | null;
   projectile: EnemyProjectileConfig;
+  /** `points` may also list marker ids (strings) when given as overrides; spawnEnemy resolves them. */
   patrol: { mode: "wander" | "path"; points: Vec2[]; radius: number; pauseMs: number; chase: boolean };
   guard: { upMs: number; downMs: number; frontalDot: number; breakers: DamageType[] };
   phases: EnemyPhase[];
