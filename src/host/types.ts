@@ -1,0 +1,126 @@
+import type { AABB, Facing } from "../core/math.ts";
+
+/**
+ * Boundary between the engine-agnostic toolkit and the host (PS Maker via
+ * Phaser, or the fake host used by unit tests). Nothing outside `src/host`
+ * touches Phaser directly.
+ */
+export interface HostAdapter {
+  readonly input: InputSource;
+  readonly renderer: Renderer;
+  readonly hud: HudSink | null;
+  readonly debug: DebugDraw | null;
+
+  /** Writes the player's hurtbox (body or sprite bounds) into `out`. False if no player. */
+  readPlayerBox(out: AABB): boolean;
+  /** Optional facing hint from the host (e.g. current animation name). */
+  readPlayerFacingHint(): Facing | null;
+  /** Moves the player sprite by a delta; collision was already checked by the toolkit. */
+  movePlayerBy(dx: number, dy: number): void;
+  setPlayerPosition(x: number, y: number): void;
+  /** While locked, the host cancels the engine's own player movement. */
+  setPlayerLocked(locked: boolean): void;
+  /** Visual feedback: invulnerability blink / hit flash. */
+  setPlayerBlink(visible: boolean): void;
+  setPlayerTint(color: number | null): void;
+
+  /** True when the box overlaps map collision that the toolkit does not own. */
+  isMapBlocked(box: AABB): boolean;
+  /** Called once per fixed tick before systems run (cache refresh etc). */
+  beginTick(tick: number): void;
+
+  /** Releases every listener, view and texture reference owned by the adapter. */
+  dispose(): void;
+}
+
+export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "debug";
+
+export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "debug"];
+
+/**
+ * Edge-aware input. `latch()` is called once per fixed tick; presses that
+ * happened between ticks are reported as `pressed` exactly once.
+ */
+export interface InputSource {
+  latch(): void;
+  isDown(action: InputAction): boolean;
+  pressed(action: InputAction): boolean;
+  released(action: InputAction): boolean;
+  /** Clears held/pressed state (window blur, pause). */
+  reset(): void;
+}
+
+/** Visual description used to create a view; keeps systems asset-agnostic. */
+export interface ViewSpec {
+  /** Built-in procedural sprite id (see host/textures.ts) or a texture key. */
+  sprite: string;
+  /** Optional existing game object to adopt instead of creating one (NPC). */
+  adopt?: unknown;
+  width?: number;
+  height?: number;
+  tint?: number;
+  /** Rendering layer offset added to the y-sorted depth. */
+  layer?: number;
+  /** Draw the view without y-sorting (above everything, e.g. explosions). */
+  overlay?: boolean;
+}
+
+export interface EntityView {
+  setPosition(x: number, y: number): void;
+  setVisible(visible: boolean): void;
+  setAlpha(alpha: number): void;
+  setTint(color: number | null): void;
+  setSprite(sprite: string): void;
+  setRotation(radians: number): void;
+  setScale(scale: number): void;
+  setFlipX(flip: boolean): void;
+  destroy(): void;
+}
+
+export interface Renderer {
+  createView(spec: ViewSpec): EntityView;
+}
+
+export interface DebugDraw {
+  clear(): void;
+  rect(box: AABB, color: number, alpha?: number): void;
+  circle(x: number, y: number, r: number, color: number, alpha?: number): void;
+  label(x: number, y: number, text: string): void;
+  setVisible(visible: boolean): void;
+}
+
+export interface HudItemSlot {
+  itemId: string;
+  name: string;
+  description: string;
+  icon: string;
+  count: number | null;
+  selected: boolean;
+}
+
+export interface HudModel {
+  visible: boolean;
+  hp: number;
+  maxHp: number;
+  heartValue: number;
+  magic: number;
+  maxMagic: number;
+  showHearts: boolean;
+  showMagic: boolean;
+  activeItem: HudItemSlot | null;
+  counters: { id: string; label: string; icon: string; value: number }[];
+  messages: { text: string; remainingMs: number }[];
+  inventoryOpen: boolean;
+  inventoryTitle: string;
+  inventory: HudItemSlot[];
+  dead: boolean;
+  deathText: string;
+  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  scale: number;
+  fontFamily: string;
+}
+
+export interface HudSink {
+  render(model: HudModel): void;
+  setVisible(visible: boolean): void;
+}

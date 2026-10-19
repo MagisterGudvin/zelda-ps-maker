@@ -1,0 +1,137 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createFakeScene } from "../helpers/fakePhaser.ts";
+import { createRig, errors } from "../helpers/fakeHost.ts";
+import { FEATURE_IDS } from "../../src/core/config.ts";
+import { spawnEnemy } from "../../src/enemies/spawn.ts";
+import { createObject } from "../../src/interactions/spawnObject.ts";
+
+test("importing the plugin has no global side effects and exposes the PS Maker plugin shape", async () => {
+  const before = Object.keys(globalThis).length;
+  const mod = await import("../../src/index.ts");
+  const plugin = mod.default as { name: string; version: string; description: string; events: { name: string; parameterDefs: object; execute: unknown }[]; actions: unknown };
+  assert.equal(plugin.name, "Zelda Maker Toolkit");
+  assert.match(plugin.version, /^\d+\.\d+\.\d+$/);
+  assert.ok(plugin.events.length >= 40);
+  assert.equal(plugin.actions, plugin.events);
+  const names = new Set<string>();
+  for (const e of plugin.events) {
+    assert.ok(e.name.startsWith("Zelda: "), e.name);
+    assert.ok(!names.has(e.name), `duplicate action name ${e.name}`);
+    names.add(e.name);
+    assert.equal(typeof e.execute, "function");
+    for (const [key, def] of Object.entries(e.parameterDefs)) {
+      const d = def as { type: string; description: string };
+      assert.ok(["string", "number", "boolean", "position", "image", "audio", "npc"].includes(d.type), `${e.name}.${key} type`);
+      assert.equal(typeof d.description, "string");
+    }
+  }
+  assert.equal(Object.keys(globalThis).length, before, "no globals until an action runs");
+  assert.equal((globalThis as Record<string, unknown>).ZeldaMakerToolkit, undefined);
+});
+
+test("editor actions drive a full session on a Phaser-like scene and shutdown releases every listener", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  const f = createFakeScene();
+  const ctx = { game: f.game, scene: f.scene, player: f.player };
+  const action = (name: string) => plugin.events.find((e: { name: string }) => e.name === name)!;
+  const baselineScene = f.events.count();
+
+  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "alttp", config: '{"debug":{"logLevel":"silent"}}', language: "ru", debugHitboxes: true }, ctx);
+  const tk = getToolkit();
+  assert.equal(tk.session?.mapId, "field");
+  assert.equal(tk.i18n.language, "ru");
+  assert.ok((globalThis as Record<string, unknown>).ZeldaMakerToolkit, "public API installed on first use");
+  assert.ok(f.events.count("postupdate") === 1, "one frame listener");
+  assert.ok(f.keyboard.count() === 2, "keydown + keyup");
+
+  action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, npc: undefined, id: "e1", group: "g", overrides: "" }, ctx);
+  action("Zelda: Create Chest").execute({ id: "c1", position: { x: 100, y: 80 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }, ctx);
+  action("Zelda: Add Rule").execute({ id: "r", when: '{"enemiesDefeated":"g"}', then: '[{"setFlag":"won"}]', else: "", once: true }, ctx);
+  action("Zelda: Give Item").execute({ item: "bow", count: 1, silent: true }, ctx);
+  assert.equal(tk.session!.world.count("enemy"), 1);
+
+  // Calling Start Toolkit again on the same map must not create a second session.
+  const first = tk.session;
+  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "", config: "", language: "", debugHitboxes: false }, ctx);
+  assert.equal(tk.session, first);
+  assert.equal(f.events.count("postupdate"), 1);
+
+  // Simulate frames: PS Maker's scene emits postupdate with (time, delta).
+  for (let i = 0; i < 120; i++) f.events.emit("postupdate", i * 16, 16.6667);
+  f.keyboard.emit("keydown", { code: "KeyX" });
+  f.events.emit("postupdate", 0, 16.6667);
+  f.keyboard.emit("keyup", { code: "KeyX" });
+  for (let i = 0; i < 30; i++) f.events.emit("postupdate", 0, 16.6667);
+  action("Zelda: Defeat Enemy").execute({ id: "e1", group: "" }, ctx);
+  f.events.emit("postupdate", 0, 16.6667);
+  assert.equal(tk.state.flags.won, true);
+
+  // Map closes.
+  const busBefore = tk.bus.listenerCount();
+  f.events.emit("shutdown");
+  assert.equal(tk.session, null);
+  assert.equal(f.events.count(), baselineScene, "no scene listeners left");
+  assert.equal(f.keyboard.count(), 0, "no keyboard listeners left");
+  assert.equal(f.gameEvents.count(), 0, "no game listeners left");
+  assert.ok(tk.bus.listenerCount() < busBefore, "session bus listeners released");
+  assert.equal(tk.bus.listenerCount(), 0, "nothing left on the bus");
+  // Every object the toolkit created in the map scene was destroyed (HUD scene objects are reused).
+  assert.equal(tk.state.inventory.owned.includes("bow"), true, "progress survives map shutdown");
+  resetToolkitForTests();
+  delete (globalThis as Record<string, unknown>).ZeldaMakerToolkit;
+});
+
+test("stopping a session disposes views and leaves the player as found", () => {
+  const rig = createRig();
+  spawnEnemy(rig.session, "slime", 50, 50);
+  createObject(rig.session, "bush", 70, 70);
+  rig.session.player.lock("test");
+  rig.step(10);
+  rig.tk.stop("test");
+  assert.equal(rig.host.disposed, true);
+  assert.equal(rig.host.locked, false);
+  assert.equal(rig.host.blinkVisible, true);
+  assert.ok(rig.host.views.every((v) => v.destroyed), "all views destroyed");
+  assert.equal(rig.tk.bus.listenerCount(), 0);
+});
+
+for (const feature of FEATURE_IDS) {
+  test(`disabling "${feature}" does not break the other modules`, () => {
+    const rig = createRig({ features: { [feature]: false } });
+    rig.tk.inventory.give("bombs", 3, { silent: true });
+    rig.tk.inventory.give("boomerang", 1, { silent: true });
+    const p = rig.host.player!;
+    spawnEnemy(rig.session, "soldier", p.x + 40, p.y);
+    createObject(rig.session, "chest", p.x, p.y - 20, { id: "c", overrides: { contents: { item: "key", count: 1 } } });
+    createObject(rig.session, "bush", p.x + 20, p.y + 20);
+    rig.session.rules?.addRule({ id: "r", when: { flag: "x" }, then: [{ message: "hi" }] });
+    for (let i = 0; i < 300; i++) {
+      if (i % 40 === 0) rig.host.input.tap("sword");
+      if (i % 90 === 0) rig.host.input.tap("useItem");
+      if (i % 70 === 0) rig.host.input.tap("action");
+      if (i % 50 === 0) rig.host.input.tap("nextItem");
+      rig.host.walk(i % 2 ? 0.5 : -0.5, 0);
+      rig.step();
+    }
+    rig.tk.saves.save(undefined, { silent: true });
+    rig.tk.stop("end");
+    assert.deepEqual(errors(rig), [], "no errors logged");
+  });
+}
+
+test("events: handler errors are isolated and runaway recursion is cut", () => {
+  const rig = createRig();
+  let ok = 0;
+  rig.tk.bus.on("zelda:custom:x", () => {
+    throw new Error("boom");
+  });
+  rig.tk.bus.on("zelda:custom:x", () => ok++);
+  rig.tk.bus.emit("zelda:custom:x", {});
+  assert.equal(ok, 1);
+  const off = rig.tk.bus.on("zelda:custom:loop", () => rig.tk.bus.emit("zelda:custom:loop", {}));
+  rig.tk.bus.emit("zelda:custom:loop", {});
+  off();
+  assert.ok(errors(rig).some((e) => String(e[1]).includes("recursion")));
+});

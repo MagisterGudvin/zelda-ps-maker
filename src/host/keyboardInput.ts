@@ -1,0 +1,162 @@
+import type { ToolkitConfig } from "../core/config.ts";
+import { INPUT_ACTIONS, type InputAction, type InputSource } from "./types.ts";
+
+/** Minimal event-emitter surface (Phaser's KeyboardPlugin / Game events). */
+export interface EmitterLike {
+  on(event: string, fn: (...args: any[]) => void, context?: unknown): unknown;
+  off(event: string, fn: (...args: any[]) => void, context?: unknown): unknown;
+}
+
+export interface GamepadLike {
+  buttons: { pressed: boolean }[];
+}
+
+/**
+ * Normalizes a binding or a KeyboardEvent.code: "x" -> "KeyX", "5" -> "Digit5",
+ * "ShiftLeft"/"ShiftRight" -> "Shift" so either side matches.
+ */
+export function normalizeKey(code: string): string {
+  const c = code.trim();
+  if (/^[a-z]$/i.test(c)) return `Key${c.toUpperCase()}`;
+  if (/^[0-9]$/.test(c)) return `Digit${c}`;
+  const m = /^(Shift|Control|Alt|Meta)(Left|Right)$/.exec(c);
+  if (m) return m[1];
+  if (c.toLowerCase() === "space") return "Space";
+  if (c.toLowerCase() === "enter") return "Enter";
+  return c;
+}
+
+/**
+ * Listens to raw key events instead of creating Phaser Key objects, so the
+ * toolkit never steals or removes keys that PS Maker itself registered.
+ * Presses between two fixed ticks are latched and reported exactly once.
+ */
+export class KeyboardInput implements InputSource {
+  private readonly bindings = new Map<string, InputAction[]>();
+  private readonly down = new Set<string>();
+  private readonly pendingPress = new Set<string>();
+  private readonly pendingRelease = new Set<string>();
+  private readonly isDownMap = new Map<InputAction, boolean>();
+  private readonly pressedMap = new Map<InputAction, boolean>();
+  private readonly releasedMap = new Map<InputAction, boolean>();
+  private readonly padPrev = new Map<InputAction, boolean>();
+  private readonly keyboard: EmitterLike | null;
+  private readonly blurSource: EmitterLike | null;
+  private readonly getPad: () => GamepadLike | null;
+  private readonly config: ToolkitConfig;
+
+  private readonly onDown = (event: KeyboardEvent) => {
+    if (!event || typeof event.code !== "string") return;
+    const code = normalizeKey(event.code);
+    if (!this.down.has(code)) this.pendingPress.add(code);
+    this.down.add(code);
+  };
+
+  private readonly onUp = (event: KeyboardEvent) => {
+    if (!event || typeof event.code !== "string") return;
+    const code = normalizeKey(event.code);
+    this.down.delete(code);
+    this.pendingRelease.add(code);
+  };
+
+  private readonly onBlur = () => this.reset();
+
+  constructor(config: ToolkitConfig, keyboard: EmitterLike | null, blurSource: EmitterLike | null, getPad: () => GamepadLike | null) {
+    this.config = config;
+    this.keyboard = keyboard;
+    this.blurSource = blurSource;
+    this.getPad = getPad;
+    this.rebind();
+    keyboard?.on("keydown", this.onDown);
+    keyboard?.on("keyup", this.onUp);
+    blurSource?.on("blur", this.onBlur);
+  }
+
+  /** Rebuilds the key map from configuration (called on Configure). */
+  rebind(): void {
+    this.bindings.clear();
+    const c = this.config.controls;
+    const add = (action: InputAction, keys: string[]) => {
+      for (const k of keys) {
+        const code = normalizeKey(k);
+        const list = this.bindings.get(code) ?? [];
+        if (!list.includes(action)) list.push(action);
+        this.bindings.set(code, list);
+      }
+    };
+    add("sword", c.sword);
+    add("useItem", c.useItem);
+    add("shield", c.shield);
+    add("action", c.action);
+    add("nextItem", c.nextItem);
+    add("prevItem", c.prevItem);
+    add("inventory", c.inventory);
+    add("debug", [this.config.debug.toggleKey]);
+  }
+
+  latch(): void {
+    for (const a of INPUT_ACTIONS) {
+      this.isDownMap.set(a, false);
+      this.pressedMap.set(a, false);
+      this.releasedMap.set(a, false);
+    }
+    for (const code of this.down) for (const a of this.bindings.get(code) ?? []) this.isDownMap.set(a, true);
+    for (const code of this.pendingPress) for (const a of this.bindings.get(code) ?? []) this.pressedMap.set(a, true);
+    for (const code of this.pendingRelease) for (const a of this.bindings.get(code) ?? []) this.releasedMap.set(a, true);
+    this.pendingPress.clear();
+    this.pendingRelease.clear();
+    this.latchGamepad();
+  }
+
+  private latchGamepad(): void {
+    const g = this.config.controls.gamepad;
+    if (!g.enabled) return;
+    const pad = this.getPad();
+    if (!pad || !pad.buttons) return;
+    const map: [InputAction, number][] = [
+      ["sword", g.sword],
+      ["useItem", g.useItem],
+      ["shield", g.shield],
+      ["action", g.action],
+      ["nextItem", g.nextItem],
+      ["prevItem", g.prevItem],
+      ["inventory", g.inventory],
+    ];
+    for (const [action, index] of map) {
+      const now = !!pad.buttons[index]?.pressed;
+      const prev = this.padPrev.get(action) ?? false;
+      if (now) this.isDownMap.set(action, true);
+      if (now && !prev) this.pressedMap.set(action, true);
+      if (!now && prev) this.releasedMap.set(action, true);
+      this.padPrev.set(action, now);
+    }
+  }
+
+  isDown(action: InputAction): boolean {
+    return this.isDownMap.get(action) ?? false;
+  }
+
+  pressed(action: InputAction): boolean {
+    return this.pressedMap.get(action) ?? false;
+  }
+
+  released(action: InputAction): boolean {
+    return this.releasedMap.get(action) ?? false;
+  }
+
+  reset(): void {
+    this.down.clear();
+    this.pendingPress.clear();
+    this.pendingRelease.clear();
+    this.isDownMap.clear();
+    this.pressedMap.clear();
+    this.releasedMap.clear();
+  }
+
+  dispose(): void {
+    this.keyboard?.off("keydown", this.onDown);
+    this.keyboard?.off("keyup", this.onUp);
+    this.blurSource?.off("blur", this.onBlur);
+    this.reset();
+  }
+}
