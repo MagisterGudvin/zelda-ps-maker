@@ -1,0 +1,67 @@
+{
+  "_comment": "Ready-to-paste JSON for the PS Maker actions named in each section. Validated by tests/unit/examples.test.ts.",
+  "items": [
+    {
+      "id": "ice_rod",
+      "name": { "en": "Ice Rod", "ru": "Ледяной жезл" },
+      "description": { "en": "Freezes enemies for a moment.", "ru": "Ненадолго замораживает врагов." },
+      "icon": "icon_fire_rod",
+      "resource": "magic",
+      "cost": 4,
+      "cooldownMs": 400,
+      "effect": "projectile",
+      "projectile": { "damageType": "ice", "damage": 3, "stunMs": 1200, "speed": 180, "range": 150, "tint": 8965375 }
+    },
+    {
+      "id": "quake_medallion",
+      "name": { "en": "Quake Medallion", "ru": "Медальон землетрясения" },
+      "icon": "icon_generic",
+      "resource": "magic",
+      "cost": 16,
+      "cooldownMs": 1500,
+      "effect": "area",
+      "area": { "radius": 64, "damage": 4, "damageType": "magic", "knockback": 260, "stunMs": 800 }
+    },
+    {
+      "id": "red_potion",
+      "name": { "en": "Red Potion", "ru": "Красное зелье" },
+      "icon": "pickup_heart",
+      "effect": "heal",
+      "amount": 12
+    },
+    {
+      "id": "old_letter",
+      "name": { "en": "Old Letter", "ru": "Старое письмо" },
+      "description": { "en": "Show it to the elder.", "ru": "Покажите его старейшине." },
+      "icon": "icon_generic",
+      "effect": "none"
+    }
+  ],
+  "enemies": {
+    "fire_soldier": { "extends": "soldier", "hp": 6, "tint": 16737860, "resistances": { "fire": 0, "ice": 2 } },
+    "triple_spitter": { "extends": "spitter", "projectile": { "count": 3, "speed": 110 } },
+    "armored_slime": { "extends": "slime", "hp": 4, "resistances": { "sword": 0.5, "bomb": 2 }, "knockbackResist": 0.6 },
+    "watchman": { "extends": "sentry", "patrol": { "mode": "path", "points": [ { "x": 64, "y": 64 }, { "x": 192, "y": 64 }, { "x": 192, "y": 160 } ], "pauseMs": 300, "radius": 0, "chase": true } }
+  },
+  "rules": [
+    { "id": "torches_open_stairs", "when": { "switchOn": ["torch_1", "torch_2"] }, "then": [ { "reveal": "stairs" }, { "message": { "en": "A staircase appears.", "ru": "Появилась лестница." } } ] },
+    { "id": "room_cleared_chest", "when": { "enemiesDefeated": "room1" }, "then": [ { "reveal": "reward_chest" } ] },
+    { "id": "plate_holds_door", "when": { "switchOn": "plate_1" }, "then": [ { "openDoor": "door_1" } ], "else": [ { "closeDoor": "door_1" } ], "once": false },
+    { "id": "shop_bow", "when": { "all": [ { "flag": "talked_to_shopkeeper" }, { "hasItem": { "item": "rupees", "count": 80 } }, { "not": { "hasItem": "bow" } } ] }, "then": [ { "spendResource": { "id": "rupees", "count": 80 } }, { "giveItem": "bow" } ] }
+  ],
+  "waveRoom": {
+    "id": "arena",
+    "autoStart": false,
+    "lockDoors": ["arena_door"],
+    "waves": [
+      [ { "template": "slime", "x": 120, "y": 80 }, { "template": "slime", "x": 200, "y": 80 } ],
+      [ { "template": "fire_soldier", "x": 160, "y": 60 }, { "template": "triple_spitter", "x": 160, "y": 140 } ]
+    ],
+    "onCleared": [ { "reveal": "arena_chest" }, { "setFlag": "arena_done" } ]
+  },
+  "configs": {
+    "fastCombat": { "sword": { "damage": 3, "recoveryMs": 80, "lockUntilRecovered": false }, "shield": { "mode": "hold", "blocks": ["projectile", "arrow", "contact"] } },
+    "magicRegen": { "player": { "maxMagic": 64, "startMagic": 64, "magicRegenPerSecond": 2 } },
+    "tilesUnits": { "world": { "positionUnits": "tiles", "tileSize": 16 } }
+  }
+}

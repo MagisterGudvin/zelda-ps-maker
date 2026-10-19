@@ -55,7 +55,7 @@ test("switch sequence: wrong order resets, correct order solves and runs actions
   sw("s1");
   sw("s3");
   assert.equal(failed, 1);
-  assert.equal((rig.session.world.get("s1") as { objState: string }).objState, "off", "reset after mistake");
+  assert.equal((rig.session.world.get("s1") as unknown as { objState: string }).objState, "off", "reset after mistake");
   sw("s1");
   sw("s2");
   sw("s3");

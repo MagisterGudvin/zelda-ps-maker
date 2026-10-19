@@ -22,8 +22,6 @@ export interface ToolkitOptions {
  * event bus and extension registries. A `Session` is attached per map.
  */
 export class Toolkit {
-  static readonly VERSION = "0.1.0";
-
   readonly config: ToolkitConfig = createDefaultConfig();
   readonly logger: Logger;
   readonly bus: EventBus;

@@ -152,7 +152,7 @@ export class FakeHost implements HostAdapter {
     out.hh = this.player.hh;
     return true;
   }
-  readPlayerFacingHint(): Facing | null {
+  readPlayerFacingHint(_current: Facing): Facing | null {
     return this.facingHint;
   }
   movePlayerBy(dx: number, dy: number): void {

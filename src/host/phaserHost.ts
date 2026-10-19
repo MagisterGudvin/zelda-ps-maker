@@ -287,7 +287,12 @@ export class PhaserHost implements HostAdapter {
     return true;
   }
 
-  readPlayerFacingHint(): Facing | null {
+  readPlayerFacingHint(current: Facing): Facing | null {
+    if (this.cfg.player.facingFromInput) {
+      const fromKeys = this.input.directionHint(current);
+      if (fromKeys) return fromKeys;
+    }
+    if (!this.cfg.player.facingFromAnimation) return null;
     const key: string = this.player?.anims?.currentAnim?.key ?? "";
     const k = key.toLowerCase();
     if (k.includes("up")) return "up";

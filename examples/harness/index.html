@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zelda Maker Toolkit — Demo Harness</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #12121a; color: #e8e6f0; font: 14px/1.5 system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+      #game { margin: 12px 0; image-rendering: pixelated; }
+      .help { max-width: 820px; }
+      kbd { background: #2a2a3a; border-radius: 3px; padding: 0 4px; }
+      .warn { color: #ffcf70; }
+    </style>
+  </head>
+  <body>
+    <h1>Zelda Maker Toolkit — demo harness</h1>
+    <p class="help warn">This page emulates the PS Maker host (Phaser scene + Arcade player) to run the real plugin bundle. It is not PS Maker itself.</p>
+    <div id="game"></div>
+    <div class="help">
+      <p><kbd>←↑→↓</kbd>/<kbd>WASD</kbd> move · <kbd>X</kbd> sword (hold: spin) · <kbd>C</kbd> use item · <kbd>Q</kbd>/<kbd>E</kbd> switch item · <kbd>Z</kbd> lift / open / throw · <kbd>V</kbd> shield (hold mode) · <kbd>I</kbd> items · <kbd>F9</kbd> hitboxes · <kbd>F5</kbd> save · <kbd>F8</kbd> load · <kbd>F6</kbd> reset</p>
+      <p>Field: open chests (boomerang, bow, bombs), bomb the cracked wall (secret heart container), hit the switch behind the pits with the boomerang to open the gate. Dungeon: push the block onto the plate, take the key, open the locked door, survive the waves and beat the guardian.</p>
+    </div>
+    <script src="../../node_modules/phaser/dist/phaser.min.js"></script>
+    <script type="module" src="./host-emulator.js"></script>
+  </body>
+</html>

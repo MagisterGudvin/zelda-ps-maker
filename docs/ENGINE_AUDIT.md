@@ -166,3 +166,9 @@ PS Maker получает просто объект `export default { name, desc
 | U-6 | Порядок обновления контроллера игрока PS Maker | Toolkit работает в `postupdate`. |
 | U-7 | Какая версия Phaser в PS Maker | Используется только API Phaser 3, стабильный с 3.50; интеграционный тест — на Phaser 3.90.0. |
 | U-8 | Блокирует ли открытый диалог PS Maker обновление сцены | Действия `Zelda: Pause Combat` / `Zelda: Resume Combat`. |
+
+## 8. Проверка после реализации
+
+- Сборка официальным CLI проходит; бандл импортируется без побочных эффектов, `default` = `{ name, description, version, events, actions }`, 43 действия.
+- Работа адаптера Phaser (клавиатура через события `keydown/keyup`, синхронизация с Arcade Body в `postupdate`, коллизии по `staticBodies`, HUD-сцена, отписка на `shutdown`) подтверждена интеграционным тестом в Phaser 3.90.0 / Chromium через эмулятор хоста — см. [TESTING.md](TESTING.md).
+- Открытые вопросы U-1…U-8 остаются до проверки в самом PS Maker (ручные сценарии M-01…M-13 в TESTING.md).

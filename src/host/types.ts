@@ -13,8 +13,11 @@ export interface HostAdapter {
 
   /** Writes the player's hurtbox (body or sprite bounds) into `out`. False if no player. */
   readPlayerBox(out: AABB): boolean;
-  /** Optional facing hint from the host (e.g. current animation name). */
-  readPlayerFacingHint(): Facing | null;
+  /**
+   * Optional facing hint (held movement keys, animation name). `current` lets
+   * the host keep the current facing while two directions are held.
+   */
+  readPlayerFacingHint(current: Facing): Facing | null;
   /** Moves the player sprite by a delta; collision was already checked by the toolkit. */
   movePlayerBy(dx: number, dy: number): void;
   setPlayerPosition(x: number, y: number): void;

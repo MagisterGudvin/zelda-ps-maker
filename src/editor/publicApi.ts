@@ -7,6 +7,7 @@ import type { ActionHandler, ConditionHandler } from "../puzzles/ruleRegistry.ts
 import { spawnEnemy, type SpawnEnemyOptions } from "../enemies/spawn.ts";
 import { createObject, type CreateObjectOptions } from "../interactions/spawnObject.ts";
 import { changeHealth } from "../player/health.ts";
+import { TOOLKIT_VERSION } from "../core/version.ts";
 
 export const GLOBAL_KEY = "ZeldaMakerToolkit";
 
@@ -16,7 +17,7 @@ export const GLOBAL_KEY = "ZeldaMakerToolkit";
  */
 export function createPublicApi(tk: Toolkit) {
   return {
-    version: "0.1.0",
+    version: TOOLKIT_VERSION,
     get toolkit() {
       return tk;
     },
@@ -102,7 +103,7 @@ export type ZeldaMakerToolkitApi = ReturnType<typeof createPublicApi>;
 export function installPublicApi(tk: Toolkit): void {
   const g = globalThis as Record<string, unknown>;
   const existing = g[GLOBAL_KEY] as { version?: string } | undefined;
-  if (existing && existing.version !== "0.1.0") {
+  if (existing && existing.version !== TOOLKIT_VERSION) {
     tk.logger.warn(`globalThis.${GLOBAL_KEY} already defined by version ${existing.version}; not overriding.`);
     return;
   }

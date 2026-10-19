@@ -156,3 +156,18 @@ test("math helpers", () => {
   h.query({ x: 0, y: 0, hw: 30, hh: 30 }, res);
   assert.equal(res.length, 1, "multi-cell items are returned once");
 });
+
+test("held movement keys give a facing hint (facing a wall without moving)", () => {
+  const kb = new FakeEmitter();
+  const input = new KeyboardInput(createDefaultConfig(), kb, null, () => null);
+  assert.equal(input.directionHint("down"), null);
+  kb.emit("keydown", { code: "ArrowUp" });
+  assert.equal(input.directionHint("down"), "up");
+  kb.emit("keydown", { code: "KeyD" });
+  assert.equal(input.directionHint("up"), "up", "keeps the current facing while it is still held");
+  assert.equal(input.directionHint("down"), "right", "otherwise the latest direction");
+  kb.emit("keyup", { code: "ArrowUp" });
+  kb.emit("keyup", { code: "KeyD" });
+  assert.equal(input.directionHint("right"), null);
+  input.dispose();
+});

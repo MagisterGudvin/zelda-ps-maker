@@ -155,12 +155,10 @@ export class PlayerSystem implements SessionSystem, Damageable {
 
   private updateFacing(): void {
     if (this.facingLocked) return;
-    if (this.s.config.player.facingFromAnimation) {
-      const hint = this.s.host.readPlayerFacingHint();
-      if (hint) {
-        this.facing = hint;
-        return;
-      }
+    const hint = this.s.host.readPlayerFacingHint(this.facing);
+    if (hint) {
+      this.facing = hint;
+      return;
     }
     if (!this.hasPrev || this.knockMs > 0) return;
     this.facing = facingFromVector(this.box.x - this.prevX, this.box.y - this.prevY, this.facing);

@@ -35,7 +35,8 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   const f = createFakeScene();
   const ctx = { game: f.game, scene: f.scene, player: f.player };
-  const action = (name: string) => plugin.events.find((e: { name: string }) => e.name === name)!;
+  type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
+  const action = (name: string) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!;
   const baselineScene = f.events.count();
 
   action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "alttp", config: '{"debug":{"logLevel":"silent"}}', language: "ru", debugHitboxes: true }, ctx);
@@ -134,4 +135,19 @@ test("events: handler errors are isolated and runaway recursion is cut", () => {
   rig.tk.bus.emit("zelda:custom:loop", {});
   off();
   assert.ok(errors(rig).some((e) => String(e[1]).includes("recursion")));
+});
+
+test("pausing combat freezes enemies and sword input", () => {
+  const rig = createRig();
+  const p = rig.host.player!;
+  const e = spawnEnemy(rig.session, "soldier", p.x + 50, p.y)!;
+  rig.session.setPaused("script", true);
+  const x0 = e.x;
+  rig.host.input.tap("sword");
+  rig.run(1000);
+  assert.equal(e.x, x0);
+  assert.equal(rig.session.sword!.phase, "idle");
+  rig.session.setPaused("script", false);
+  rig.run(1000);
+  assert.notEqual(e.x, x0);
 });

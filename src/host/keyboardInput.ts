@@ -1,5 +1,6 @@
 import type { ToolkitConfig } from "../core/config.ts";
 import { INPUT_ACTIONS, type InputAction, type InputSource } from "./types.ts";
+import type { Facing } from "../core/math.ts";
 
 /** Minimal event-emitter surface (Phaser's KeyboardPlugin / Game events). */
 export interface EmitterLike {
@@ -33,6 +34,9 @@ export function normalizeKey(code: string): string {
  */
 export class KeyboardInput implements InputSource {
   private readonly bindings = new Map<string, InputAction[]>();
+  private readonly moveKeys = new Map<string, Facing>();
+  /** Held movement directions, most recent last. */
+  private readonly heldDirs: Facing[] = [];
   private readonly down = new Set<string>();
   private readonly pendingPress = new Set<string>();
   private readonly pendingRelease = new Set<string>();
@@ -48,7 +52,15 @@ export class KeyboardInput implements InputSource {
   private readonly onDown = (event: KeyboardEvent) => {
     if (!event || typeof event.code !== "string") return;
     const code = normalizeKey(event.code);
-    if (!this.down.has(code)) this.pendingPress.add(code);
+    if (!this.down.has(code)) {
+      this.pendingPress.add(code);
+      const dir = this.moveKeys.get(code);
+      if (dir) {
+        const i = this.heldDirs.indexOf(dir);
+        if (i >= 0) this.heldDirs.splice(i, 1);
+        this.heldDirs.push(dir);
+      }
+    }
     this.down.add(code);
   };
 
@@ -57,7 +69,14 @@ export class KeyboardInput implements InputSource {
     const code = normalizeKey(event.code);
     this.down.delete(code);
     this.pendingRelease.add(code);
+    const dir = this.moveKeys.get(code);
+    if (dir && !this.isDirHeld(dir)) this.heldDirs.splice(this.heldDirs.indexOf(dir), 1);
   };
+
+  private isDirHeld(dir: Facing): boolean {
+    for (const [code, d] of this.moveKeys) if (d === dir && this.down.has(code)) return true;
+    return false;
+  }
 
   private readonly onBlur = () => this.reset();
 
@@ -92,6 +111,21 @@ export class KeyboardInput implements InputSource {
     add("prevItem", c.prevItem);
     add("inventory", c.inventory);
     add("debug", [this.config.debug.toggleKey]);
+    this.moveKeys.clear();
+    const m = c.move;
+    for (const [dir, keys] of [["up", m.up], ["down", m.down], ["left", m.left], ["right", m.right]] as [Facing, string[]][]) {
+      for (const k of keys) this.moveKeys.set(normalizeKey(k), dir);
+    }
+  }
+
+  /**
+   * Facing from held movement keys: keeps `current` while it is still held
+   * (diagonal strafing), otherwise the most recently pressed direction.
+   */
+  directionHint(current: Facing): Facing | null {
+    if (this.heldDirs.length === 0) return null;
+    if (this.heldDirs.includes(current)) return current;
+    return this.heldDirs[this.heldDirs.length - 1];
   }
 
   latch(): void {
@@ -145,6 +179,7 @@ export class KeyboardInput implements InputSource {
   }
 
   reset(): void {
+    this.heldDirs.length = 0;
     this.down.clear();
     this.pendingPress.clear();
     this.pendingRelease.clear();

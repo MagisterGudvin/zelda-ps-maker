@@ -1,6 +1,7 @@
 import type { Toolkit } from "../core/toolkit.ts";
 import { createDefaultState, createDungeonProgress, type DungeonProgress, type GameState } from "../core/state.ts";
 import type { FlagValue } from "../core/events.ts";
+import { TOOLKIT_VERSION } from "../core/version.ts";
 
 /** Storage backend (localStorage in the browser, a Map in tests). */
 export interface SaveStorage {
@@ -85,7 +86,7 @@ export class SaveManager {
       format: SAVE_FORMAT,
       version: SAVE_VERSION,
       savedAt: new Date().toISOString(),
-      toolkitVersion: "0.1.0",
+      toolkitVersion: TOOLKIT_VERSION,
       state: this.tk.state,
     };
     return JSON.stringify(env);

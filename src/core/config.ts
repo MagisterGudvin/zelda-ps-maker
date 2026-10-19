@@ -40,6 +40,8 @@ export interface ToolkitConfig {
     nextItem: string[];
     prevItem: string[];
     inventory: string[];
+    /** Movement keys of the PS Maker controller, read only as a facing hint. */
+    move: { up: string[]; down: string[]; left: string[]; right: string[] };
     gamepad: {
       enabled: boolean;
       sword: number;
@@ -64,6 +66,8 @@ export interface ToolkitConfig {
     hurtboxInset: number;
     lockMovementWhileAttacking: boolean;
     lockMovementWhileUsingItem: boolean;
+    /** Turn toward held movement keys even when blocked by a wall. */
+    facingFromInput: boolean;
     facingFromAnimation: boolean;
     deathBehavior: "respawn" | "none";
     respawnDelayMs: number;
@@ -232,6 +236,7 @@ export function createDefaultConfig(): ToolkitConfig {
       nextItem: ["KeyE"],
       prevItem: ["KeyQ"],
       inventory: ["KeyI"],
+      move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
       gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9 },
     },
     player: {
@@ -245,6 +250,7 @@ export function createDefaultConfig(): ToolkitConfig {
       hurtboxInset: 2,
       lockMovementWhileAttacking: true,
       lockMovementWhileUsingItem: true,
+      facingFromInput: true,
       facingFromAnimation: false,
       deathBehavior: "respawn",
       respawnDelayMs: 1200,

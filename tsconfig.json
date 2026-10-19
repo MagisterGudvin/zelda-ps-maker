@@ -16,6 +16,7 @@
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    "allowJs": true,
     "types": ["node"]
   },
   "include": ["src/**/*", "locales/**/*", "tests/**/*.ts"],
