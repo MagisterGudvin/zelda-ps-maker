@@ -4,6 +4,7 @@ import { type AABB, boxCircleOverlap, type Facing, makeBox } from "../core/math.
 import type { EntityView } from "../host/types.ts";
 import type { DamageType, HitResult } from "../core/types.ts";
 import { AttackInstance, isDamageable, makeDamage, resolveHit } from "./combat.ts";
+import { buildOverlay } from "../player/overlay.ts";
 
 export type SwordPhase = "idle" | "windup" | "active" | "recovery" | "charging" | "spin";
 
@@ -31,6 +32,8 @@ export class SwordSystem implements SessionSystem {
   private view: EntityView | null = null;
   private angle = 0;
   private readonly targets: Entity[] = [];
+  /** Time since the swing started (drives attack animations across phases). */
+  private swingMs = 0;
 
   constructor(session: Session) {
     this.s = session;
@@ -67,6 +70,7 @@ export class SwordSystem implements SessionSystem {
     }
     const input = this.s.host.input;
     this.phaseMs += dtMs;
+    this.swingMs += dtMs;
 
     switch (this.phase) {
       case "idle":
@@ -113,6 +117,7 @@ export class SwordSystem implements SessionSystem {
 
   startSwing(): void {
     const p = this.s.player;
+    this.swingMs = 0;
     p.facingLocked = true;
     if (this.s.config.player.lockMovementWhileAttacking) p.lock("sword");
     this.attack.begin(this.cfg.maxHitsPerTarget);
@@ -157,13 +162,22 @@ export class SwordSystem implements SessionSystem {
     this.placeHitbox(this.angle, length, width);
   }
 
-  private placeHitbox(angle: number, length: number, width: number): void {
+  /**
+   * Distance from the pivot to the edge of the character's body along `angle`.
+   * The blade starts there in every phase, so it never drifts toward the player.
+   */
+  private edge(angle: number): number {
     const p = this.s.player.box;
+    return Math.abs(Math.cos(angle)) * p.hw + Math.abs(Math.sin(angle)) * p.hh;
+  }
+
+  private placeHitbox(angle: number, length: number, width: number): void {
+    const pl = this.s.player;
     const c = Math.abs(Math.cos(angle));
     const sn = Math.abs(Math.sin(angle));
-    const reach = c * p.hw + sn * p.hh + length / 2;
-    this.hitbox.x = p.x + Math.cos(angle) * reach;
-    this.hitbox.y = p.y + Math.sin(angle) * reach;
+    const reach = this.edge(angle) + length / 2;
+    this.hitbox.x = pl.pivotX + Math.cos(angle) * reach;
+    this.hitbox.y = pl.pivotY + Math.sin(angle) * reach;
     this.hitbox.hw = (c * length + sn * width) / 2;
     this.hitbox.hh = (sn * length + c * width) / 2;
     this.hitboxActive = true;
@@ -177,11 +191,11 @@ export class SwordSystem implements SessionSystem {
   }
 
   private updateSpin(): void {
-    const p = this.s.player.box;
+    const pl = this.s.player;
     const r = this.cfg.charge.spinRadius;
     this.spinRadius = r;
-    this.hitbox.x = p.x;
-    this.hitbox.y = p.y;
+    this.hitbox.x = pl.pivotX;
+    this.hitbox.y = pl.pivotY;
     this.hitbox.hw = r;
     this.hitbox.hh = r;
     this.hitboxActive = true;
@@ -192,6 +206,7 @@ export class SwordSystem implements SessionSystem {
   /** Returns true when at least one target took the hit or blocked it. */
   private hitTargets(attack: AttackInstance, amount: number, type: DamageType, circle: boolean): boolean {
     const p = this.s.player.box;
+    const pl = this.s.player;
     const found = this.targets;
     found.length = 0;
     this.s.world.query(this.hitbox, found, isDamageable);
@@ -199,7 +214,7 @@ export class SwordSystem implements SessionSystem {
     for (let i = 0; i < found.length; i++) {
       const target = found[i];
       if (!isDamageable(target)) continue;
-      if (circle && !boxCircleOverlap(target, p.x, p.y, this.spinRadius)) continue;
+      if (circle && !boxCircleOverlap(target, pl.pivotX, pl.pivotY, this.spinRadius)) continue;
       const info = makeDamage({
         amount,
         type,
@@ -234,26 +249,55 @@ export class SwordSystem implements SessionSystem {
     this.view?.setVisible(false);
   }
 
+  /** Built-in blade unless an attack animation replaces it (sword.showBlade). */
+  private bladeVisible(): boolean {
+    const mode = this.cfg.showBlade;
+    if (mode !== "auto") return mode === "always";
+    const sp = this.s.config.player.sprites;
+    return !(sp.attack || sp.weaponAttack) || !this.s.config.sprites.animations[sp.attack || sp.weaponAttack];
+  }
+
   private updateView(): void {
-    if (this.phase === "idle" || this.phase === "windup") {
+    this.requestAnimation();
+    if (this.phase === "idle" || this.phase === "windup" || !this.bladeVisible()) {
       this.view?.setVisible(false);
       return;
     }
-    if (!this.view) this.view = this.s.host.renderer.createView({ sprite: "sword", layer: 1 });
-    const p = this.s.player.box;
+    // The blade sprite (16px) has its hilt at the origin and is stretched to the hitbox length.
+    if (!this.view) this.view = this.s.host.renderer.createView({ sprite: "sword", layer: 1, originX: 0, originY: 0.5 });
+    const pl = this.s.player;
     let angle = this.angle;
-    let dist = this.cfg.range * 0.5 + Math.max(p.hw, p.hh);
+    let length = this.cfg.range;
     if (this.phase === "charging") {
-      angle = FACING_ANGLE[this.s.player.facing];
-      dist = Math.max(p.hw, p.hh) + this.cfg.range * 0.3;
+      angle = FACING_ANGLE[pl.facing];
       this.view.setTint(this.charged && Math.floor(this.phaseMs / 80) % 2 === 0 ? 0x88ccff : null);
     } else {
       this.view.setTint(null);
     }
-    if (this.phase === "spin") dist = this.cfg.charge.spinRadius * 0.6;
+    const start = this.edge(angle);
+    if (this.phase === "spin") length = Math.max(8, this.cfg.charge.spinRadius - start);
     this.view.setVisible(true);
     this.view.setRotation(angle);
-    this.view.setPosition(p.x + Math.cos(angle) * dist, p.y + Math.sin(angle) * dist);
+    this.view.setScale(length / 16);
+    this.view.setPosition(pl.pivotX + Math.cos(angle) * start, pl.pivotY + Math.sin(angle) * start);
+  }
+
+  /** Attack/spin/charge animations from author sprite sheets (config.player.sprites). */
+  private requestAnimation(): void {
+    if (this.phase === "idle") return;
+    const sp = this.s.config.player.sprites;
+    const facing = this.s.player.facing;
+    const c = this.cfg;
+    let layers = null;
+    if (this.phase === "windup" || this.phase === "active" || this.phase === "recovery") {
+      layers = buildOverlay(this.s.config, sp.attack, sp.weaponAttack, facing, this.swingMs, c.windupMs + c.activeMs + c.recoveryMs);
+    } else if (this.phase === "spin") {
+      layers = buildOverlay(this.s.config, sp.spin || sp.attack, sp.weaponSpin || sp.weaponAttack, facing, this.phaseMs, c.charge.spinMs);
+    } else if (this.phase === "charging") {
+      // Without a charge animation, hold the last frame of the attack (sword pointed forward).
+      layers = sp.charge || sp.weaponCharge ? buildOverlay(this.s.config, sp.charge, sp.weaponCharge, facing, this.phaseMs) : buildOverlay(this.s.config, sp.attack, sp.weaponAttack, facing, 1e9, 1);
+    }
+    this.s.player.requestOverlay(2, layers);
   }
 
   dispose(): void {

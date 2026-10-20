@@ -160,6 +160,7 @@ export class Session {
     if (!this.isPaused()) {
       for (let i = 0; i < this.systems.length; i++) this.systems[i].tick(dtMs);
       this.tickEntities(dtMs);
+      this.player.flushOverlay();
       this.dungeons?.tick(dtMs);
       this.rules?.tick(dtMs);
       this.world.flush();

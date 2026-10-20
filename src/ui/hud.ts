@@ -1,14 +1,15 @@
 import type { Session } from "../core/session.ts";
 import type { HudItemSlot, HudModel } from "../host/types.ts";
+import { digitsFor } from "./hudLayout.ts";
 
 const MAX_MESSAGES = 3;
 
 const COUNTER_ICONS: Record<string, string> = {
-  rupees: "pickup_rupee",
-  bombs: "pickup_bomb",
-  arrows: "pickup_arrow",
-  keys: "pickup_key",
-  magic: "pickup_magic",
+  rupees: "hud_rupee",
+  bombs: "hud_bomb",
+  arrows: "hud_arrow",
+  keys: "hud_key",
+  magic: "hud_magic",
 };
 
 /**
@@ -72,12 +73,17 @@ export class HudSystem {
         selected: id === activeId,
       };
     };
-    const counters = ui.counters.map((id) => ({
-      id,
-      label: s.i18n.t(`resource.${id}`),
-      icon: COUNTER_ICONS[id] ?? `icon_${id}`,
-      value: inv.count(id === "keys" ? "key" : id),
-    }));
+    const counters = ui.counters.map((id) => {
+      const key = id === "keys" ? "key" : id;
+      const max = id === "keys" ? 9 : inv.capacity(key);
+      return {
+        id,
+        label: s.i18n.t(`resource.${id}`),
+        icon: COUNTER_ICONS[id] ?? `icon_${id}`,
+        value: inv.count(key),
+        digits: Math.min(4, digitsFor(max === 9999 ? 99 : max)),
+      };
+    });
     return {
       visible: true,
       hp: st.player.hp,
@@ -95,8 +101,10 @@ export class HudSystem {
       inventory: open ? [...st.inventory.owned.filter((id) => s.toolkit.items.has(id)).map(slot)] : [],
       dead: s.player.isDead,
       deathText: s.i18n.t("hud.dead"),
-      position: ui.position,
+      lifeLabel: s.i18n.t("hud.life"),
+      position: ui.position.startsWith("bottom") ? "bottom" : "top",
       scale: ui.scale,
+      safeArea: { ...ui.safeArea },
       fontFamily: ui.fontFamily,
     };
   }

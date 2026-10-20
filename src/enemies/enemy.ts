@@ -9,6 +9,7 @@ import { spawnEffect } from "../items/effect.ts";
 import { Projectile } from "../items/projectile.ts";
 import type { EnemyConfig } from "./templates.ts";
 import { BEHAVIORS } from "./behaviors.ts";
+import { animFrame } from "../core/animation.ts";
 
 export type EnemyState = "idle" | "patrol" | "alert" | "chase" | "windup" | "attack" | "recover" | "hurt" | "stunned" | "dead";
 
@@ -72,7 +73,16 @@ export class Enemy extends Entity implements Damageable {
     this.slot = session.world.count("enemy");
     this.persistentKey = opts.persistent ? objectKey(session.mapId, id) : null;
     this.adopted = opts.adopt !== undefined && opts.adopt !== null;
-    this.view = session.host.renderer.createView({ sprite: cfg.sprite, adopt: opts.adopt, width: cfg.width, height: cfg.height, tint: cfg.tint ?? undefined });
+    this.view = session.host.renderer.createView({
+      sprite: cfg.sprite,
+      adopt: opts.adopt,
+      width: cfg.width,
+      height: cfg.height,
+      tint: cfg.tint ?? undefined,
+      scale: cfg.spriteScale !== 1 ? cfg.spriteScale : undefined,
+      offsetX: cfg.spriteOffsetX,
+      offsetY: cfg.spriteOffsetY,
+    });
     this.state = cfg.behavior === "patroller" ? "patrol" : "idle";
   }
 
@@ -95,6 +105,7 @@ export class Enemy extends Entity implements Damageable {
     if (this.state === "dead") {
       this.fadeMs -= dtMs;
       this.view?.setAlpha(Math.max(0, this.fadeMs / s.config.enemies.deathFadeMs));
+      if (!this.adopted) this.updateAnimation();
       if (this.fadeMs <= 0) s.world.remove(this);
       return;
     }
@@ -291,7 +302,48 @@ export class Enemy extends Entity implements Damageable {
       this.tintState = tint;
       this.view?.setTint(tint);
     }
-    if (!this.adopted) this.view?.setFlipX(this.facing === "left");
+    if (!this.adopted && !this.updateAnimation()) this.view?.setFlipX(this.facing === "left");
+  }
+
+  private animMs = 0;
+  private animName = "";
+  private lastX = 0;
+  private lastY = 0;
+
+  /** Picks the sprite-sheet animation for the current state; false when none is configured. */
+  private updateAnimation(): boolean {
+    const a = this.cfg.animations;
+    const moved = Math.abs(this.x - this.lastX) + Math.abs(this.y - this.lastY) > 0.01;
+    this.lastX = this.x;
+    this.lastY = this.y;
+    let name = "";
+    switch (this.state) {
+      case "dead":
+        name = a.death || a.hurt;
+        break;
+      case "hurt":
+      case "stunned":
+        name = a.hurt || a.idle;
+        break;
+      case "windup":
+        name = a.windup || a.attack;
+        break;
+      case "attack":
+        name = a.attack || a.walk;
+        break;
+      default:
+        name = moved ? a.walk || a.idle : a.idle || a.walk;
+    }
+    const def = name ? this.session.config.sprites.animations[name] : undefined;
+    if (!def) return false;
+    if (name !== this.animName) {
+      this.animName = name;
+      this.animMs = 0;
+    }
+    this.animMs += 1000 / this.session.config.world.fixedStepHz;
+    const f = animFrame({ ...def, loop: def.loop ?? (this.state !== "dead" && this.state !== "windup") }, this.facing, this.animMs);
+    if (f) this.view?.setAnimFrame(f.sheet, f.frame, f.flipX);
+    return !!f;
   }
 
   override dispose(): void {

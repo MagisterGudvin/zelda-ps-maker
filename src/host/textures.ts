@@ -42,6 +42,51 @@ function outline(c: Ctx, x: number, y: number, w: number, h: number, color: stri
   c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
+/** Draws a pixel grid: each char maps to a palette color ("." = transparent). */
+function grid(c: Ctx, rows: string[], palette: Record<string, string>): void {
+  for (let y = 0; y < rows.length; y++) {
+    for (let x = 0; x < rows[y].length; x++) {
+      const color = palette[rows[y][x]];
+      if (color) rect(c, x, y, 1, 1, color);
+    }
+  }
+}
+
+/** 4x6 digit glyphs; drawn white with a 1px dark outline into a 6x8 cell. */
+const DIGITS: string[][] = [
+  ["####", "#..#", "#..#", "#..#", "#..#", "####"],
+  [".##.", "###.", ".##.", ".##.", ".##.", "####"],
+  ["####", "...#", "####", "#...", "#...", "####"],
+  ["####", "...#", ".###", "...#", "...#", "####"],
+  ["#..#", "#..#", "####", "...#", "...#", "...#"],
+  ["####", "#...", "####", "...#", "...#", "####"],
+  ["####", "#...", "####", "#..#", "#..#", "####"],
+  ["####", "...#", "..#.", ".#..", ".#..", ".#.."],
+  ["####", "#..#", "####", "#..#", "#..#", "####"],
+  ["####", "#..#", "####", "...#", "...#", "####"],
+];
+
+function digit(c: Ctx, n: number): void {
+  const g = DIGITS[n];
+  for (let y = 0; y < g.length; y++) for (let x = 0; x < 4; x++) if (g[y][x] === "#") rect(c, x, y, 3, 3, "#101018");
+  for (let y = 0; y < g.length; y++) for (let x = 0; x < 4; x++) if (g[y][x] === "#") rect(c, x + 1, y + 1, 1, 1, "#ffffff");
+}
+
+const HEART8 = [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."];
+
+function heart8(c: Ctx, part: number): void {
+  const at = (x: number, y: number) => HEART8[y]?.[x] === "#";
+  for (let y = 0; y < HEART8.length; y++) {
+    for (let x = 0; x < 7; x++) {
+      if (!at(x, y)) continue;
+      const edge = !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1);
+      const filled = part >= 1 || (part > 0 && x <= 3);
+      rect(c, x, y, 1, 1, edge ? "#200810" : filled ? "#e8303c" : "#4a3038");
+    }
+  }
+  if (part > 0) rect(c, 1, 1, 1, 1, "#ffb8c0");
+}
+
 function heart(c: Ctx, fill: string, part: number): void {
   // part: 1 = full, 0.5 = half, 0 = empty (outline only)
   const shape = [1, 3, 3, 1, 5, 1, 7, 3, 9, 1, 11, 1, 13, 3, 13, 6, 7, 13, 1, 6];
@@ -352,6 +397,15 @@ const DEFS: Record<string, SpriteDef> = {
   hud_heart_empty: { w: 14, h: 14, paint: (c) => heart(c, "#e8323c", 0) },
   hud_slot: { w: 20, h: 20, paint: (c) => (rect(c, 0, 0, 20, 20, "#f0e6c8"), rect(c, 2, 2, 16, 16, "#1c1c2a")) },
   pixel: { w: 1, h: 1, paint: (c) => rect(c, 0, 0, 1, 1, "#ffffff") },
+  hud_heart8_full: { w: 7, h: 7, paint: (c) => heart8(c, 1) },
+  hud_heart8_half: { w: 7, h: 7, paint: (c) => heart8(c, 0.5) },
+  hud_heart8_empty: { w: 7, h: 7, paint: (c) => heart8(c, 0) },
+  hud_rupee: { w: 8, h: 8, paint: (c) => grid(c, ["...o....", "..ogo...", ".oggGo..", ".ogGGo..", ".ogGGo..", ".oGGgo..", "..oGo...", "...o...."], { o: "#0a2a10", g: "#7cf09a", G: "#22a040" }) },
+  hud_bomb: { w: 8, h: 8, paint: (c) => grid(c, [".....y..", "....o...", "..oooo..", ".obbbbo.", ".obwbbo.", ".obbbbo.", ".obbbbo.", "..oooo.."], { o: "#05050c", b: "#2a3060", w: "#a0b0ff", y: "#ffb030" }) },
+  hud_arrow: { w: 8, h: 8, paint: (c) => grid(c, [".......w", "......ww", ".....bw.", "....b...", "...b....", "f.b.....", ".f......", "f.f....."], { w: "#e0e8f0", b: "#a06830", f: "#f0f0f0" }) },
+  hud_key: { w: 8, h: 8, paint: (c) => grid(c, ["..yyy...", ".y...y..", ".y...y..", "..yyy...", "...y....", "...yy...", "...y....", "...yy..."], { y: "#f0c030" }) },
+  hud_magic: { w: 8, h: 8, paint: (c) => grid(c, ["..bb....", "...b....", ".oooo...", "oggggo..", "oggggo..", "oggggo..", ".oooo...", "........"], { o: "#062010", g: "#3ad16b", b: "#a07040" }) },
+  ...Object.fromEntries(DIGITS.map((_, n) => [`hud_digit_${n}`, { w: 6, h: 8, paint: (c: Ctx) => digit(c, n) }])),
 };
 
 export function builtinSpriteIds(): string[] {

@@ -90,6 +90,8 @@ test("param resolvers accept the plausible PS Maker shapes", () => {
   assert.deepEqual(resolvePosition([1, 2], cfg), { x: 1, y: 2 });
   assert.deepEqual(resolvePosition("3, 4", cfg), { x: 3, y: 4 });
   assert.equal(resolvePosition(undefined, cfg), null);
+  assert.deepEqual(resolvePosition({ X: "60", Y: "64" }, cfg), { x: 60, y: 64 });
+  assert.deepEqual(resolvePosition({ value: { x: 5, y: 6 } }, cfg), { x: 5, y: 6 });
   cfg.world.positionUnits = "tiles";
   assert.deepEqual(resolvePosition({ x: 2, y: 3 }, cfg), { x: 40, y: 56 });
   const npc = { name: "guard_1", x: 5, y: 6, setVisible() {} };

@@ -72,6 +72,7 @@ export class Toolkit {
     this.updateDomBridge();
     this.session?.hud?.markDirty();
     this.session?.debug?.setEnabled(this.config.debug.hitboxes);
+    if (this.session?.debug && this.session.debug.diagnosticsOn !== this.config.debug.diagnostics) this.session.debug.setDiagnostics(this.config.debug.diagnostics);
   }
 
   private updateDomBridge(): void {

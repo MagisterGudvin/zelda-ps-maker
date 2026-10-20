@@ -26,6 +26,7 @@ export function createObject(s: Session, type: string, x: number, y: number, opt
     return null;
   }
   const cfg = resolveObjectConfig(type, opts.overrides);
+  s.logger.info(`Object "${id}" (${type}) created at ${Math.round(x)}, ${Math.round(y)}.`);
   return s.world.add(new Interactable(s, id, cfg, x, y, explicit));
 }
 

@@ -169,6 +169,6 @@ PS Maker получает просто объект `export default { name, desc
 
 ## 8. Проверка после реализации
 
-- Сборка официальным CLI проходит; бандл импортируется без побочных эффектов, `default` = `{ name, description, version, events, actions }`, 45 действий.
+- Сборка официальным CLI проходит; бандл импортируется без побочных эффектов, `default` = `{ name, description, version, events, actions }`, 50 действий.
 - Работа адаптера Phaser (клавиатура через события `keydown/keyup`, синхронизация с Arcade Body в `postupdate`, коллизии по `staticBodies`, HUD-сцена, отписка на `shutdown`) подтверждена интеграционным тестом в Phaser 3.90.0 / Chromium через эмулятор хоста — см. [TESTING.md](TESTING.md).
 - Открытые вопросы U-1…U-8 остаются до проверки в самом PS Maker (ручные сценарии M-01…M-13 в TESTING.md).

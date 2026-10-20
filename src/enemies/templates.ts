@@ -65,6 +65,12 @@ export interface EnemyConfig {
   persistent: boolean;
   /** Extra tags for author rules. */
   tags: string[];
+  /** Animation ids from config.sprites per state (empty = built-in sprite). */
+  animations: { idle: string; walk: string; windup: string; attack: string; hurt: string; death: string };
+  /** Sprite drawing relative to the hitbox (e.g. 64x64 frames whose feet sit low). */
+  spriteScale: number;
+  spriteOffsetX: number;
+  spriteOffsetY: number;
 }
 
 const BASE: EnemyConfig = {
@@ -100,6 +106,10 @@ const BASE: EnemyConfig = {
   boss: false,
   persistent: false,
   tags: [],
+  animations: { idle: "", walk: "", windup: "", attack: "", hurt: "", death: "" },
+  spriteScale: 1,
+  spriteOffsetX: 0,
+  spriteOffsetY: 0,
 };
 
 /** Original placeholder enemy set (names and art are not Nintendo assets). */
@@ -207,7 +217,7 @@ function cloneBase(): EnemyConfig {
   return JSON.parse(JSON.stringify(BASE)) as EnemyConfig;
 }
 
-const NESTED: (keyof EnemyConfig)[] = ["projectile", "patrol", "guard", "resistances"];
+const NESTED: (keyof EnemyConfig)[] = ["projectile", "patrol", "guard", "resistances", "animations"];
 
 function mergeEnemy(target: EnemyConfig, patch: Partial<EnemyConfig>): EnemyConfig {
   for (const [k, v] of Object.entries(patch) as [keyof EnemyConfig, unknown][]) {

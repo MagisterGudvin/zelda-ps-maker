@@ -12,6 +12,12 @@ import { MAPS } from "./demo-maps.js";
 
 const Phaser = window.Phaser;
 const SPEED = 90;
+// ?w=1980&h=1475&mapZoom=6 emulates a large PS Maker window (camera zoom on the map).
+const Q = new URLSearchParams(location.search);
+const GAME_W = Number(Q.get("w") ?? 400);
+const GAME_H = Number(Q.get("h") ?? 240);
+const MAP_ZOOM = Number(Q.get("mapZoom") ?? 1);
+const CANVAS_ZOOM = Number(Q.get("zoom") ?? 2);
 
 function action(name) {
   const ev = plugin.events.find((e) => e.name === name);
@@ -84,7 +90,9 @@ class GameMap extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys("W,A,S,D");
-    this.cameras.main.setBounds(0, 0, map.size.w, map.size.h);
+    this.cameras.main.setZoom(MAP_ZOOM);
+    this.cameras.main.startFollow(this.player, true);
+    if (MAP_ZOOM === 1) this.cameras.main.setBounds(0, 0, map.size.w, map.size.h);
 
     // PS Maker runs the map's On-load events after the map is built.
     for (const [name, params] of map.onLoad) action(name).execute(params, this.ctx());
@@ -131,9 +139,9 @@ class GameMap extends Phaser.Scene {
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game",
-  width: 400,
-  height: 240,
-  zoom: 2,
+  width: GAME_W,
+  height: GAME_H,
+  zoom: CANVAS_ZOOM,
   pixelArt: true,
   backgroundColor: "#000000",
   physics: { default: "arcade", arcade: { debug: false } },

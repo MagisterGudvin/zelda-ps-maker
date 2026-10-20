@@ -1,8 +1,10 @@
 import type { Session, SessionSystem } from "../core/session.ts";
 import type { Entity } from "../core/entity.ts";
-import { type AABB, type Facing, FACING_VECTORS, facingFromVector, isInFront, makeBox, normalize, penetration, type Vec2 } from "../core/math.ts";
+import { type AABB, copyBox, type Facing, FACING_VECTORS, facingFromVector, isInFront, makeBox, normalize, penetration, type Vec2 } from "../core/math.ts";
 import type { Damageable, DamageInfo, HitResult } from "../core/types.ts";
 import { changeHealth, changeMagic } from "./health.ts";
+import { buildOverlay } from "./overlay.ts";
+import type { OverlayLayer } from "../host/types.ts";
 
 export type PlayerState = "normal" | "dead";
 
@@ -23,6 +25,11 @@ export class PlayerSystem implements SessionSystem, Damageable {
   readonly box: AABB = makeBox(0, 0, 6, 6);
   /** Body box shrunk by `player.hurtboxInset`: what enemies and projectiles must touch. */
   readonly hurtbox: AABB = makeBox(0, 0, 4, 4);
+  /** Displayed sprite bounds (falls back to the body when the host cannot tell). */
+  readonly visual: AABB = makeBox(0, 0, 6, 6);
+  /** Point weapons swing around: the sprite center plus `sword.pivotOffset`. */
+  pivotX = 0;
+  pivotY = 0;
   facing: Facing = "down";
   state: PlayerState = "normal";
   /** Set when a box was read this tick; false when the scene has no player. */
@@ -55,6 +62,9 @@ export class PlayerSystem implements SessionSystem, Damageable {
   private readonly tmp: Vec2 = { x: 0, y: 0 };
   private blinkHidden = false;
   private tinted = false;
+  private overlayReq: { prio: number; layers: OverlayLayer[] } | null = null;
+  private overlayShown = false;
+  private hurtMs = -1;
 
   constructor(session: Session) {
     this.s = session;
@@ -123,6 +133,40 @@ export class PlayerSystem implements SessionSystem, Damageable {
     return this.present;
   }
 
+  /**
+   * Systems ask for a sprite overlay each tick (attack 2 > hurt 1); the
+   * highest priority wins and is sent to the host once per tick by
+   * `flushOverlay`. No request = the PS Maker sprite is shown again.
+   */
+  requestOverlay(prio: number, layers: OverlayLayer[] | null): void {
+    if (!layers) return;
+    if (!this.overlayReq || prio >= this.overlayReq.prio) this.overlayReq = { prio, layers };
+  }
+
+  flushOverlay(): void {
+    if (this.hurtMs >= 0 && this.knockMs > 0 && this.state === "normal") {
+      const sp = this.s.config.player.sprites;
+      this.requestOverlay(1, buildOverlay(this.s.config, sp.hurt, "", this.facing, this.hurtMs));
+    }
+    const req = this.overlayReq;
+    this.overlayReq = null;
+    if (req) {
+      this.s.host.setPlayerOverlay(req.layers);
+      this.overlayShown = true;
+    } else if (this.overlayShown) {
+      this.s.host.setPlayerOverlay(null);
+      this.overlayShown = false;
+    }
+  }
+
+  /** Refreshes the sprite bounds and the weapon pivot (call after the player moved). */
+  syncVisual(): void {
+    if (!this.s.host.readPlayerVisual(this.visual)) copyBox(this.visual, this.box);
+    // Keep the pivot inside the body column horizontally: wide frames (64x64 sheets) are centered on the body anyway.
+    this.pivotX = this.visual.x + this.s.config.sword.pivotOffsetX;
+    this.pivotY = this.visual.y + this.s.config.sword.pivotOffsetY;
+  }
+
   private syncHurtbox(): void {
     const inset = this.s.config.player.hurtboxInset;
     this.hurtbox.x = this.box.x;
@@ -148,6 +192,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.updateTimers(dtMs);
     this.regenMagic(dtMs);
     this.syncHurtbox();
+    this.syncVisual();
     this.prevX = this.box.x;
     this.prevY = this.box.y;
     this.hasPrev = true;
@@ -165,7 +210,11 @@ export class PlayerSystem implements SessionSystem, Damageable {
   }
 
   private applyKnockback(dtMs: number): void {
-    if (this.knockMs <= 0) return;
+    if (this.hurtMs >= 0) this.hurtMs += dtMs;
+    if (this.knockMs <= 0) {
+      this.hurtMs = -1;
+      return;
+    }
     const step = Math.min(dtMs, this.knockMs) / 1000;
     this.knockMs -= dtMs;
     this.moveWithCollision(this.knockVX * step, this.knockVY * step);
@@ -289,6 +338,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.s.host.setPlayerTint(HURT_TINT);
     const speed = info.knockback > 0 ? info.knockback : cfg.knockbackSpeed;
     this.startKnockback(info.originX, info.originY, speed, cfg.knockbackMs);
+    this.hurtMs = 0;
     if (this.s.state.player.hp <= 0) {
       this.die();
       return "killed";
@@ -378,6 +428,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
   dispose(): void {
     // Leave the PS Maker player exactly as we found it.
     this.locks.clear();
+    if (this.overlayShown) this.s.host.setPlayerOverlay(null);
     this.s.host.setPlayerLocked(false);
     this.s.host.setPlayerBlink(true);
     this.s.host.setPlayerTint(null);

@@ -45,6 +45,10 @@
 ### `sword`
 `damage 2, range 18, width 10, windupMs 50, activeMs 130, recoveryMs 120, sweep true` (хитбокс проходит дугой от бока к фронту), `maxHitsPerTarget 1, knockback 220, lockUntilRecovered true` (иначе удар можно прервать новым в фазе восстановления).
 `charge: { enabled true, chargeMs 800, spinDamageMultiplier 2, spinRadius 26, spinMs 300, pokeWhileCharging true, pokeDamage 1 }`.
+`showBlade "auto" | "always" | "never"` — встроенный клинок (в `auto` скрыт, если задана анимация атаки); `pivotOffsetX 0, pivotOffsetY 0` — смещение точки вращения удара от центра спрайта игрока. Клинок всегда начинается у края тела и равен длине хитбокса во всех фазах (удар, заряд, круговой).
+
+### `sprites` и `player.sprites`
+Листы и анимации из `Zelda: Define Sprite Sheet` / `Zelda: Define Animation`: `sprites: { sheets: { id: { image, frameWidth, frameHeight, margin?, spacing? } }, animations: { id: { sheet, frames, fps?, loop?, flipX? } } }`. Анимации атаки игрока: `player.sprites: { attack, spin, charge, hurt, weaponAttack, weaponSpin, weaponCharge, weaponBehind ["up"], hidePlayer true, offsetX 0, offsetY 0 }`. Подробно — [SPRITES.md](SPRITES.md).
 
 ### `shield`
 `enabled true, mode "passive"` (поднят, пока игрок не атакует) или `"hold"` (клавиша щита), `blocks ["projectile","arrow"]` — блокируемые типы урона, `frontalDot 0.5` — ширина сектора (косинус половины угла), `blockPushback 60`.
@@ -72,16 +76,17 @@
 Таблица дропа: `{ "chance": 0.4, "entries": [ { "item": "heart", "weight": 5 }, { "item": "rupees", "count": 5, "weight": 1 } ] }`.
 
 ### `world`
-`positionUnits "pixels" | "tiles"`, `tileSize 16` (шаг толкания блоков и пересчёт координат в режиме `tiles`), `useArcadeStaticBodies true`, `useTilemapLayers true` (источники коллизий карты), `depthMode "y" | "fixed"`, `depthBase 0`, `fixedStepHz 60`, `maxStepsPerFrame 5`, `collisionRefreshTicks 120`.
+`positionUnits "pixels" | "tiles"`, `tileSize 16` (шаг толкания блоков и пересчёт координат в режиме `tiles`), `useArcadeStaticBodies true`, `useTilemapLayers true` (источники коллизий карты), `depthMode "auto" | "y" | "fixed"` (`auto`: если PS Maker сортирует персонажей по y — тоже по y, иначе на слое игрока с поправкой по y, чтобы объекты не оказывались под слоями карты), `depthBase 0`, `fixedStepHz 60`, `maxStepsPerFrame 5`, `collisionRefreshTicks 120`.
 
 ### `ui`
-`enabled, showHearts, showMagic, showActiveItem, counters ["rupees","bombs","arrows","keys"], position "top-left" | "top-right" | "bottom-left" | "bottom-right", scale 0` (0 = авто по высоте игры), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true, fontFamily "monospace"`.
+Классическая полоса: шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд).
+`enabled, showHearts, showMagic, showActiveItem, counters ["rupees","bombs","arrows","keys"], position "top" | "bottom"` (старые `top-left` и т.п. читаются как top/bottom), `scale 0` (0 = наибольший целый масштаб, при котором 256×224 помещается на экран), `safeArea { top 0, right 24, bottom 0, left 0 }` (место под собственный UI PS Maker — шестерёнку настроек справа сверху; в пикселях HUD), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true, fontFamily "monospace"`. Сообщения выводятся рамками внизу свободной области и не перекрывают полосу HUD.
 
 ### `save`
 `enabled true, storageKey "zelda-maker-toolkit", slot "default", autoSave true` (сундуки, двери, новые предметы, завершение подземелья), `autoLoadOnStart false`.
 
 ### `debug`, `language`, `publicApi`
-`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, domEvents false }`; `language: "auto" | "en" | "ru"`; `publicApi: true`.
+`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, domEvents false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, последние предупреждения и действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
 
 ## Примеры
 

@@ -14,7 +14,7 @@
 src/
   index.ts                  definePlugin(...) — точка входа для CLI
   editor/                   интеграция с PS Maker
-    actions.ts              45 действий редактора (defineEvent)
+    actions.ts              50 действий редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     paramResolvers.ts       разбор параметров position / npc / image
     publicApi.ts            globalThis.ZeldaMakerToolkit
@@ -32,8 +32,9 @@ src/
     phaserHost.ts           HostAdapter: игрок, коллизии карты, рендер, отладка
     keyboardInput.ts        клавиатура и геймпад с защёлкиванием нажатий
     phaserHud.ts            HUD-сцена (одна на игру)
-    textures.ts             оригинальные процедурные спрайты
-  player/                   PlayerSystem (направление, урон, щит, смерть), health.ts
+    textures.ts             оригинальные процедурные спрайты, пиксельные цифры/иконки HUD
+    sheets.ts               нарезка спрайт-листов авторов (по ключу текстуры или URL)
+  player/                   PlayerSystem (направление, урон, щит, смерть, оверлей анимаций), health.ts, overlay.ts
   combat/                   AttackInstance, resolveHit, scaleDamage; SwordSystem
   items/                    реестр предметов, ItemSystem, бомба, бумеранг, крюк, снаряды, подбираемое
   inventory/                модель инвентаря (на GameState) и InventorySystem (ввод, панель)
@@ -41,7 +42,7 @@ src/
   interactions/             Interactable (все типы объектов), InteractionSystem, пресеты
   puzzles/                  RuleRegistry, RulesEngine, встроенные условия/действия, последовательности
   dungeons/                 DungeonSystem: подземелья, ключи, боссы, волны
-  ui/                       HudSystem (модель HUD), i18n
+  ui/                       HudSystem (модель HUD), hudLayout (раскладка без наложений), i18n
   save/                     SaveManager: формат, версии, миграции, санитизация
   debug/                    DebugSystem: оверлей хитбоксов
 locales/{en,ru}/strings.ts  строки интерфейса

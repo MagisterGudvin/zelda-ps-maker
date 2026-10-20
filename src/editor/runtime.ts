@@ -1,6 +1,6 @@
 import { Toolkit } from "../core/toolkit.ts";
 import type { Session } from "../core/session.ts";
-import { PhaserHost, type PluginContextLike } from "../host/phaserHost.ts";
+import { mapSceneOf, PhaserHost, type PluginContextLike } from "../host/phaserHost.ts";
 import { installPublicApi } from "./publicApi.ts";
 
 /**
@@ -59,7 +59,7 @@ export function ensureSession(ctx: PluginContextLike, mapId?: string): Session {
   const current = tk.session;
   if (current && !current.isDisposed) {
     const host = hostOf(current);
-    const sameScene = host ? host.scene === ctx.scene : true;
+    const sameScene = host ? host.scene === mapSceneOf(ctx) : true;
     const sameMap = mapId === undefined || mapId === "" || mapId === current.mapId;
     if (sameScene && sameMap) {
       host?.updatePlayer(ctx.player);

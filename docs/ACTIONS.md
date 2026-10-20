@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.2.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.3.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **45**. Все имена начинаются с `Zelda: `.
+Всего действий: **50**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -11,6 +11,7 @@
 - [Zelda: Stop Toolkit](#zelda-stop-toolkit)
 - [Zelda: Pause Combat](#zelda-pause-combat)
 - [Zelda: Toggle Debug](#zelda-toggle-debug)
+- [Zelda: Diagnostics](#zelda-diagnostics)
 - [Zelda: Create Enemy](#zelda-create-enemy)
 - [Zelda: Create Object](#zelda-create-object)
 - [Zelda: Create Chest](#zelda-create-chest)
@@ -24,6 +25,10 @@
 - [Zelda: Run Actions](#zelda-run-actions)
 - [Zelda: Create Switch Sequence](#zelda-create-switch-sequence)
 - [Zelda: Place Marker](#zelda-place-marker)
+- [Zelda: Define Sprite Sheet](#zelda-define-sprite-sheet)
+- [Zelda: Define Animation](#zelda-define-animation)
+- [Zelda: Set Player Sprites](#zelda-set-player-sprites)
+- [Zelda: Preview Sprite Sheet](#zelda-preview-sprite-sheet)
 - [Zelda: Create Wave Room](#zelda-create-wave-room)
 - [Zelda: Add Wave Enemy](#zelda-add-wave-enemy)
 - [Zelda: Start Waves](#zelda-start-waves)
@@ -63,6 +68,7 @@ Starts Zelda Maker Toolkit on this map. Put it first in the map's On-load events
 | `config` (Config JSON) | string | `""` | Optional JSON overrides, e.g. {"sword":{"damage":3}}. / JSON-настройки. |
 | `language` (Language) | string | `"auto"` | auto, en or ru. / Язык интерфейса. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
+| `diagnostics` (Show diagnostics) | boolean | `false` | On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики. |
 
 ## Zelda: Configure
 
@@ -94,6 +100,14 @@ Shows or hides the hitbox/state overlay. / Показ отладочных хи�
 |---|---|---|---|
 | `enabled` (Enabled) | boolean | `true` | Show the overlay. |
 
+## Zelda: Diagnostics
+
+Shows an on-screen panel: player/camera positions, nearby toolkit objects, recent messages (same as F10). Use it when something does not appear. / Панель диагностики.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `enabled` (Enabled) | boolean | `true` | Show the panel. |
+
 ## Zelda: Create Enemy
 
 Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre or your own). / Создаёт врага по шаблону.
@@ -105,6 +119,7 @@ Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre o
 | `npc` (Use NPC) | npc | — | Optional: turn this placed NPC into the enemy (uses its sprite). / Превратить NPC во врага. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses and rules). |
 | `group` (Group) | string | `""` | Group for rules like {"enemiesDefeated":"room1"}. |
+| `animations` (Animations) | string | `""` | Optional sprite-sheet animations: walk=slime_walk, attack=slime_attack, hurt=..., death=..., idle=... (ids from Zelda: Define Animation). / Анимации из спрайт-листа. |
 | `patrol` (Patrol markers) | string | `""` | Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1,p2,p3. / Маршрут патруля по маркерам. |
 | `overrides` (Overrides JSON) | string | `""` | Change stats, e.g. {"hp":6,"speed":50,"resistances":{"arrow":0}} |
 
@@ -225,12 +240,65 @@ Switches must be activated in this order; a wrong one resets them. / Перек�
 
 ## Zelda: Place Marker
 
-Names a point picked on the map. Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.
+Names a map point once (tip: press F9 in playtest and click the map to get X/Y). Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `id` (Marker ID) | string | `"marker_1"` | Name of the point, e.g. boss_spot. |
-| `position` (Position) | position | — | Pick the point on the map. |
+| `position` (Position) | position | — | Point in map pixels. In playtest press F9 and click the map to read/copy X and Y. |
+
+## Zelda: Define Sprite Sheet
+
+Registers a sprite sheet image cut into equal frames (Mana Seed: 64x64). Frames are numbered from 0, left to right, top to bottom; check them with Zelda: Preview Sprite Sheet. / Спрайт-лист.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `id` (Sheet ID) | string | `"hero"` | Name used by animations, e.g. hero. |
+| `image` (Image) | image | — | The sheet image. |
+| `imageKey` (Image key or URL) | string | `""` | Optional: texture key or image URL if the Image picker does not work. |
+| `frameWidth` (Frame width) | number | `64` | Pixels. |
+| `frameHeight` (Frame height) | number | `64` | Pixels. |
+| `margin` (Margin) | number | `0` | Empty pixels around the sheet. |
+| `spacing` (Spacing) | number | `0` | Empty pixels between frames. |
+
+## Zelda: Define Animation
+
+Names frames of a sprite sheet. Frames: "8,9,10,11" for all directions or JSON per direction {"down":[0,1,2],"up":[8,9,10],"right":[16,17,18]} (left mirrors right if omitted). FPS 0 = stretch over the action. / Анимация из кадров.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `id` (Animation ID) | string | `"hero_slash"` | e.g. hero_slash. |
+| `sheet` (Sheet ID) | string | `"hero"` | From Zelda: Define Sprite Sheet. |
+| `frames` (Frames) | string | `""` | Frame numbers (see Preview Sprite Sheet). |
+| `fps` (FPS) | number | `0` | Frames per second; 0 = fit the action duration (attacks). |
+| `loop` (Loop) | boolean | `false` | Repeat (walk/idle). |
+
+## Zelda: Set Player Sprites
+
+Uses sprite-sheet animations for the player's attacks (body and weapon layers, e.g. Mana Seed character + weapon sheets). Empty = built-in blade. / Анимации атаки игрока.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `attack` (Attack (body)) | string | `""` | Animation id for the sword swing. |
+| `weaponAttack` (Attack (weapon)) | string | `""` | Weapon layer for the swing. |
+| `spin` (Spin (body)) | string | `""` | Spin attack; empty = attack. |
+| `weaponSpin` (Spin (weapon)) | string | `""` |  |
+| `charge` (Charge (body)) | string | `""` | While charging; empty = last attack frame. |
+| `weaponCharge` (Charge (weapon)) | string | `""` |  |
+| `hurt` (Hurt (body)) | string | `""` | While knocked back. |
+| `weaponBehind` (Weapon behind in) | string | `"up"` | Directions where the weapon is drawn behind the body: up, left... |
+| `hidePlayer` (Hide PS Maker sprite) | boolean | `true` | Hide the normal sprite while an animation plays. |
+| `offsetX` (Offset X) | number | `0` | Pixels. |
+| `offsetY` (Offset Y) | number | `0` | Pixels. |
+
+## Zelda: Preview Sprite Sheet
+
+Shows a sprite sheet full screen with every frame number, to pick frames for Define Animation. Run it again with Show off to close. / Просмотр кадров.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `sheet` (Sheet ID) | string | `"hero"` | Sheet to show. |
+| `show` (Show) | boolean | `true` | Open or close. |
 
 ## Zelda: Create Wave Room
 
@@ -246,7 +314,7 @@ Room with enemy waves: doors stay shut until every wave is beaten. Add enemies w
 
 ## Zelda: Add Wave Enemy
 
-Adds one enemy to a wave of a wave room; its spawn point is picked on the map. / Добавляет врага в волну (точка выбирается на карте).
+Adds one enemy to a wave of a wave room at the given point. / Добавляет врага в волну.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|

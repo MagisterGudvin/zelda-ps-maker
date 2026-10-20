@@ -2,6 +2,7 @@
 export const en: Record<string, string> = {
   "hud.inventory": "Items",
   "hud.dead": "You fell! Rising again...",
+  "hud.life": "- LIFE -",
   "hud.empty": "(empty)",
   "resource.rupees": "Rupees",
   "resource.bombs": "Bombs",

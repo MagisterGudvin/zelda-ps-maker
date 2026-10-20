@@ -17,14 +17,20 @@
     "toggleKey": "F9",
     "logLevel": "warn",
     "rethrowErrors": false,
-    "domEvents": false
+    "domEvents": false,
+    "diagnostics": false,
+    "diagnosticsKey": "F10"
+  },
+  "sprites": {
+    "sheets": {},
+    "animations": {}
   },
   "world": {
     "positionUnits": "pixels",
     "tileSize": 16,
     "useArcadeStaticBodies": true,
     "useTilemapLayers": true,
-    "depthMode": "y",
+    "depthMode": "auto",
     "depthBase": 0,
     "fixedStepHz": 60,
     "maxStepsPerFrame": 5,
@@ -104,7 +110,22 @@
       "sword",
       "shield"
     ],
-    "startCounts": {}
+    "startCounts": {},
+    "sprites": {
+      "attack": "",
+      "spin": "",
+      "charge": "",
+      "hurt": "",
+      "weaponAttack": "",
+      "weaponSpin": "",
+      "weaponCharge": "",
+      "weaponBehind": [
+        "up"
+      ],
+      "hidePlayer": true,
+      "offsetX": 0,
+      "offsetY": 0
+    }
   },
   "sword": {
     "enabled": true,
@@ -115,6 +136,9 @@
     "activeMs": 130,
     "recoveryMs": 120,
     "sweep": true,
+    "showBlade": "auto",
+    "pivotOffsetX": 0,
+    "pivotOffsetY": 0,
     "maxHitsPerTarget": 1,
     "knockback": 220,
     "lockUntilRecovered": true,
@@ -283,8 +307,14 @@
       "arrows",
       "keys"
     ],
-    "position": "top-left",
+    "position": "top",
     "scale": 0,
+    "safeArea": {
+      "top": 0,
+      "right": 24,
+      "bottom": 0,
+      "left": 0
+    },
     "messageMs": 2200,
     "inventoryPanel": true,
     "pauseWhileInventoryOpen": true,

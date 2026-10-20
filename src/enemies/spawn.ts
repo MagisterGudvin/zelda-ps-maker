@@ -43,6 +43,7 @@ export function spawnEnemy(s: Session, template: string, x: number, y: number, o
   if (persistent && s.state.objects[objectKey(s.mapId, id)] === "defeated") return null;
   const enemy = new Enemy(s, id, cfg, x, y, { group: opts.group, adopt: opts.adopt, persistent });
   s.world.add(enemy);
+  s.logger.info(`Enemy "${id}" (${template}) spawned at ${Math.round(x)}, ${Math.round(y)}${opts.adopt ? " using an NPC sprite" : ""}.`);
   s.bus.emit("zelda:enemy:spawned", { enemyId: id, template, group: enemy.group });
   return enemy;
 }

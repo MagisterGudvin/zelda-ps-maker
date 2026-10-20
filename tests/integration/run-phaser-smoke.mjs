@@ -291,6 +291,51 @@ await check("save (F5) and load (F8) restore progress from localStorage", async 
   return `rupees restored to ${r0}`;
 });
 
+await check("sprite sheets: data-URL and texture-key sheets, attack overlay, enemy animation, preview", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    // A 4x2 sheet of 16x16 frames with distinct colors, as a texture and as a data URL.
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 32;
+    const g = c.getContext("2d");
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = `hsl(${i * 45},80%,50%)`;
+      g.fillRect((i % 4) * 16, Math.floor(i / 4) * 16, 16, 16);
+    }
+    scene.textures.addCanvas("test_sheet_tex", c);
+    H.run("Zelda: Define Sprite Sheet", { id: "hero", image: "test_sheet_tex", imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
+    H.run("Zelda: Define Sprite Sheet", { id: "url_sheet", image: { url: c.toDataURL() }, imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
+    H.run("Zelda: Define Animation", { id: "slash", sheet: "hero", frames: '{"down":[0,1,2,3],"right":[4,5,6,7]}', fps: 0, loop: false });
+    H.run("Zelda: Define Animation", { id: "blob_walk", sheet: "url_sheet", frames: "1,2", fps: 6, loop: true });
+    H.run("Zelda: Set Player Sprites", { attack: "slash", weaponAttack: "", spin: "", weaponSpin: "", charge: "", weaponCharge: "", hurt: "", weaponBehind: "up", hidePlayer: true, offsetX: 0, offsetY: 0 });
+    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 60, y: 200 }, npc: "", id: "anim_slime", group: "", animations: "walk=blob_walk, idle=blob_walk", patrol: "", overrides: '{"detectRange":0}' });
+    await new Promise((ok) => setTimeout(ok, 400));
+    const p = H.player();
+    const before = p.alpha;
+    scene.input.keyboard.emit("keydown", { code: "KeyX" });
+    scene.input.keyboard.emit("keyup", { code: "KeyX" });
+    await new Promise((ok) => setTimeout(ok, 120));
+    const during = p.alpha;
+    const overlay = scene.children.list.filter((o) => o.type === "Image" && o.visible && o.texture?.key === "test_sheet_tex" && String(o.frame?.name).startsWith("zmt_16x16_"));
+    await new Promise((ok) => setTimeout(ok, 600));
+    const after = p.alpha;
+    const enemyImg = scene.children.list.find((o) => o.type === "Image" && String(o.texture?.key).startsWith("zmt_sheet_url_sheet"));
+    H.run("Zelda: Preview Sprite Sheet", { sheet: "hero", show: true });
+    await new Promise((ok) => setTimeout(ok, 100));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const labels = hud.children.list.filter((o) => o.type === "Text" && o.visible && /^[0-7]$/.test(o.text)).length;
+    H.run("Zelda: Preview Sprite Sheet", { sheet: "hero", show: false });
+    return { before, during, after, overlay: overlay.length, overlayFrame: overlay[0]?.frame?.name, enemyFrame: enemyImg?.frame?.name ?? null, labels };
+  });
+  assert(r.during === 0 && r.after === r.before, `player alpha ${r.before} → ${r.during} → ${r.after}`);
+  assert(r.overlay >= 1, "attack overlay image not shown");
+  assert(r.enemyFrame === "zmt_16x16_1" || r.enemyFrame === "zmt_16x16_2", `enemy frame ${r.enemyFrame}`);
+  assert(r.labels === 8, `preview labels ${r.labels}`);
+  return `overlay ${r.overlayFrame}, enemy ${r.enemyFrame}, preview ${r.labels} frames`;
+});
+
 await check("no page errors or console errors", async () => {
   assert(pageErrors.length === 0, pageErrors.join("\n"));
   assert(consoleErrors.length === 0, consoleErrors.join("\n"));

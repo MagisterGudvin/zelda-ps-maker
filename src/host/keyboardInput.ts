@@ -111,6 +111,7 @@ export class KeyboardInput implements InputSource {
     add("prevItem", c.prevItem);
     add("inventory", c.inventory);
     add("debug", [this.config.debug.toggleKey]);
+    add("diagnostics", [this.config.debug.diagnosticsKey]);
     this.moveKeys.clear();
     const m = c.move;
     for (const [dir, keys] of [["up", m.up], ["down", m.down], ["left", m.left], ["right", m.right]] as [Facing, string[]][]) {

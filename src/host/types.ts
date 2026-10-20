@@ -13,6 +13,14 @@ export interface HostAdapter {
 
   /** Writes the player's hurtbox (body or sprite bounds) into `out`. False if no player. */
   readPlayerBox(out: AABB): boolean;
+  /** Writes the player's displayed sprite bounds (sword pivot, overlays). False if unknown. */
+  readPlayerVisual(out: AABB): boolean;
+  /** Draws animation frames over the player sprite (attack, weapon); null restores the sprite. */
+  setPlayerOverlay(layers: OverlayLayer[] | null): void;
+  /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */
+  previewSheet(sheetId: string | null): boolean;
+  /** Host facts for the diagnostics panel (scene, camera, player). */
+  describe(): string[];
   /**
    * Optional facing hint (held movement keys, animation name). `current` lets
    * the host keep the current facing while two directions are held.
@@ -36,9 +44,9 @@ export interface HostAdapter {
   dispose(): void;
 }
 
-export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "debug";
+export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "debug" | "diagnostics";
 
-export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "debug"];
+export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "debug", "diagnostics"];
 
 /**
  * Edge-aware input. `latch()` is called once per fixed tick; presses that
@@ -51,6 +59,15 @@ export interface InputSource {
   released(action: InputAction): boolean;
   /** Clears held/pressed state (window blur, pause). */
   reset(): void;
+}
+
+/** One layer of a player overlay: a frame of an author sprite sheet. */
+export interface OverlayLayer {
+  sheet: string;
+  frame: number;
+  flipX: boolean;
+  /** Drawn behind the body layer (e.g. weapon when facing up). */
+  behind: boolean;
 }
 
 /** Visual description used to create a view; keeps systems asset-agnostic. */
@@ -66,6 +83,12 @@ export interface ViewSpec {
   layer?: number;
   /** Draw the view without y-sorting (above everything, e.g. explosions). */
   overlay?: boolean;
+  /** Sprite drawn offset from the entity center (feet of 64x64 character frames). */
+  offsetX?: number;
+  offsetY?: number;
+  scale?: number;
+  originX?: number;
+  originY?: number;
 }
 
 export interface EntityView {
@@ -77,6 +100,8 @@ export interface EntityView {
   setRotation(radians: number): void;
   setScale(scale: number): void;
   setFlipX(flip: boolean): void;
+  /** Shows frame `frame` of an author sprite sheet (keeps the current look while it loads). */
+  setAnimFrame(sheet: string, frame: number, flipX: boolean): void;
   destroy(): void;
 }
 
@@ -111,19 +136,35 @@ export interface HudModel {
   showHearts: boolean;
   showMagic: boolean;
   activeItem: HudItemSlot | null;
-  counters: { id: string; label: string; icon: string; value: number }[];
+  counters: { id: string; label: string; icon: string; value: number; digits: number }[];
   messages: { text: string; remainingMs: number }[];
   inventoryOpen: boolean;
   inventoryTitle: string;
   inventory: HudItemSlot[];
   dead: boolean;
   deathText: string;
-  position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  lifeLabel: string;
+  position: "top" | "bottom";
   scale: number;
+  safeArea: { top: number; right: number; bottom: number; left: number };
   fontFamily: string;
+}
+
+/** Sheet shown full-screen with frame numbers (Zelda: Preview Sprite Sheet). */
+export interface SheetPreview {
+  textureKey: string;
+  frameWidth: number;
+  frameHeight: number;
+  margin: number;
+  spacing: number;
+  title: string;
 }
 
 export interface HudSink {
   render(model: HudModel): void;
   setVisible(visible: boolean): void;
+  /** Diagnostics text block (null hides it). */
+  setDiagnostics(lines: string[] | null): void;
+  /** Full-screen sprite-sheet viewer (null hides it). */
+  setSheetPreview(preview: SheetPreview | null): void;
 }

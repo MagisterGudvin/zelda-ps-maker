@@ -1,5 +1,7 @@
 import type { LogLevel } from "./logger.ts";
 import type { DamageType, DropTable } from "./types.ts";
+import type { AnimDef, SheetDef } from "./animation.ts";
+import type { Facing } from "./math.ts";
 
 /**
  * Central configuration. Every value has a safe default; authors override any
@@ -17,6 +19,14 @@ export interface ToolkitConfig {
     rethrowErrors: boolean;
     /** Mirror toolkit events as `window` CustomEvents named like the event. */
     domEvents: boolean;
+    /** On-screen diagnostics panel (positions, depths, recent log lines). */
+    diagnostics: boolean;
+    diagnosticsKey: string;
+  };
+  /** Author sprite sheets and animations (Zelda: Define Sprite Sheet / Define Animation). */
+  sprites: {
+    sheets: Record<string, SheetDef>;
+    animations: Record<string, AnimDef>;
   };
   world: {
     positionUnits: "pixels" | "tiles";
@@ -25,7 +35,11 @@ export interface ToolkitConfig {
     useArcadeStaticBodies: boolean;
     /** Treat colliding tiles of Phaser tilemap layers as walls. */
     useTilemapLayers: boolean;
-    depthMode: "y" | "fixed";
+    /**
+     * "auto": follow PS Maker's own sorting — y-sorted when the player's depth
+     * equals its y, otherwise the player's layer ± a tiny y offset.
+     */
+    depthMode: "auto" | "y" | "fixed";
     depthBase: number;
     fixedStepHz: number;
     maxStepsPerFrame: number;
@@ -77,6 +91,22 @@ export interface ToolkitConfig {
     magicRegenPerSecond: number;
     startItems: string[];
     startCounts: Record<string, number>;
+    /** Animation ids (from config.sprites) drawn over the PS Maker player sprite. Empty = not used. */
+    sprites: {
+      attack: string;
+      spin: string;
+      charge: string;
+      hurt: string;
+      weaponAttack: string;
+      weaponSpin: string;
+      weaponCharge: string;
+      /** Directions where the weapon layer is drawn behind the body (typical for Mana Seed: up). */
+      weaponBehind: Facing[];
+      /** Hide the PS Maker sprite while an overlay animation plays. */
+      hidePlayer: boolean;
+      offsetX: number;
+      offsetY: number;
+    };
   };
   sword: {
     enabled: boolean;
@@ -88,6 +118,11 @@ export interface ToolkitConfig {
     recoveryMs: number;
     /** Sweep the hitbox from the side to the front during the active phase. */
     sweep: boolean;
+    /** "auto": show the built-in blade only when no attack animation is configured. */
+    showBlade: "auto" | "always" | "never";
+    /** Swing pivot offset from the player sprite's center (pixels). */
+    pivotOffsetX: number;
+    pivotOffsetY: number;
     maxHitsPerTarget: number;
     knockback: number;
     /** Ignore new presses until recovery ends; otherwise recovery can be cancelled. */
@@ -155,9 +190,12 @@ export interface ToolkitConfig {
     showMagic: boolean;
     showActiveItem: boolean;
     counters: string[];
-    position: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-    /** HUD pixel scale; 0 = automatic from the game height. */
+    /** Classic bar at the top or bottom of the screen ("top-left" etc. are read as top/bottom). */
+    position: "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+    /** HUD pixel scale; 0 = automatic (largest whole scale that fits 256x224). */
     scale: number;
+    /** Space kept free for PS Maker's own UI, in HUD pixels (the settings gear sits top-right). */
+    safeArea: { top: number; right: number; bottom: number; left: number };
     messageMs: number;
     inventoryPanel: boolean;
     pauseWhileInventoryOpen: boolean;
@@ -216,13 +254,14 @@ export function createDefaultConfig(): ToolkitConfig {
       save: true,
       debugTools: true,
     },
-    debug: { hitboxes: false, toggleKey: "F9", logLevel: "warn", rethrowErrors: false, domEvents: false },
+    debug: { hitboxes: false, toggleKey: "F9", logLevel: "warn", rethrowErrors: false, domEvents: false, diagnostics: false, diagnosticsKey: "F10" },
+    sprites: { sheets: {}, animations: {} },
     world: {
       positionUnits: "pixels",
       tileSize: 16,
       useArcadeStaticBodies: true,
       useTilemapLayers: true,
-      depthMode: "y",
+      depthMode: "auto",
       depthBase: 0,
       fixedStepHz: 60,
       maxStepsPerFrame: 5,
@@ -260,6 +299,7 @@ export function createDefaultConfig(): ToolkitConfig {
       magicRegenPerSecond: 0,
       startItems: ["sword", "shield"],
       startCounts: {},
+      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
     },
     sword: {
       enabled: true,
@@ -270,6 +310,9 @@ export function createDefaultConfig(): ToolkitConfig {
       activeMs: 130,
       recoveryMs: 120,
       sweep: true,
+      showBlade: "auto",
+      pivotOffsetX: 0,
+      pivotOffsetY: 0,
       maxHitsPerTarget: 1,
       knockback: 220,
       lockUntilRecovered: true,
@@ -342,8 +385,9 @@ export function createDefaultConfig(): ToolkitConfig {
       showMagic: true,
       showActiveItem: true,
       counters: ["rupees", "bombs", "arrows", "keys"],
-      position: "top-left",
+      position: "top",
       scale: 0,
+      safeArea: { top: 0, right: 24, bottom: 0, left: 0 },
       messageMs: 2200,
       inventoryPanel: true,
       pauseWhileInventoryOpen: true,
@@ -403,7 +447,7 @@ export function mergeConfig(target: object, patch: unknown, path = "", issues: C
   return issues;
 }
 
-const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts"]);
+const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations"]);
 
 /** Ready-made balance presets selectable from the editor. */
 export const CONFIG_PRESETS: Record<string, unknown> = {

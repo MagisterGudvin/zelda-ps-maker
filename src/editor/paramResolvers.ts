@@ -23,9 +23,9 @@ export function resolvePosition(value: unknown, config: ToolkitConfig): Vec2 | n
     if (parts.length >= 2) [x, y] = parts;
   } else if (value && typeof value === "object") {
     const o = value as Record<string, unknown>;
-    if (o.position && typeof o.position === "object") return resolvePosition(o.position, config);
-    x = o.x ?? o.tileX ?? o.col;
-    y = o.y ?? o.tileY ?? o.row;
+    for (const k of ["position", "value", "pos", "point"]) if (o[k] && typeof o[k] === "object") return resolvePosition(o[k], config);
+    x = o.x ?? o.X ?? o.tileX ?? o.col;
+    y = o.y ?? o.Y ?? o.tileY ?? o.row;
   }
   if (typeof x === "string") x = Number(x);
   if (typeof y === "string") y = Number(y);
@@ -75,12 +75,26 @@ export function resolveNpc(value: unknown, scene: any): any | null {
 
 /** Returns a texture key for an `image` parameter value ("" when empty). */
 export function resolveImage(value: unknown): string {
-  if (typeof value === "string") return value;
+  return imageCandidates(value)[0] ?? "";
+}
+
+/** Every string an `image` parameter might identify the picture by (key, name, URL...). */
+export function imageCandidates(value: unknown): string[] {
+  if (typeof value === "string") return value ? [value] : [];
+  const out: string[] = [];
   if (value && typeof value === "object") {
     const o = value as Record<string, unknown>;
-    for (const k of ["key", "textureKey", "texture", "name", "id"]) if (typeof o[k] === "string") return o[k] as string;
+    for (const k of ["key", "textureKey", "texture", "name", "id", "assetId", "url", "src", "path", "dataUrl"]) if (typeof o[k] === "string" && o[k]) out.push(o[k] as string);
   }
-  return "";
+  return out;
+}
+
+/** Picks an already loaded texture key if possible, else the first URL-like candidate. */
+export function pickImageSource(value: unknown, textureExists: (key: string) => boolean): string {
+  const list = imageCandidates(value);
+  for (const c of list) if (textureExists(c)) return c;
+  for (const c of list) if (/^(data:|blob:|https?:|\/)|\.(png|webp|gif|jpe?g)(\?.*)?$/i.test(c)) return c;
+  return list[0] ?? "";
 }
 
 /** Parses "true"/"false"/numbers; other text stays a string. */

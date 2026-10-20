@@ -9,6 +9,29 @@ export interface LogSink {
   error(...args: unknown[]): void;
 }
 
+export interface LogEntry {
+  level: Exclude<LogLevel, "silent">;
+  text: string;
+}
+
+const HISTORY_SIZE = 40;
+
+/** Formats log arguments into one short line for the on-screen diagnostics panel. */
+export function formatLogArgs(args: unknown[]): string {
+  return args
+    .map((a) => {
+      if (typeof a === "string") return a;
+      if (a instanceof Error) return `${a.name}: ${a.message}`;
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    })
+    .join(" ")
+    .slice(0, 300);
+}
+
 /**
  * Prefixed, level-filtered logger. Errors are never swallowed silently: the
  * level can hide debug/info/warn noise, but `error` is only hidden when the
@@ -16,9 +39,20 @@ export interface LogSink {
  */
 export class Logger {
   level: LogLevel = "warn";
+  /**
+   * Recent info/warn/error lines, kept regardless of `level`, so the in-game
+   * diagnostics panel (F10) can show them when the browser console is not
+   * reachable (e.g. inside the PS Maker editor).
+   */
+  readonly history: LogEntry[] = [];
   private readonly sink: LogSink;
   private readonly prefix: string;
   private readonly onceKeys = new Set<string>();
+
+  private remember(level: LogEntry["level"], args: unknown[]): void {
+    this.history.push({ level, text: formatLogArgs(args) });
+    if (this.history.length > HISTORY_SIZE) this.history.shift();
+  }
 
   constructor(prefix = "[ZeldaMakerToolkit]", sink: LogSink = console) {
     this.prefix = prefix;
@@ -34,14 +68,17 @@ export class Logger {
   }
 
   info(...args: unknown[]): void {
+    this.remember("info", args);
     if (this.enabled("info")) this.sink.info(this.prefix, ...args);
   }
 
   warn(...args: unknown[]): void {
+    this.remember("warn", args);
     if (this.enabled("warn")) this.sink.warn(this.prefix, ...args);
   }
 
   error(...args: unknown[]): void {
+    this.remember("error", args);
     if (this.enabled("error")) this.sink.error(this.prefix, ...args);
   }
 

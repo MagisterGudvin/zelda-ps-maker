@@ -42,6 +42,8 @@
 | `boss` | победа = `zelda:boss:defeated`, завершение подземелья |
 | `persistent` | не появляется снова после победы (нужен ID) |
 | `tags` | метки для своих правил |
+| `animations` | `{ idle, walk, windup, attack, hurt, death }` — id анимаций из спрайт-листа ([SPRITES.md](SPRITES.md)) |
+| `spriteScale`, `spriteOffsetX`, `spriteOffsetY` | масштаб и смещение картинки относительно хитбокса |
 
 ## Свой шаблон
 

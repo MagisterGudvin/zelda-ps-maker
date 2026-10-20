@@ -2,6 +2,7 @@
 export const ru: Record<string, string> = {
   "hud.inventory": "Предметы",
   "hud.dead": "Вы пали! Возрождение...",
+  "hud.life": "- ЖИЗНЬ -",
   "hud.empty": "(пусто)",
   "resource.rupees": "Рупии",
   "resource.bombs": "Бомбы",

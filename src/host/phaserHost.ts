@@ -2,10 +2,11 @@ import type { ToolkitConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { type AABB, type Facing, makeBox, overlaps } from "../core/math.ts";
 import { SpatialHash } from "../core/spatialHash.ts";
-import type { DebugDraw, EntityView, HostAdapter, HudSink, Renderer, ViewSpec } from "./types.ts";
+import type { DebugDraw, EntityView, HostAdapter, HudSink, OverlayLayer, Renderer, ViewSpec } from "./types.ts";
 import { KeyboardInput, type GamepadLike } from "./keyboardInput.ts";
 import { resolveTexture } from "./textures.ts";
 import { getHud } from "./phaserHud.ts";
+import { SheetLibrary } from "./sheets.ts";
 
 /**
  * The PS Maker plugin context, typed only as far as the toolkit uses it.
@@ -17,6 +18,16 @@ export interface PluginContextLike {
   player: any;
 }
 
+/**
+ * The scene the player lives in. PS Maker documents `ctx.scene` as the map
+ * scene, but the player's own scene is the safest source (it is where the
+ * camera, physics and map collision are).
+ */
+export function mapSceneOf(ctx: PluginContextLike): any {
+  const s = ctx.player?.scene;
+  return s && s.sys && s.add ? s : ctx.scene;
+}
+
 const OVERLAY_DEPTH = 100000;
 const DEBUG_DEPTH = 200000;
 
@@ -24,36 +35,47 @@ interface StaticBox extends AABB {
   body: any;
 }
 
+/** Depth provider: lets views follow PS Maker's own sorting (see world.depthMode). */
+interface DepthSource {
+  depthFor(y: number, layer: number): number;
+  sheetFrame(sheet: string, frame: number): { key: string; frame: string } | null;
+}
+
 /** A Phaser Image owned by the toolkit. */
 class ImageView implements EntityView {
   private readonly scene: any;
   private readonly img: any;
   private readonly spec: ViewSpec;
-  private readonly cfg: ToolkitConfig;
+  private readonly host: DepthSource;
   private sprite: string;
+  private frameKey = "";
 
-  constructor(scene: any, cfg: ToolkitConfig, spec: ViewSpec, textureKey: string) {
+  constructor(scene: any, host: DepthSource, spec: ViewSpec, textureKey: string) {
     this.scene = scene;
-    this.cfg = cfg;
+    this.host = host;
     this.spec = spec;
     this.sprite = spec.sprite;
     this.img = scene.add.image(0, 0, textureKey);
     this.fitSize();
     if (spec.tint !== undefined) this.img.setTint(spec.tint);
+    if (spec.originX !== undefined || spec.originY !== undefined) this.img.setOrigin(spec.originX ?? 0.5, spec.originY ?? 0.5);
     if (spec.overlay) this.img.setDepth(OVERLAY_DEPTH);
   }
 
   private fitSize(): void {
+    if (this.spec.scale) {
+      this.img.setScale(this.spec.scale);
+      return;
+    }
     // Author textures (from PS Maker image params) are scaled to the entity size.
     const key: string = this.img.texture?.key ?? "";
     if (!key.startsWith("zmt_") && this.spec.width && this.spec.height) this.img.setDisplaySize(this.spec.width, this.spec.height);
   }
 
   setPosition(x: number, y: number): void {
-    this.img.setPosition(x, y);
+    this.img.setPosition(x + (this.spec.offsetX ?? 0), y + (this.spec.offsetY ?? 0));
     if (this.spec.overlay) return;
-    const w = this.cfg.world;
-    this.img.setDepth(w.depthMode === "y" ? w.depthBase + y + (this.spec.layer ?? 0) : w.depthBase + (this.spec.layer ?? 0));
+    this.img.setDepth(this.host.depthFor(y, this.spec.layer ?? 0));
   }
   setVisible(visible: boolean): void {
     this.img.setVisible(visible);
@@ -68,18 +90,31 @@ class ImageView implements EntityView {
     } else this.img.setTint(color);
   }
   setSprite(sprite: string): void {
-    if (sprite === this.sprite) return;
+    if (sprite === this.sprite && !this.frameKey) return;
     const key = resolveTexture(this.scene.textures, sprite);
     if (!key) return;
     this.sprite = sprite;
+    this.frameKey = "";
     this.img.setTexture(key);
     this.fitSize();
+  }
+  setAnimFrame(sheet: string, frame: number, flipX: boolean): void {
+    const ref = this.host.sheetFrame(sheet, frame);
+    if (ref) {
+      const id = `${ref.key}|${ref.frame}`;
+      if (id !== this.frameKey) {
+        this.frameKey = id;
+        this.img.setTexture(ref.key, ref.frame);
+        this.img.setScale(this.spec.scale ?? 1);
+      }
+    }
+    this.img.setFlipX(flipX);
   }
   setRotation(r: number): void {
     this.img.setRotation(r);
   }
   setScale(s: number): void {
-    this.img.setScale(s);
+    this.img.setScale(s * (this.spec.scale ?? 1));
   }
   setFlipX(flip: boolean): void {
     this.img.setFlipX(flip);
@@ -125,6 +160,9 @@ class AdoptedView implements EntityView {
   setScale(): void {}
   setFlipX(flip: boolean): void {
     this.obj.setFlipX?.(flip);
+  }
+  setAnimFrame(): void {
+    // Adopted NPCs keep their own PS Maker animation set.
   }
   destroy(): void {
     this.obj.setVisible?.(false);
@@ -240,7 +278,7 @@ class PhaserDebug implements DebugDraw {
  * the toolkit only sees the HostAdapter interface. All listeners and objects
  * created here are released in `dispose()`.
  */
-export class PhaserHost implements HostAdapter {
+export class PhaserHost implements HostAdapter, DepthSource {
   readonly input: KeyboardInput;
   readonly renderer: Renderer;
   readonly hud: HudSink | null;
@@ -265,10 +303,19 @@ export class PhaserHost implements HostAdapter {
   private shutdownListener: (() => void) | null = null;
   private disposed = false;
   private readonly probe = makeBox();
+  private readonly sheets: SheetLibrary;
+  private playerDepth = 0;
+  private playerY = 0;
+  private ySorted = true;
+  private overlayImgs: any[] = [];
+  private overlayHidPlayer = false;
+  private savedAlpha = 1;
+  private previewing: string | null = null;
 
   constructor(ctx: PluginContextLike, cfg: ToolkitConfig, logger: Logger) {
-    this.scene = ctx.scene;
-    this.game = ctx.game ?? ctx.scene?.game;
+    this.scene = mapSceneOf(ctx);
+    if (ctx.scene && this.scene !== ctx.scene) logger.info("ctx.scene differs from the player's scene; using the player's scene for toolkit objects.");
+    this.game = ctx.game ?? this.scene?.game;
     this.player = ctx.player;
     this.cfg = cfg;
     this.logger = logger;
@@ -284,9 +331,10 @@ export class PhaserHost implements HostAdapter {
           logger.warnOnce(`tex-${spec.sprite}`, `Sprite "${spec.sprite}" is neither a loaded texture nor a built-in sprite; using a placeholder.`);
           key = resolveTexture(scene.textures, "icon_generic")!;
         }
-        return new ImageView(scene, cfg, spec, key);
+        return new ImageView(scene, this, spec, key);
       },
     };
+    this.sheets = new SheetLibrary(scene, logger);
     this.hud = this.game?.scene ? getHud(this.game, cfg, logger) : null;
     this.debug = scene?.add ? new PhaserDebug(scene, cfg, logger) : null;
   }
@@ -428,7 +476,114 @@ export class PhaserHost implements HostAdapter {
     }
   }
 
+  /**
+   * Depth for a toolkit object at `y`. In "auto" mode the toolkit detects
+   * whether PS Maker y-sorts characters (player depth == player y) and either
+   * uses y as well, or stays on the player's layer with a tiny y offset, so
+   * objects are never hidden under map layers.
+   */
+  depthFor(y: number, layer: number): number {
+    const w = this.cfg.world;
+    if (w.depthMode === "fixed") return w.depthBase + layer;
+    if (w.depthMode === "y" || this.ySorted) return w.depthBase + y + layer;
+    return this.playerDepth + (y - this.playerY) * 0.001 + layer * 0.0001;
+  }
+
+  sheetFrame(sheet: string, frame: number): { key: string; frame: string } | null {
+    const def = this.cfg.sprites.sheets[sheet];
+    if (!def) {
+      this.logger.warnOnce(`sheet-${sheet}`, `Sprite sheet "${sheet}" is not defined (Zelda: Define Sprite Sheet).`);
+      return null;
+    }
+    return this.sheets.frame(sheet, def, frame);
+  }
+
+  readPlayerVisual(out: AABB): boolean {
+    const p = this.player;
+    if (!p || p.active === false || typeof p.x !== "number") return false;
+    const w = p.displayWidth ?? p.width ?? 16;
+    const h = p.displayHeight ?? p.height ?? 16;
+    const ox = typeof p.originX === "number" ? p.originX : 0.5;
+    const oy = typeof p.originY === "number" ? p.originY : 0.5;
+    out.x = p.x + (0.5 - ox) * w;
+    out.y = p.y + (0.5 - oy) * h;
+    out.hw = w / 2;
+    out.hh = h / 2;
+    return true;
+  }
+
+  /** Overlay images copy the player's transform each frame; layers behind use a lower depth. */
+  setPlayerOverlay(layers: OverlayLayer[] | null): void {
+    const p = this.player;
+    if (!layers || layers.length === 0 || !p) {
+      for (const img of this.overlayImgs) img.setVisible(false);
+      if (this.overlayHidPlayer && p) p.setAlpha?.(this.savedAlpha);
+      this.overlayHidPlayer = false;
+      return;
+    }
+    while (this.overlayImgs.length < layers.length) this.overlayImgs.push(this.scene.add.image(0, 0, resolveTexture(this.scene.textures, "pixel")));
+    const sp = this.cfg.player.sprites;
+    let shown = 0;
+    layers.forEach((layer, i) => {
+      const img = this.overlayImgs[i];
+      const ref = this.sheetFrame(layer.sheet, layer.frame);
+      if (!ref) {
+        img.setVisible(false);
+        return;
+      }
+      img.setTexture(ref.key, ref.frame);
+      img.setOrigin(p.originX ?? 0.5, p.originY ?? 0.5);
+      img.setScale(p.scaleX ?? 1, p.scaleY ?? 1);
+      img.setPosition(p.x + sp.offsetX, p.y + sp.offsetY);
+      img.setFlipX(layer.flipX);
+      img.setDepth((p.depth ?? 0) + (layer.behind ? -0.01 : 0.01) + i * 0.001);
+      img.setVisible(!this.hiddenByUs && p.visible !== false);
+      shown++;
+    });
+    for (let i = layers.length; i < this.overlayImgs.length; i++) this.overlayImgs[i].setVisible(false);
+    if (shown > 0 && sp.hidePlayer && !this.overlayHidPlayer) {
+      this.savedAlpha = typeof p.alpha === "number" ? p.alpha : 1;
+      p.setAlpha?.(0);
+      this.overlayHidPlayer = true;
+    }
+  }
+
+  previewSheet(sheetId: string | null): boolean {
+    if (!this.hud) return false;
+    if (sheetId === null) {
+      this.previewing = null;
+      this.hud.setSheetPreview(null);
+      return true;
+    }
+    const def = this.cfg.sprites.sheets[sheetId];
+    if (!def) return false;
+    const key = this.sheets.textureKey(sheetId, def);
+    this.previewing = sheetId;
+    if (key) this.hud.setSheetPreview({ textureKey: key, frameWidth: def.frameWidth, frameHeight: def.frameHeight, margin: def.margin ?? 0, spacing: def.spacing ?? 0, title: sheetId });
+    return true;
+  }
+
+  describe(): string[] {
+    const s = this.scene;
+    const p = this.player;
+    const cam = s?.cameras?.main;
+    const n = (v: unknown) => (typeof v === "number" ? Math.round(v * 10) / 10 : "?");
+    const lines = [
+      `scene "${s?.sys?.settings?.key ?? "?"}"  camera scroll ${n(cam?.scrollX)},${n(cam?.scrollY)} zoom ${n(cam?.zoom)} view ${n(cam?.width)}x${n(cam?.height)}`,
+      `player sprite ${n(p?.x)},${n(p?.y)} depth ${n(p?.depth)} size ${n(p?.displayWidth)}x${n(p?.displayHeight)} body ${p?.body ? `${n(p.body.x)},${n(p.body.y)} ${n(p.body.width)}x${n(p.body.height)}` : "none"}`,
+      `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers`,
+    ];
+    return lines;
+  }
+
   beginTick(tick: number): void {
+    const p = this.player;
+    if (p && typeof p.depth === "number" && typeof p.y === "number") {
+      this.playerDepth = p.depth;
+      this.playerY = p.y;
+      this.ySorted = Math.abs(p.depth - p.y) < 2 || Math.abs(p.depth - (p.body ? p.body.y + p.body.height : p.y)) < 2;
+    }
+    if (this.previewing) this.previewSheet(this.previewing);
     const world = this.scene?.physics?.world;
     const statics = world?.staticBodies;
     const size = statics ? (statics.size ?? statics.entries?.length ?? 0) : 0;
@@ -495,6 +650,10 @@ export class PhaserHost implements HostAdapter {
     this.frameListener = null;
     this.shutdownListener = null;
     this.input.dispose();
+    this.setPlayerOverlay(null);
+    for (const img of this.overlayImgs) img.destroy();
+    this.overlayImgs = [];
+    if (this.previewing) this.hud?.setSheetPreview(null);
     this.locked = false;
     this.setPlayerBlink(true);
     this.setPlayerTint(null);

@@ -1,6 +1,6 @@
 import type { AABB, Facing } from "../../src/core/math.ts";
 import { overlaps } from "../../src/core/math.ts";
-import type { DebugDraw, EntityView, HostAdapter, HudModel, HudSink, InputAction, InputSource, Renderer, ViewSpec } from "../../src/host/types.ts";
+import type { DebugDraw, EntityView, HostAdapter, HudModel, HudSink, InputAction, InputSource, OverlayLayer, Renderer, ViewSpec } from "../../src/host/types.ts";
 import { Toolkit } from "../../src/core/toolkit.ts";
 import type { Session } from "../../src/core/session.ts";
 import { createMemoryStorage } from "../../src/save/save.ts";
@@ -84,6 +84,10 @@ export class FakeView implements EntityView {
   setRotation(): void {}
   setScale(): void {}
   setFlipX(): void {}
+  animFrame: { sheet: string; frame: number; flipX: boolean } | null = null;
+  setAnimFrame(sheet: string, frame: number, flipX: boolean): void {
+    this.animFrame = { sheet, frame, flipX };
+  }
   destroy(): void {
     this.destroyed = true;
   }
@@ -99,6 +103,14 @@ export class FakeHud implements HudSink {
   }
   setVisible(v: boolean): void {
     this.visible = v;
+  }
+  diagnostics: string[] | null = null;
+  setDiagnostics(lines: string[] | null): void {
+    this.diagnostics = lines;
+  }
+  preview: unknown = null;
+  setSheetPreview(p: unknown): void {
+    this.preview = p;
   }
 }
 
@@ -151,6 +163,29 @@ export class FakeHost implements HostAdapter {
     out.hw = this.player.hw;
     out.hh = this.player.hh;
     return true;
+  }
+  /** Sprite drawn 16px taller than the body (feet collision box), like many PS Maker characters. */
+  readPlayerVisual(out: AABB): boolean {
+    if (!this.player) return false;
+    out.x = this.player.x;
+    out.y = this.player.y - 8;
+    out.hw = this.player.hw;
+    out.hh = this.player.hh + 8;
+    return true;
+  }
+  overlay: OverlayLayer[] | null = null;
+  overlayLog: (OverlayLayer[] | null)[] = [];
+  setPlayerOverlay(layers: OverlayLayer[] | null): void {
+    this.overlay = layers;
+    this.overlayLog.push(layers);
+  }
+  previewed: string | null = null;
+  previewSheet(id: string | null): boolean {
+    this.previewed = id;
+    return true;
+  }
+  describe(): string[] {
+    return ["fake host"];
   }
   readPlayerFacingHint(_current: Facing): Facing | null {
     return this.facingHint;
