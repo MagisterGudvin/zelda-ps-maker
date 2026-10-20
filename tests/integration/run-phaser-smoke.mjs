@@ -61,7 +61,7 @@ async function waitForMap(id) {
 const listenerCounts = () =>
   ev(() => {
     const s = window.__harness.scene();
-    return { postupdate: s.events.listenerCount("postupdate"), keydown: s.input.keyboard.listenerCount("keydown"), blur: window.__harness.game.events.listenerCount("blur") };
+    return { postupdate: s.events.listenerCount("postupdate"), keydown: s.input.keyboard.listenerCount("keydown"), pointerdown: s.input.listenerCount("pointerdown"), blur: window.__harness.game.events.listenerCount("blur") };
   });
 
 console.log(`Harness: ${url}`);
@@ -196,6 +196,15 @@ await check("boomerang over the pits hits the switch; the rule opens the gate", 
 
 await page.keyboard.press("F9");
 await sleep(200);
+await check("debug overlay: clicking the map shows and copies its coordinates", async () => {
+  const box = await page.locator("#game canvas").boundingBox();
+  // Game is 400x240 at zoom 2: map point (150, 100) is canvas pixel (300, 200).
+  await page.mouse.click(box.x + 300, box.y + 200);
+  await sleep(100);
+  const label = await ev(() => window.__harness.scene().children.list.find((o) => o.type === "Text" && /^X: \d+ Y: \d+/.test(o.text ?? ""))?.text ?? "");
+  assert(/^X: 150 Y: 100/.test(label), `label "${label}"`);
+  return label;
+});
 await page.screenshot({ path: `${ARTIFACTS}field.png` });
 await page.keyboard.press("F9");
 
@@ -221,6 +230,7 @@ await check("map transfer restarts the scene without leaking listeners", async (
   // Arcade Physics' own POST_UPDATE listener + exactly one toolkit frame listener.
   assert(d2.postupdate === 2, `postupdate listeners ${d2.postupdate}`);
   assert(d2.keydown === 1, `keydown listeners ${d2.keydown}`);
+  assert(d2.pointerdown === 1, `pointerdown listeners ${d2.pointerdown}`);
   return JSON.stringify(d2);
 });
 

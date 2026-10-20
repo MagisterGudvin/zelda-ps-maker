@@ -58,6 +58,7 @@ function where(s: Session, ctx: Ctx, position: unknown, npcValue: unknown, what:
   if (adopt) return { x: adopt.x, y: adopt.y, adopt };
   if (npcValue !== undefined && npcValue !== null && npcValue !== "") s.logger.warn(`${what}: NPC "${String(npcValue)}" was not found in the scene; using the position parameter.`);
   const p = resolvePosition(position, s.config);
+  if (p && p.x === 0 && p.y === 0) s.logger.warn(`${what}: Position is X 0, Y 0 (top-left corner) — was it left unset? Tip: F9 in playtest, then click the map to get coordinates.`);
   if (p) return { x: p.x, y: p.y, adopt: undefined };
   s.logger.warn(`${what}: no valid position (got ${JSON.stringify(position)}).`);
   return null;
@@ -379,10 +380,10 @@ const switchSequence = defineEvent({
 const placeMarker = defineEvent({
   name: "Zelda: Place Marker",
   description:
-    'Names a point picked on the map. Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.',
+    'Names a map point once (tip: press F9 in playtest and click the map to get X/Y). Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.',
   parameterDefs: {
     id: str("Marker ID", "Name of the point, e.g. boss_spot.", "marker_1"),
-    position: pos("Position", "Pick the point on the map."),
+    position: pos("Position", "Point in map pixels. In playtest press F9 and click the map to read/copy X and Y."),
   },
   execute(params, ctx) {
     run("Zelda: Place Marker", ctx, (s) => {
@@ -428,7 +429,7 @@ const waveRoom = defineEvent({
 
 const addWaveEnemy = defineEvent({
   name: "Zelda: Add Wave Enemy",
-  description: "Adds one enemy to a wave of a wave room; its spawn point is picked on the map. / Добавляет врага в волну (точка выбирается на карте).",
+  description: "Adds one enemy to a wave of a wave room at the given point. / Добавляет врага в волну.",
   parameterDefs: {
     roomId: str("Room ID", "Wave room id.", "arena"),
     wave: num("Wave", "Wave number: 1, 2, 3...", 1),
@@ -445,7 +446,7 @@ const addWaveEnemy = defineEvent({
         return;
       }
       const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Add Wave Enemy overrides") ?? undefined;
-      // Store pixels: positions from the picker are already converted.
+      // Store as a marker: resolvePosition already converted to pixels.
       const marker = `__wave_${params.roomId}_${s.markers.size}`;
       s.markers.set(marker, p);
       s.dungeons.addWaveSpawn(params.roomId, params.wave || 1, { template: params.template || "slime", at: marker, overrides });

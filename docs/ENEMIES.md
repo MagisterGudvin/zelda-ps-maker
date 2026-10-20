@@ -1,6 +1,6 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position (выбор на карте) **или** Use NPC, ID, Group, Patrol markers, Overrides JSON.
+`Zelda: Create Enemy` — Template, Position (X/Y) **или** Use NPC, ID, Group, Patrol markers, Overrides JSON.
 
 **Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.
 

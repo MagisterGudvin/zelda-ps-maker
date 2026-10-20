@@ -1,6 +1,6 @@
 {
   "name": "zelda-maker-toolkit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Zelda Maker Toolkit — action-adventure (A Link to the Past style) plugin for PS Maker (Pixel Stories).",
   "license": "UNLICENSED",
@@ -12,7 +12,8 @@
     "test:integration": "node tests/integration/run-phaser-smoke.mjs",
     "check": "npm run typecheck && npm test && npm run build && npm run test:integration",
     "harness": "npm run build && node examples/harness/serve.mjs",
-    "docs:actions": "npm run build && node scripts/gen-actions-doc.mjs"
+    "docs:actions": "npm run build && node scripts/gen-actions-doc.mjs",
+    "build:probe": "node scripts/build-probe.mjs"
   },
   "dependencies": {
     "@ps-maker/plugin-api": "0.0.3"

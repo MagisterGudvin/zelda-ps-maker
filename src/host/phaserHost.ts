@@ -132,17 +132,60 @@ class AdoptedView implements EntityView {
   }
 }
 
+/**
+ * Debug overlay plus a coordinate picker: while the overlay is on (F9), a
+ * click on the map marks the point, shows "X: … Y: …" and copies "x, y" to the
+ * clipboard, so the numbers can be pasted into Position fields of plugin
+ * actions (the editor shows plugin positions as number fields, not a picker).
+ */
 class PhaserDebug implements DebugDraw {
   private readonly g: any;
   private readonly labels: any[] = [];
   private used = 0;
   private readonly scene: any;
+  private readonly pickG: any;
+  private readonly pickText: any;
+  private readonly cfg: ToolkitConfig;
+  private readonly logger: Logger;
+  private readonly onPointer = (pointer: any) => this.pick(pointer);
 
-  constructor(scene: any) {
+  constructor(scene: any, cfg: ToolkitConfig, logger: Logger) {
     this.scene = scene;
+    this.cfg = cfg;
+    this.logger = logger;
     this.g = scene.add.graphics();
     this.g.setDepth(DEBUG_DEPTH);
     this.g.setVisible(false);
+    this.pickG = scene.add.graphics();
+    this.pickG.setDepth(DEBUG_DEPTH + 2);
+    this.pickText = scene.add.text(0, 0, "", { fontFamily: "monospace", fontSize: "8px", color: "#ffff66", backgroundColor: "#000000cc" });
+    this.pickText.setDepth(DEBUG_DEPTH + 3);
+    this.pickText.setVisible(false);
+    scene.input?.on?.("pointerdown", this.onPointer);
+  }
+
+  /** Converts a click to map coordinates (pixels, and tiles when positionUnits = tiles). */
+  private pick(pointer: any): void {
+    if (!this.g.visible || !pointer) return;
+    const x = Math.round(pointer.worldX ?? pointer.x);
+    const y = Math.round(pointer.worldY ?? pointer.y);
+    const t = this.cfg.world.tileSize;
+    const tiles = this.cfg.world.positionUnits === "tiles";
+    const vx = tiles ? Math.floor(x / t) : x;
+    const vy = tiles ? Math.floor(y / t) : y;
+    this.pickG.clear();
+    this.pickG.lineStyle(1, 0xffff66, 1);
+    this.pickG.strokeCircle(x, y, 4);
+    this.pickG.lineBetween(x - 7, y, x + 7, y);
+    this.pickG.lineBetween(x, y - 7, x, y + 7);
+    const text = `X: ${vx} Y: ${vy}${tiles ? " (tiles)" : ""}`;
+    this.pickText.setText(`${text}  copied`).setPosition(x + 6, y + 6).setVisible(true);
+    this.logger.info(`Picked ${text} (pixels ${x}, ${y}).`);
+    try {
+      void navigator?.clipboard?.writeText?.(`${vx}, ${vy}`)?.catch?.(() => undefined);
+    } catch {
+      // Clipboard may be unavailable (insecure context); the label still shows the numbers.
+    }
   }
 
   clear(): void {
@@ -176,9 +219,16 @@ class PhaserDebug implements DebugDraw {
   }
   setVisible(visible: boolean): void {
     this.g.setVisible(visible);
-    if (!visible) for (const t of this.labels) t.setVisible(false);
+    if (!visible) {
+      for (const t of this.labels) t.setVisible(false);
+      this.pickG.clear();
+      this.pickText.setVisible(false);
+    }
   }
   dispose(): void {
+    this.scene.input?.off?.("pointerdown", this.onPointer);
+    this.pickG.destroy();
+    this.pickText.destroy();
     this.g.destroy();
     for (const t of this.labels) t.destroy();
     this.labels.length = 0;
@@ -238,7 +288,7 @@ export class PhaserHost implements HostAdapter {
       },
     };
     this.hud = this.game?.scene ? getHud(this.game, cfg, logger) : null;
-    this.debug = scene?.add ? new PhaserDebug(scene) : null;
+    this.debug = scene?.add ? new PhaserDebug(scene, cfg, logger) : null;
   }
 
   /** Hooks the per-frame callback and scene shutdown. */
