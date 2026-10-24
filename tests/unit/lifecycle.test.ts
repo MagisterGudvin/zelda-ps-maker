@@ -65,7 +65,7 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   f.events.emit("postupdate", 0, 16.6667);
   f.keyboard.emit("keyup", { code: "KeyX" });
   for (let i = 0; i < 30; i++) f.events.emit("postupdate", 0, 16.6667);
-  action("Zelda: Defeat Enemy").execute({ id: "e1", group: "" }, ctx);
+  action("Zelda: Remove Target").execute({ id: "e1", group: "", defeat: true }, ctx);
   f.events.emit("postupdate", 0, 16.6667);
   assert.equal(tk.state.flags.won, true);
 

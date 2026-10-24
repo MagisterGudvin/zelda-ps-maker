@@ -57,7 +57,7 @@
 
 ## Состояния
 
-`idle, destroyed, on, off, opened, closed, locked, unlocked, lit, revealed, hidden, carried`. Активные (для условий `switchOn` и др.): `on, opened, unlocked, lit, destroyed, revealed`. Изменить вручную — `Zelda: Set Object State`; сбросить в исходное и забыть сохранённое — `Zelda: Reset Object`.
+`idle, destroyed, on, off, opened, closed, locked, unlocked, lit, revealed, hidden, carried`. Активные (для условий `switchOn` и др.): `on, opened, unlocked, lit, destroyed, revealed`. Изменить вручную — `Zelda: Change Object` (операции open, close, on, off, toggle, reveal, hide, destroy, state); сбросить в исходное и забыть сохранённое — та же операция `reset`.
 
 ## Примеры JSON
 

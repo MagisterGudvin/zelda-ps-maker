@@ -187,6 +187,10 @@ export class FakeHost implements HostAdapter {
   describe(): string[] {
     return ["fake host"];
   }
+  sounds: { src: string; volume: number }[] = [];
+  playSound(src: string, volume: number): void {
+    this.sounds.push({ src, volume });
+  }
   readPlayerFacingHint(_current: Facing): Facing | null {
     return this.facingHint;
   }

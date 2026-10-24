@@ -17,11 +17,15 @@ export interface ToolkitConfig {
     logLevel: LogLevel;
     /** Re-throw errors from editor actions after logging them (development aid). */
     rethrowErrors: boolean;
-    /** Mirror toolkit events as `window` CustomEvents named like the event. */
-    domEvents: boolean;
     /** On-screen diagnostics panel (positions, depths, recent log lines). */
     diagnostics: boolean;
     diagnosticsKey: string;
+  };
+  /** Sound effects: toolkit moment -> audio (Zelda: Set Sound). */
+  audio: {
+    enabled: boolean;
+    volume: number;
+    sounds: Record<string, { src: string; volume: number }>;
   };
   /** Author sprite sheets and animations (Zelda: Define Sprite Sheet / Define Animation). */
   sprites: {
@@ -35,6 +39,8 @@ export interface ToolkitConfig {
     useArcadeStaticBodies: boolean;
     /** Treat colliding tiles of Phaser tilemap layers as walls. */
     useTilemapLayers: boolean;
+    /** PS Maker NPCs (moving Arcade bodies, colliding since PS Maker 1.1) block enemies and projectiles. */
+    npcsBlock: boolean;
     /**
      * "auto": follow PS Maker's own sorting — y-sorted when the player's depth
      * equals its y, otherwise the player's layer ± a tiny y offset.
@@ -254,13 +260,15 @@ export function createDefaultConfig(): ToolkitConfig {
       save: true,
       debugTools: true,
     },
-    debug: { hitboxes: false, toggleKey: "F9", logLevel: "warn", rethrowErrors: false, domEvents: false, diagnostics: false, diagnosticsKey: "F10" },
+    debug: { hitboxes: false, toggleKey: "F9", logLevel: "warn", rethrowErrors: false, diagnostics: false, diagnosticsKey: "F10" },
     sprites: { sheets: {}, animations: {} },
+    audio: { enabled: true, volume: 1, sounds: {} },
     world: {
       positionUnits: "pixels",
       tileSize: 16,
       useArcadeStaticBodies: true,
       useTilemapLayers: true,
+      npcsBlock: true,
       depthMode: "auto",
       depthBase: 0,
       fixedStepHz: 60,
@@ -447,7 +455,7 @@ export function mergeConfig(target: object, patch: unknown, path = "", issues: C
   return issues;
 }
 
-const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations"]);
+const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
 
 /** Ready-made balance presets selectable from the editor. */
 export const CONFIG_PRESETS: Record<string, unknown> = {

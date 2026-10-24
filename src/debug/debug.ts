@@ -15,7 +15,7 @@ const COLORS = {
 
 /**
  * Hitbox/state overlay. Toggled with `debug.toggleKey` (F9) or the
- * `Zelda: Toggle Debug` action. Draws nothing (and costs nothing) when off.
+ * `Zelda: Debug` action. Draws nothing (and costs nothing) when off.
  */
 export class DebugSystem {
   readonly name = "debug";

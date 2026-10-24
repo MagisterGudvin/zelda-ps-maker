@@ -1,6 +1,6 @@
 import type { HostAdapter } from "../host/types.ts";
 import { CONFIG_PRESETS, type ConfigIssue, createDefaultConfig, mergeConfig, type ToolkitConfig } from "./config.ts";
-import { EventBus, type FlagValue, type Unsubscribe } from "./events.ts";
+import { EventBus, type FlagValue } from "./events.ts";
 import { Logger, type LogSink } from "./logger.ts";
 import { createDefaultState, type GameState } from "./state.ts";
 import { Session, type SessionOptions } from "./session.ts";
@@ -36,7 +36,6 @@ export class Toolkit {
   session: Session | null = null;
   /** True once a game has been started or loaded (start items granted). */
   private gameInitialized = false;
-  private domBridge: Unsubscribe | null = null;
 
   constructor(options: ToolkitOptions = {}) {
     this.logger = new Logger("[ZeldaMakerToolkit]", options.logSink);
@@ -69,22 +68,9 @@ export class Toolkit {
   private applyRuntimeSettings(): void {
     this.logger.level = this.config.debug.logLevel;
     this.i18n.setLanguage(this.config.language);
-    this.updateDomBridge();
     this.session?.hud?.markDirty();
     this.session?.debug?.setEnabled(this.config.debug.hitboxes);
     if (this.session?.debug && this.session.debug.diagnosticsOn !== this.config.debug.diagnostics) this.session.debug.setDiagnostics(this.config.debug.diagnostics);
-  }
-
-  private updateDomBridge(): void {
-    const want = this.config.debug.domEvents && typeof window !== "undefined" && typeof CustomEvent !== "undefined";
-    if (want && !this.domBridge) {
-      this.domBridge = this.bus.onAny((name, payload) => {
-        window.dispatchEvent(new CustomEvent(name, { detail: payload }));
-      });
-    } else if (!want && this.domBridge) {
-      this.domBridge();
-      this.domBridge = null;
-    }
   }
 
   /** Starts a fresh game: default state plus configured starting items. */

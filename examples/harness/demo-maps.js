@@ -34,7 +34,7 @@ export const MAPS = {
     npcs: [{ name: "npc_guard", x: 120, y: 184, color: "#d9822b" }],
     onLoad: [
       ["Zelda: Start Toolkit", { mapId: "field", preset: "alttp", config: '{"debug":{"logLevel":"info"}}', language: "auto", debugHitboxes: false }],
-      ["Zelda: Leave Dungeon", {}],
+      ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
       ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, id: "sign_intro", config: '{"message":{"en":"Arrows: move  X: sword (hold = spin)  C: item  Q/E: switch item  Z: lift/open  I: items  F9: hitboxes","ru":"Стрелки: ход  X: меч (держать — круговой)  C: предмет  Q/E: смена  Z: поднять/открыть  I: предметы  F9: хитбоксы"}}' }],
       // 3. Sword targets and enemies (several types).

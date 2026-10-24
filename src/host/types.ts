@@ -21,6 +21,8 @@ export interface HostAdapter {
   previewSheet(sheetId: string | null): boolean;
   /** Host facts for the diagnostics panel (scene, camera, player). */
   describe(): string[];
+  /** Plays a sound by audio key or URL (loaded on first use). */
+  playSound(src: string, volume: number): void;
   /**
    * Optional facing hint (held movement keys, animation name). `current` lets
    * the host keep the current facing while two directions are held.

@@ -76,7 +76,7 @@
 Таблица дропа: `{ "chance": 0.4, "entries": [ { "item": "heart", "weight": 5 }, { "item": "rupees", "count": 5, "weight": 1 } ] }`.
 
 ### `world`
-`positionUnits "pixels" | "tiles"`, `tileSize 16` (шаг толкания блоков и пересчёт координат в режиме `tiles`), `useArcadeStaticBodies true`, `useTilemapLayers true` (источники коллизий карты), `depthMode "auto" | "y" | "fixed"` (`auto`: если PS Maker сортирует персонажей по y — тоже по y, иначе на слое игрока с поправкой по y, чтобы объекты не оказывались под слоями карты), `depthBase 0`, `fixedStepHz 60`, `maxStepsPerFrame 5`, `collisionRefreshTicks 120`.
+`positionUnits "pixels" | "tiles"`, `tileSize 16` (шаг толкания блоков и пересчёт координат в режиме `tiles`), `useArcadeStaticBodies true`, `useTilemapLayers true` (источники коллизий карты), `npcsBlock true` (NPC PS Maker — препятствия для врагов и снарядов), `depthMode "auto" | "y" | "fixed"` (`auto`: если PS Maker сортирует персонажей по y — тоже по y, иначе на слое игрока с поправкой по y, чтобы объекты не оказывались под слоями карты), `depthBase 0`, `fixedStepHz 60`, `maxStepsPerFrame 5`, `collisionRefreshTicks 120`.
 
 ### `ui`
 Классическая полоса: шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд).
@@ -85,8 +85,11 @@
 ### `save`
 `enabled true, storageKey "zelda-maker-toolkit", slot "default", autoSave true` (сундуки, двери, новые предметы, завершение подземелья), `autoLoadOnStart false`.
 
+### `audio`
+`enabled true, volume 1, sounds {}` — звуки моментов (`Zelda: Set Sound`): `{"audio":{"sounds":{"swordSwing":{"src":"sfx/swing.ogg","volume":0.8}}}}`. Список моментов — в [PS_MAKER_INTEGRATION.md](PS_MAKER_INTEGRATION.md#звук).
+
 ### `debug`, `language`, `publicApi`
-`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, domEvents false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, последние предупреждения и действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
+`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, последние предупреждения и действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
 
 ## Примеры
 

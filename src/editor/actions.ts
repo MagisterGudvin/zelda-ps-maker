@@ -16,7 +16,8 @@ import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, startSession } from "./runtime.ts";
 import { mapSceneOf } from "../host/phaserHost.ts";
-import { parseFlagValue, parseJsonValue, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { SOUND_EVENTS } from "../ui/sound.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 
@@ -30,6 +31,7 @@ const bool = (label: string, description: string, defaultValue = false) => ({ ty
 const pos = (label: string, description: string) => ({ type: "position" as const, label, description });
 const npc = (label: string, description: string) => ({ type: "npc" as const, label, description });
 const img = (label: string, description: string) => ({ type: "image" as const, label, description });
+const audio = (label: string, description: string) => ({ type: "audio" as const, label, description });
 
 type Ctx = PluginContext;
 
@@ -170,21 +172,150 @@ const pauseCombat = defineEvent({
   },
 });
 
-const diagnosticsAction = defineEvent({
-  name: "Zelda: Diagnostics",
-  description: "Shows an on-screen panel: player/camera positions, nearby toolkit objects, recent messages (same as F10). Use it when something does not appear. / Панель диагностики.",
-  parameterDefs: { enabled: bool("Enabled", "Show the panel.", true) },
+const debugAction = defineEvent({
+  name: "Zelda: Debug",
+  description: "Hitbox overlay (F9; click the map to read coordinates) and the diagnostics panel (F10): positions, nearby objects, recent warnings. / Отладка и диагностика.",
+  parameterDefs: {
+    hitboxes: bool("Hitboxes", "Show hitboxes (F9).", true),
+    diagnostics: bool("Diagnostics", "Show the diagnostics panel (F10).", false),
+  },
   execute(params, ctx) {
-    run("Zelda: Diagnostics", ctx, params, (s) => s.debug?.setDiagnostics(!!params.enabled));
+    run("Zelda: Debug", ctx, params, (s) => {
+      s.debug?.setEnabled(!!params.hitboxes);
+      s.debug?.setDiagnostics(!!params.diagnostics);
+    });
   },
 });
 
-const toggleDebug = defineEvent({
-  name: "Zelda: Toggle Debug",
-  description: "Shows or hides the hitbox/state overlay. / Показ отладочных хитбоксов.",
-  parameterDefs: { enabled: bool("Enabled", "Show the overlay.", true) },
+const runActions = defineEvent({
+  name: "Zelda: Run Actions",
+  description:
+    'Runs toolkit actions, optionally only when a toolkit condition holds (item, flag, enemy state...). PS Maker conditionals cannot read toolkit state, so check it here. E.g. When {"hasItem":"bow"}, Then [{"openDoor":"d1"}]. / Действия Toolkit с условием.',
+  parameterDefs: {
+    when: str("When (JSON, optional)", 'Condition, e.g. {"flag":"talked_to_sage"}. Empty = always.', ""),
+    then: str("Then (JSON)", 'Actions, e.g. [{"giveItem":{"item":"bombs","count":5}}]', "[]"),
+    else: str("Else (JSON)", "Actions when the condition is false.", ""),
+  },
   execute(params, ctx) {
-    run("Zelda: Toggle Debug", ctx, params, (s) => s.debug?.setEnabled(!!params.enabled));
+    run("Zelda: Run Actions", ctx, params, (s) => {
+      if (!s.rules) {
+        s.logger.warn('Run Actions: the "puzzles" feature is disabled.');
+        return;
+      }
+      const when = params.when.trim() ? json<Record<string, unknown>>(s, params.when, "Run Actions when") : {};
+      if (when === null) return;
+      const branch = json<RuleAction[]>(s, s.rules.evaluate(when) ? params.then : params.else, "Run Actions");
+      if (branch) s.rules.execute(Array.isArray(branch) ? branch : [branch], "Run Actions");
+    });
+  },
+});
+
+const enterDungeon = defineEvent({
+  name: "Zelda: Enter Dungeon",
+  description: "Marks the current dungeon: small keys and the Big Key are counted per dungeon. Empty ID = back to the overworld. / Вход в подземелье (пусто — выход).",
+  parameterDefs: {
+    dungeonId: str("Dungeon ID", "Unique dungeon id; empty to leave.", "dungeon_1"),
+    completeOnBoss: bool("Complete on boss", "Defeating a boss enemy completes the dungeon.", true),
+  },
+  execute(params, ctx) {
+    run("Zelda: Enter Dungeon", ctx, params, (s) => {
+      if (params.dungeonId) s.dungeons?.enter(params.dungeonId, { completeOnBoss: params.completeOnBoss });
+      else s.dungeons?.leave();
+    });
+  },
+});
+
+const OBJECT_OPERATIONS = ["open", "close", "on", "off", "toggle", "reveal", "hide", "reset", "destroy", "state"] as const;
+
+const changeObject = defineEvent({
+  name: "Zelda: Change Object",
+  description: "Changes an object by id. Operation: open, close (doors, chests), on, off, toggle (levers, buttons, plates), reveal, hide, reset (forget saved progress), destroy, or state (any state name). / Изменить объект.",
+  parameterDefs: {
+    id: str("ID", "Object id.", ""),
+    operation: str("Operation", OBJECT_OPERATIONS.join(" | "), "open"),
+    state: str("State", 'Only for operation "state": on, off, opened, closed, locked, unlocked, lit, destroyed, revealed, hidden.', ""),
+  },
+  execute(params, ctx) {
+    run("Zelda: Change Object", ctx, params, (s) => {
+      const o = objectById(s, params.id, "Change Object");
+      if (!o) return;
+      switch (params.operation.trim().toLowerCase()) {
+        case "open":
+          o.open();
+          break;
+        case "close":
+          o.close();
+          break;
+        case "on":
+          o.setState("on");
+          break;
+        case "off":
+          o.setState("off");
+          break;
+        case "toggle":
+          o.setState(o.objState === "on" ? "off" : "on");
+          break;
+        case "reveal":
+          o.reveal();
+          break;
+        case "hide":
+          o.hide();
+          break;
+        case "reset":
+          o.reset();
+          break;
+        case "destroy":
+          o.destroy();
+          break;
+        case "state":
+          if (params.state) o.setState(params.state as ObjectState);
+          break;
+        default:
+          s.logger.warn(`Change Object: unknown operation "${params.operation}" (use ${OBJECT_OPERATIONS.join(", ")}).`);
+      }
+    });
+  },
+});
+
+const removeTarget = defineEvent({
+  name: "Zelda: Remove Target",
+  description: "Removes an enemy or object by id, or every enemy of a group. Defeat = counts as beaten in battle (drops, rules, boss rewards). / Убрать или победить цель.",
+  parameterDefs: {
+    id: str("ID", "Enemy or object id (empty to use Group).", ""),
+    group: str("Group", "Enemy group.", ""),
+    defeat: bool("Defeat", "Enemies die with drops and events instead of vanishing.", true),
+  },
+  execute(params, ctx) {
+    run("Zelda: Remove Target", ctx, params, (s) => {
+      const targets = params.id ? [s.world.get(params.id)].filter(Boolean) : s.world.list("enemy").filter((e) => params.group && e.group === params.group);
+      if (targets.length === 0) s.logger.warn(`Remove Target: nothing matches id "${params.id}" / group "${params.group}".`);
+      for (const e of targets) {
+        if (params.defeat && e instanceof Enemy) e.die();
+        else if (e) s.world.remove(e);
+      }
+    });
+  },
+});
+
+const changePlayerStats = defineEvent({
+  name: "Zelda: Change Player Stats",
+  description: "Stat: health, max health (also refills) or magic. Mode: add (+/-) or set. 1 heart = 2 health points by default. / Здоровье и магия игрока.",
+  parameterDefs: {
+    stat: str("Stat", "health | max health | magic", "health"),
+    mode: str("Mode", "add | set", "add"),
+    amount: num("Amount", "Points.", 2),
+  },
+  execute(params, ctx) {
+    run("Zelda: Change Player Stats", ctx, params, (s, tk) => {
+      const stat = params.stat.trim().toLowerCase().replace(/[\s_-]/g, "");
+      const set = params.mode.trim().toLowerCase() === "set";
+      if (stat === "maxhealth") setMaxHealth(tk, set ? params.amount : tk.state.player.maxHp + params.amount, true);
+      else if (stat === "magic") changeMagic(tk, set ? params.amount - tk.state.player.magic : params.amount);
+      else if (stat === "health") {
+        if (set) setHealth(tk, params.amount);
+        else changeHealth(tk, params.amount);
+      } else s.logger.warn(`Change Player Stats: unknown stat "${params.stat}" (health, max health, magic).`);
+    });
   },
 });
 
@@ -196,7 +327,7 @@ const createEnemy = defineEvent({
   parameterDefs: {
     template: str("Template", "Enemy template name.", "slime"),
     position: pos("Position", "Where to spawn (ignored if an NPC is chosen)."),
-    npc: npc("Use NPC", "Optional: turn this placed NPC into the enemy (uses its sprite). / Превратить NPC во врага."),
+    npc: npc("Use NPC", "Optional: an NPC already spawned on this map (Spawn NPC runs earlier) becomes the enemy and keeps its sprite. / Превратить NPC на карте во врага."),
     id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
     group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
     animations: str("Animations", "Optional sprite-sheet animations: walk=slime_walk, attack=slime_attack, hurt=..., death=..., idle=... (ids from Zelda: Define Animation). / Анимации из спрайт-листа.", ""),
@@ -249,7 +380,7 @@ const createChest = defineEvent({
     item: str("Item", "Item or resource id: key, big_key, bombs, arrows, rupees, boomerang, bow, heart_container...", "key"),
     count: num("Count", "How many.", 1),
     requiresBigKey: bool("Needs Big Key", "Big chest that needs the dungeon's Big Key.", false),
-    hidden: bool("Hidden", "Starts invisible; reveal it with a rule or `Zelda: Reveal Object`.", false),
+    hidden: bool("Hidden", "Starts invisible; reveal it with a rule or Zelda: Change Object (reveal).", false),
   },
   execute(params, ctx) {
     run("Zelda: Create Chest", ctx, params, (s) => {
@@ -295,19 +426,6 @@ const placeItem = defineEvent({
     run("Zelda: Place Item", ctx, params, (s) => {
       const at = where(s, ctx, params.position, undefined, "Place Item");
       if (at) placePickup(s, params.item, Math.max(1, params.count || 1), at.x, at.y, params.id || undefined);
-    });
-  },
-});
-
-const removeTarget = defineEvent({
-  name: "Zelda: Remove Target",
-  description: "Removes an enemy or object by id (enemies die without drops). / Удаляет врага или объект.",
-  parameterDefs: { id: str("ID", "Enemy or object id.", "") },
-  execute(params, ctx) {
-    run("Zelda: Remove Target", ctx, params, (s) => {
-      const e = s.world.get(params.id);
-      if (e) s.world.remove(e);
-      else s.logger.warn(`Remove Target: "${params.id}" not found.`);
     });
   },
 });
@@ -362,37 +480,6 @@ const addRule = defineEvent({
       const spec: RuleSpec = { id: params.id, when, then: Array.isArray(then) ? then : [then], once: params.once };
       if (otherwise) spec.else = Array.isArray(otherwise) ? otherwise : [otherwise];
       s.rules.addRule(spec);
-    });
-  },
-});
-
-const ifAction = defineEvent({
-  name: "Zelda: If",
-  description: 'Checks a toolkit condition now (item, flag, enemy state...) and runs toolkit actions. E.g. when {"hasItem":"bow"}. / Проверка условия и действия.',
-  parameterDefs: {
-    when: str("When (JSON)", 'e.g. {"flag":"talked_to_sage"} or {"enemyState":{"id":"boss","state":"dead"}}', ""),
-    then: str("Then (JSON)", "Actions if true.", "[]"),
-    else: str("Else (JSON)", "Actions if false.", "[]"),
-  },
-  execute(params, ctx) {
-    run("Zelda: If", ctx, params, (s) => {
-      if (!s.rules) return;
-      const when = json<Record<string, unknown>>(s, params.when, "If when");
-      if (!when) return;
-      const branch = json<RuleAction[]>(s, s.rules.evaluate(when) ? params.then : params.else, "If branch");
-      if (branch) s.rules.execute(Array.isArray(branch) ? branch : [branch], "If");
-    });
-  },
-});
-
-const runActions = defineEvent({
-  name: "Zelda: Run Actions",
-  description: 'Runs a list of toolkit actions, e.g. [{"giveItem":{"item":"bombs","count":5}},{"openDoor":"d1"}]. / Выполняет список действий.',
-  parameterDefs: { actions: str("Actions (JSON)", "Array of action objects.", "[]") },
-  execute(params, ctx) {
-    run("Zelda: Run Actions", ctx, params, (s) => {
-      const list = json<RuleAction[]>(s, params.actions, "Run Actions");
-      if (list && s.rules) s.rules.execute(Array.isArray(list) ? list : [list], "Run Actions");
     });
   },
 });
@@ -549,6 +636,29 @@ const setPlayerSprites = defineEvent({
   },
 });
 
+const setSound = defineEvent({
+  name: "Zelda: Set Sound",
+  description: `Plays a sound at a toolkit moment: ${SOUND_EVENTS.join(", ")}. Leave Audio empty to remove it. / Звук для момента игры.`,
+  parameterDefs: {
+    moment: str("Moment", SOUND_EVENTS.join(" | "), "swordSwing"),
+    sound: audio("Sound", "Audio asset."),
+    soundKey: str("Sound key or URL", "Optional: audio key or file URL if the Sound picker does not work.", ""),
+    volume: num("Volume", "0..1", 1),
+  },
+  execute(params, ctx) {
+    run("Zelda: Set Sound", ctx, params, (s, tk) => {
+      if (!(SOUND_EVENTS as readonly string[]).includes(params.moment)) {
+        s.logger.warn(`Set Sound: unknown moment "${params.moment}" (${SOUND_EVENTS.join(", ")}).`);
+        return;
+      }
+      const scene = (s.host as { scene?: { cache?: { audio?: { exists(k: string): boolean } } } }).scene;
+      const src = params.soundKey || pickAudioSource(params.sound, (k) => !!scene?.cache?.audio?.exists(k));
+      tk.configure({ audio: { sounds: { [params.moment]: { src, volume: Number.isFinite(params.volume) ? params.volume : 1 } } } }, "Set Sound");
+      if (!src) s.logger.info(`Set Sound: "${params.moment}" has no sound now.`);
+    });
+  },
+});
+
 const previewSheet = defineEvent({
   name: "Zelda: Preview Sprite Sheet",
   description: "Shows a sprite sheet full screen with every frame number, to pick frames for Define Animation. Run it again with Show off to close. / Просмотр кадров.",
@@ -622,82 +732,7 @@ const startWaves = defineEvent({
   },
 });
 
-const enterDungeon = defineEvent({
-  name: "Zelda: Enter Dungeon",
-  description: "Marks the current dungeon: small keys and the Big Key are counted per dungeon. / Вход в подземелье.",
-  parameterDefs: {
-    dungeonId: str("Dungeon ID", "Unique dungeon id.", "dungeon_1"),
-    completeOnBoss: bool("Complete on boss", "Defeating a boss enemy completes the dungeon.", true),
-  },
-  execute(params, ctx) {
-    run("Zelda: Enter Dungeon", ctx, params, (s) => s.dungeons?.enter(params.dungeonId, { completeOnBoss: params.completeOnBoss }));
-  },
-});
-
-const leaveDungeon = defineEvent({
-  name: "Zelda: Leave Dungeon",
-  description: "Back to the overworld key counter. / Выход из подземелья.",
-  parameterDefs: {},
-  execute(params, ctx) {
-    run("Zelda: Leave Dungeon", ctx, params, (s) => s.dungeons?.leave());
-  },
-});
-
 // ---- object state ---------------------------------------------------------------------------
-
-const activateSwitch = defineEvent({
-  name: "Zelda: Activate Switch",
-  description: "Turns a lever/button/plate on or off. / Включает или выключает переключатель.",
-  parameterDefs: { id: str("ID", "Switch id.", ""), on: bool("On", "true = on, false = off.", true) },
-  execute(params, ctx) {
-    run("Zelda: Activate Switch", ctx, params, (s) => objectById(s, params.id, "Activate Switch")?.setState(params.on ? "on" : "off"));
-  },
-});
-
-const openDoor = defineEvent({
-  name: "Zelda: Open Door",
-  description: "Opens a door (or chest) by id. / Открывает дверь или сундук.",
-  parameterDefs: { id: str("ID", "Door id.", "") },
-  execute(params, ctx) {
-    run("Zelda: Open Door", ctx, params, (s) => objectById(s, params.id, "Open Door")?.open());
-  },
-});
-
-const closeDoor = defineEvent({
-  name: "Zelda: Close Door",
-  description: "Closes a door by id. / Закрывает дверь.",
-  parameterDefs: { id: str("ID", "Door id.", "") },
-  execute(params, ctx) {
-    run("Zelda: Close Door", ctx, params, (s) => objectById(s, params.id, "Close Door")?.close());
-  },
-});
-
-const setObjectState = defineEvent({
-  name: "Zelda: Set Object State",
-  description: "Sets an object's state: on, off, opened, closed, locked, unlocked, lit, destroyed, revealed, hidden. / Меняет состояние объекта.",
-  parameterDefs: { id: str("ID", "Object id.", ""), state: str("State", "New state.", "on") },
-  execute(params, ctx) {
-    run("Zelda: Set Object State", ctx, params, (s) => objectById(s, params.id, "Set Object State")?.setState(params.state as ObjectState));
-  },
-});
-
-const revealObject = defineEvent({
-  name: "Zelda: Reveal Object",
-  description: "Makes a hidden object (chest, passage...) appear. / Показывает скрытый объект.",
-  parameterDefs: { id: str("ID", "Object id.", "") },
-  execute(params, ctx) {
-    run("Zelda: Reveal Object", ctx, params, (s) => objectById(s, params.id, "Reveal Object")?.reveal());
-  },
-});
-
-const resetObject = defineEvent({
-  name: "Zelda: Reset Object",
-  description: "Restores an object to its initial state and forgets its saved progress. / Сбрасывает объект.",
-  parameterDefs: { id: str("ID", "Object id.", "") },
-  execute(params, ctx) {
-    run("Zelda: Reset Object", ctx, params, (s) => objectById(s, params.id, "Reset Object")?.reset());
-  },
-});
 
 // ---- inventory, health, flags ----------------------------------------------------------------
 
@@ -745,30 +780,6 @@ const equipItem = defineEvent({
   execute(params, ctx) {
     run("Zelda: Equip Item", ctx, params, (s, tk) => {
       if (!tk.inventory.equip(params.item || null)) s.logger.warn(`Equip Item: "${params.item}" is not an owned quick-use item.`);
-    });
-  },
-});
-
-const changePlayerHealth = defineEvent({
-  name: "Zelda: Change Player Health",
-  description: "mode add (+/-), set (exact value) or max (change maximum and refill). 1 heart = 2 points by default. / Здоровье игрока.",
-  parameterDefs: { mode: str("Mode", "add | set | max", "add"), amount: num("Amount", "Health points.", 2) },
-  execute(params, ctx) {
-    run("Zelda: Change Player Health", ctx, params, (_s, tk) => {
-      if (params.mode === "set") setHealth(tk, params.amount);
-      else if (params.mode === "max") setMaxHealth(tk, params.amount, true);
-      else changeHealth(tk, params.amount);
-    });
-  },
-});
-
-const changeMagicAction = defineEvent({
-  name: "Zelda: Change Magic",
-  description: "Adds or removes magic points. / Изменяет магию.",
-  parameterDefs: { amount: num("Amount", "Magic points (+/-).", 8) },
-  execute(params, ctx) {
-    run("Zelda: Change Magic", ctx, params, (_s, tk) => {
-      changeMagic(tk, params.amount);
     });
   },
 });
@@ -896,62 +907,34 @@ const defineEnemy = defineEvent({
   },
 });
 
-const killEnemy = defineEvent({
-  name: "Zelda: Defeat Enemy",
-  description: "Defeats an enemy (or every enemy of a group) as if killed in battle. / Побеждает врага или группу.",
-  parameterDefs: { id: str("ID", "Enemy id (leave empty to use Group).", ""), group: str("Group", "Enemy group.", "") },
-  execute(params, ctx) {
-    run("Zelda: Defeat Enemy", ctx, params, (s) => {
-      for (const e of s.world.list("enemy")) {
-        if (!(e instanceof Enemy)) continue;
-        if ((params.id && e.id === params.id) || (!params.id && params.group && e.group === params.group)) e.die();
-      }
-    });
-  },
-});
-
 /** Every action shown in the PS Maker event editor. */
 export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   startToolkit,
   configure,
   stopToolkit,
   pauseCombat,
-  toggleDebug,
-  diagnosticsAction,
+  debugAction,
   createEnemy,
   createObjectAction,
   createChest,
   createDoor,
   placeItem,
+  placeMarker,
+  changeObject,
   removeTarget,
   damageTarget,
-  killEnemy,
   addRule,
-  ifAction,
   runActions,
   switchSequence,
-  placeMarker,
-  defineSheet,
-  defineAnimation,
-  setPlayerSprites,
-  previewSheet,
   waveRoom,
   addWaveEnemy,
   startWaves,
   enterDungeon,
-  leaveDungeon,
-  activateSwitch,
-  openDoor,
-  closeDoor,
-  setObjectState,
-  revealObject,
-  resetObject,
   giveItem,
   spendResource,
   removeItem,
   equipItem,
-  changePlayerHealth,
-  changeMagicAction,
+  changePlayerStats,
   setFlag,
   setAbility,
   showMessage,
@@ -962,4 +945,9 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   resetProgress,
   defineItem,
   defineEnemy,
+  defineSheet,
+  defineAnimation,
+  setPlayerSprites,
+  previewSheet,
+  setSound,
 ];

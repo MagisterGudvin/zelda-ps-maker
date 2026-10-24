@@ -37,6 +37,7 @@ export class Bomb extends Entity {
     const cfg = session.config.items.bomb;
     const r = cfg.radius;
     spawnEffect(session, "explosion", this.x, this.y, 350, (r * 2) / 16);
+    session.bus.emit("zelda:bomb:exploded", { x: this.x, y: this.y });
     this.area.x = this.x;
     this.area.y = this.y;
     this.area.hw = r;

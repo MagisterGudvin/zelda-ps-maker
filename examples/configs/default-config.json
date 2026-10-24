@@ -17,7 +17,6 @@
     "toggleKey": "F9",
     "logLevel": "warn",
     "rethrowErrors": false,
-    "domEvents": false,
     "diagnostics": false,
     "diagnosticsKey": "F10"
   },
@@ -25,11 +24,17 @@
     "sheets": {},
     "animations": {}
   },
+  "audio": {
+    "enabled": true,
+    "volume": 1,
+    "sounds": {}
+  },
   "world": {
     "positionUnits": "pixels",
     "tileSize": 16,
     "useArcadeStaticBodies": true,
     "useTilemapLayers": true,
+    "npcsBlock": true,
     "depthMode": "auto",
     "depthBase": 0,
     "fixedStepHz": 60,

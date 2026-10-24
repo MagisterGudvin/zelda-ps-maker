@@ -33,7 +33,12 @@ export function resolvePosition(value: unknown, config: ToolkitConfig): Vec2 | n
   return { x: toWorld(config, x), y: toWorld(config, y) };
 }
 
-const ID_KEYS = ["id", "npcId", "instanceId", "uuid", "key", "name"];
+/**
+ * Since PS Maker 1.2 the NPC picker lists NPC assets, while the map holds
+ * "Spawned NPC" instances; instances are matched by their own id or by the id,
+ * name or texture of the asset they were spawned from.
+ */
+const ID_KEYS = ["id", "npcId", "instanceId", "uuid", "key", "name", "assetId", "npcAssetId", "characterId", "npcName"];
 
 function matches(obj: any, wanted: string): boolean {
   if (!obj) return false;
@@ -47,7 +52,8 @@ function matches(obj: any, wanted: string): boolean {
       if ((typeof v === "string" || typeof v === "number") && String(v) === wanted) return true;
     }
   }
-  const cfg = obj.config ?? obj.npc ?? obj.data?.values;
+  if (typeof obj.texture?.key === "string" && obj.texture.key === wanted) return true;
+  const cfg = obj.config ?? obj.npc ?? obj.asset ?? obj.data?.values;
   if (cfg && typeof cfg === "object") {
     for (const k of ID_KEYS) {
       const v = (cfg as Record<string, unknown>)[k];
@@ -94,6 +100,14 @@ export function pickImageSource(value: unknown, textureExists: (key: string) => 
   const list = imageCandidates(value);
   for (const c of list) if (textureExists(c)) return c;
   for (const c of list) if (/^(data:|blob:|https?:|\/)|\.(png|webp|gif|jpe?g)(\?.*)?$/i.test(c)) return c;
+  return list[0] ?? "";
+}
+
+/** Same idea for `audio` parameters: a loaded audio key first, then a URL-like value. */
+export function pickAudioSource(value: unknown, audioExists: (key: string) => boolean): string {
+  const list = imageCandidates(value);
+  for (const c of list) if (audioExists(c)) return c;
+  for (const c of list) if (/^(data:|blob:|https?:|\/)|\.(ogg|mp3|wav|m4a|webm)(\?.*)?$/i.test(c)) return c;
   return list[0] ?? "";
 }
 

@@ -36,6 +36,7 @@ export interface ZeldaEventMap {
   "zelda:object:lifted": { objectId: string };
   "zelda:object:thrown": { objectId: string };
   "zelda:block:moved": { objectId: string; x: number; y: number };
+  "zelda:bomb:exploded": { x: number; y: number };
   "zelda:switch:activated": { switchId: string; on: boolean };
   "zelda:chest:opened": { chestId: string; itemId: string | null; count: number };
   "zelda:door:unlocked": { doorId: string; lock: string };

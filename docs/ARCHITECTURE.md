@@ -14,7 +14,7 @@
 src/
   index.ts                  definePlugin(...) — точка входа для CLI
   editor/                   интеграция с PS Maker
-    actions.ts              50 действий редактора (defineEvent)
+    actions.ts              41 действие редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     paramResolvers.ts       разбор параметров position / npc / image
     publicApi.ts            globalThis.ZeldaMakerToolkit
@@ -42,7 +42,7 @@ src/
   interactions/             Interactable (все типы объектов), InteractionSystem, пресеты
   puzzles/                  RuleRegistry, RulesEngine, встроенные условия/действия, последовательности
   dungeons/                 DungeonSystem: подземелья, ключи, боссы, волны
-  ui/                       HudSystem (модель HUD), hudLayout (раскладка без наложений), i18n
+  ui/                       HudSystem (модель HUD), hudLayout (раскладка без наложений), sound (звуки моментов), i18n
   save/                     SaveManager: формат, версии, миграции, санитизация
   debug/                    DebugSystem: оверлей хитбоксов
 locales/{en,ru}/strings.ts  строки интерфейса
@@ -97,7 +97,7 @@ sync views → hud.tick (только при изменениях) → debug.tic
 | Условие / действие правил | `registerCondition(name, fn)`, `registerAction(name, fn)`. |
 | Объект | Комбинация полей `ObjectConfig` (инструменты, флаги, действия) без кода. |
 | Строки | `extendStrings({ ru: {...}, en: {...} })`. |
-| Реакция на события | `ZeldaMakerToolkit.on("zelda:enemy:defeated", fn)` или DOM-события при `debug.domEvents`. |
+| Реакция на события | `ZeldaMakerToolkit.on("zelda:enemy:defeated", fn)` — из плагина-расширения или события PS Maker «Run Code». |
 | Другой движок / тесты | Реализация `HostAdapter` (см. `tests/helpers/fakeHost.ts`). |
 
 ## Производительность

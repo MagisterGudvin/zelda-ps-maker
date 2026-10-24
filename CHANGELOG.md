@@ -2,6 +2,31 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.4.0] — 2026-10-24
+
+Сверено с PS Maker 1.0–1.2 (см. `docs/ENGINE_AUDIT.md`, раздел 9).
+
+### Изменено (несовместимо): действия объединены, 50 → 41
+| Было | Стало |
+|---|---|
+| `Open Door`, `Close Door`, `Activate Switch`, `Set Object State`, `Reveal Object`, `Reset Object` | `Zelda: Change Object` (Operation: open, close, on, off, toggle, reveal, hide, reset, destroy, state) |
+| `Toggle Debug`, `Diagnostics` | `Zelda: Debug` (Hitboxes, Diagnostics) |
+| `If`, `Run Actions` | `Zelda: Run Actions` (When — необязательно, Then, Else) |
+| `Leave Dungeon` | `Zelda: Enter Dungeon` с пустым ID |
+| `Defeat Enemy` | `Zelda: Remove Target` (Defeat = true, Group) |
+| `Change Player Health`, `Change Magic` | `Zelda: Change Player Stats` (Stat: health, max health, magic; Mode: add, set) |
+
+### Добавлено
+- `Zelda: Set Sound` — звуки моментов боя (взмах, круговой удар, попадание, победа над врагом, урон, блок, взрыв, разрушение, подбор, получение предмета, сундук, дверь, головоломка) из аудио-ассетов PS Maker или по URL; `audio.volume`, `audio.enabled`.
+- NPC PS Maker (подвижные тела Arcade, коллизии появились в PS Maker 1.1) — препятствия для врагов и снарядов (`world.npcsBlock`).
+- `docs/PS_MAKER_INTEGRATION.md`: титульный экран и сохранения PS Maker, карты, Spawned NPC, диалоги, звук, UI.
+
+### Улучшено
+- Поиск NPC для *Use NPC* учитывает экземпляры «Spawned NPC» (id/имя ассета, текстура).
+
+### Удалено
+- `debug.domEvents` (дублировал `ZeldaMakerToolkit.on`).
+
 ## [0.3.0] — 2026-10-20
 
 ### Добавлено

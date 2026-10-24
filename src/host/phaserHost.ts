@@ -299,6 +299,9 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private staticCount = -1;
   private tilemapLayers: any[] = [];
   private readonly candidates: StaticBox[] = [];
+  /** Moving NPC bodies, refreshed every tick (they move). */
+  private readonly npcBoxes: AABB[] = [];
+  private npcCount = 0;
   private frameListener: ((time: number, delta: number) => void) | null = null;
   private shutdownListener: (() => void) | null = null;
   private disposed = false;
@@ -563,6 +566,50 @@ export class PhaserHost implements HostAdapter, DepthSource {
     return true;
   }
 
+  private readonly soundKeys = new Map<string, string>();
+  private readonly soundLoading = new Set<string>();
+
+  /**
+   * Plays an audio key already in Phaser's cache (PS Maker assets) or loads a
+   * URL once and plays it when ready. Unknown sources are reported once.
+   */
+  playSound(src: string, volume: number): void {
+    const sound = this.scene?.sound;
+    const cache = this.scene?.cache?.audio;
+    if (!sound || !src) return;
+    try {
+      if (cache?.exists?.(src)) {
+        sound.play(src, { volume });
+        return;
+      }
+      let key = this.soundKeys.get(src);
+      if (!key) {
+        key = `zmt_snd_${this.soundKeys.size}`;
+        this.soundKeys.set(src, key);
+      }
+      if (cache?.exists?.(key)) {
+        sound.play(key, { volume });
+        return;
+      }
+      if (!/^(data:|blob:|https?:|\/|\.{0,2}\/)|\.(ogg|mp3|wav|m4a|webm)(\?.*)?$/i.test(src)) {
+        this.logger.warnOnce(`snd-${src}`, `Sound "${src}" is neither a loaded audio key nor an audio URL.`);
+        return;
+      }
+      if (this.soundLoading.has(key)) return;
+      const loader = this.scene.load;
+      this.soundLoading.add(key);
+      const k = key;
+      loader.once(`filecomplete-audio-${k}`, () => {
+        this.soundLoading.delete(k);
+        if (!this.disposed) sound.play(k, { volume });
+      });
+      loader.audio(k, src);
+      if (!loader.isLoading?.()) loader.start();
+    } catch (err) {
+      this.logger.warnOnce(`snd-err-${src}`, `Could not play sound "${src}":`, err);
+    }
+  }
+
   describe(): string[] {
     const s = this.scene;
     const p = this.player;
@@ -571,7 +618,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     const lines = [
       `scene "${s?.sys?.settings?.key ?? "?"}"  camera scroll ${n(cam?.scrollX)},${n(cam?.scrollY)} zoom ${n(cam?.zoom)} view ${n(cam?.width)}x${n(cam?.height)}`,
       `player sprite ${n(p?.x)},${n(p?.y)} depth ${n(p?.depth)} size ${n(p?.displayWidth)}x${n(p?.displayHeight)} body ${p?.body ? `${n(p.body.x)},${n(p.body.y)} ${n(p.body.width)}x${n(p.body.height)}` : "none"}`,
-      `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers`,
+      `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers, ${this.npcCount} NPC bodies`,
     ];
     return lines;
   }
@@ -584,10 +631,36 @@ export class PhaserHost implements HostAdapter, DepthSource {
       this.ySorted = Math.abs(p.depth - p.y) < 2 || Math.abs(p.depth - (p.body ? p.body.y + p.body.height : p.y)) < 2;
     }
     if (this.previewing) this.previewSheet(this.previewing);
+    this.refreshNpcBodies();
     const world = this.scene?.physics?.world;
     const statics = world?.staticBodies;
     const size = statics ? (statics.size ?? statics.entries?.length ?? 0) : 0;
     if (tick % Math.max(1, this.cfg.world.collisionRefreshTicks) === 1 || size !== this.staticCount) this.refreshCollisionCache();
+  }
+
+  /**
+   * Dynamic Arcade bodies other than the player (PS Maker NPCs). Adopted NPCs
+   * have their body disabled and are skipped automatically.
+   */
+  private refreshNpcBodies(): void {
+    this.npcCount = 0;
+    if (!this.cfg.world.npcsBlock) return;
+    const bodies = this.scene?.physics?.world?.bodies;
+    if (!bodies) return;
+    const list: any[] = bodies.entries ?? Array.from(bodies as Iterable<any>);
+    for (const body of list) {
+      if (!body || body.enable === false || body.gameObject === this.player || !(body.width > 0)) continue;
+      let b = this.npcBoxes[this.npcCount];
+      if (!b) {
+        b = makeBox();
+        this.npcBoxes.push(b);
+      }
+      b.x = body.x + body.width / 2;
+      b.y = body.y + body.height / 2;
+      b.hw = body.width / 2;
+      b.hh = body.height / 2;
+      this.npcCount++;
+    }
   }
 
   private refreshCollisionCache(): void {
@@ -630,6 +703,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
       }
     }
     c.length = 0;
+    for (let i = 0; i < this.npcCount; i++) if (overlaps(this.npcBoxes[i], box)) return true;
     for (const layer of this.tilemapLayers) {
       if (!layer.active) continue;
       const tiles = layer.getTilesWithinWorldXY(box.x - box.hw, box.y - box.hh, box.hw * 2, box.hh * 2, { isColliding: true });

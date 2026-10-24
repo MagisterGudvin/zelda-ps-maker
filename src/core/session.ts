@@ -12,6 +12,7 @@ import { RulesEngine } from "../puzzles/rules.ts";
 import { DungeonSystem } from "../dungeons/dungeonSystem.ts";
 import { HudSystem } from "../ui/hud.ts";
 import { DebugSystem } from "../debug/debug.ts";
+import { SoundSystem } from "../ui/sound.ts";
 import type { FeatureId } from "./config.ts";
 import type { Vec2 } from "./math.ts";
 import { toWorld } from "./units.ts";
@@ -57,6 +58,7 @@ export class Session {
   readonly dungeons: DungeonSystem | null;
   readonly hud: HudSystem | null;
   readonly debug: DebugSystem | null;
+  readonly sound: SoundSystem;
 
   tick = 0;
   /** Accumulated real time not yet consumed by fixed steps. */
@@ -82,6 +84,7 @@ export class Session {
     this.dungeons = f.dungeons ? new DungeonSystem(this) : null;
     this.hud = f.ui && toolkit.config.ui.enabled && host.hud ? new HudSystem(this) : null;
     this.debug = f.debugTools && host.debug ? new DebugSystem(this) : null;
+    this.sound = new SoundSystem(this);
 
     // Order matters: input-driven systems first, entities next, evaluation last.
     this.systems.push(this.player);
@@ -236,6 +239,7 @@ export class Session {
     this.dungeons?.dispose();
     this.hud?.dispose();
     this.debug?.dispose();
+    this.sound.dispose();
     this.subs.releaseAll();
     this.world.clear();
     this.markers.clear();

@@ -336,6 +336,49 @@ await check("sprite sheets: data-URL and texture-key sheets, attack overlay, ene
   return `overlay ${r.overlayFrame}, enemy ${r.enemyFrame}, preview ${r.labels} frames`;
 });
 
+await check("PS Maker NPC bodies block enemies; sounds load from a URL and play", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    const p = H.player().body.center;
+    // A moving-body NPC (PS Maker 1.1 NPCs collide) standing between an enemy and the player.
+    const npc = scene.physics.add.sprite(p.x + 40, p.y, "__WHITE").setDisplaySize(16, 16);
+    npc.body.setSize(16, 16).setImmovable(true);
+    window.ZeldaMakerToolkit.spawnEnemy("soldier", p.x + 80, p.y, { id: "npc_test", overrides: { lineOfSight: false, attackRange: 0 } });
+    // A tiny generated WAV as a data URL.
+    const rate = 8000;
+    const n = 800;
+    const buf = new ArrayBuffer(44 + n);
+    const v = new DataView(buf);
+    const w = (o, str) => [...str].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128 + Math.round(60 * Math.sin(i / 3)));
+    let bin = "";
+    new Uint8Array(buf).forEach((b) => (bin += String.fromCharCode(b)));
+    H.run("Zelda: Set Sound", { moment: "enemyDefeated", sound: "", soundKey: `data:audio/wav;base64,${btoa(bin)}`, volume: 1 });
+    await new Promise((ok) => setTimeout(ok, 2500));
+    const e = window.ZeldaMakerToolkit.session.world.get("npc_test");
+    const overlap = Math.abs(e.x - (npc.body.x + 8)) < e.hw + 8 && Math.abs(e.y - (npc.body.y + 8)) < e.hh + 8;
+    const ex = e.x;
+    const playedKeys = [];
+    const origPlay = scene.sound.play.bind(scene.sound);
+    scene.sound.play = (key, cfg) => {
+      playedKeys.push(key);
+      return origPlay(key, cfg);
+    };
+    e.die();
+    await new Promise((ok) => setTimeout(ok, 800));
+    const played = playedKeys.some((k) => String(k).startsWith("zmt_snd_")) && scene.cache.audio.exists(playedKeys[0]);
+    scene.sound.play = origPlay;
+    npc.destroy();
+    return { overlap, ex, npcX: npc.x, played, audioCtx: !!scene.sound.context };
+  });
+  assert(!r.overlap, `enemy walked into the NPC (x=${r.ex})`);
+  assert(r.played || !r.audioCtx, "sound was not played");
+  return `enemy stopped at x=${Math.round(r.ex)} (NPC at ${Math.round(r.npcX)}), sound played: ${r.played}`;
+});
+
 await check("no page errors or console errors", async () => {
   assert(pageErrors.length === 0, pageErrors.join("\n"));
   assert(consoleErrors.length === 0, consoleErrors.join("\n"));
