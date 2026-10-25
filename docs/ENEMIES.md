@@ -1,10 +1,20 @@
 # Противники
 
-`Zelda: Create Enemy` — Template (выпадающий список; *Custom template* — имя из `Define Enemy`), Position (выбор на карте; пусто — рядом с игроком), Look (PS Maker character) — выпадающий список персонажей (экспериментально: внешний вид и коллизия персонажа из библиотеки PS Maker, см. [SPRITES.md](SPRITES.md)), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
-`Zelda: Enemy From NPC` — NPC (список NPC на карте), Template, ID, Group, Health, Damage, Speed (см. ниже).
-`Zelda: Define Enemy` — новый тип на основе существующего: Template name, Based on, Health, Damage, Speed, Sight range, Boss, Immune to (`arrow, fire`). Дальше его имя пишется в *Template* у `Create Enemy`.
+`Zelda: Create Enemy`:
+- *Template* — список: slime, soldier, spitter, knight, sentry, ogre и Custom enemy 1–6 (свои типы из `Define Enemy`);
+- *Position* — точка на карте (пусто — рядом с игроком);
+- *Look (PS Maker character)* — внешний вид и коллизия персонажа из библиотеки PS Maker ([SPRITES.md](SPRITES.md));
+- *Group* — Group 1–9: правило *When group defeated* ждёт победы над всей группой;
+- *Health*, *Damage*, *Speed* — числа, 0 = как в шаблоне;
+- *Walk / Attack / Hurt / Death animation* — анимации PS Maker вручную;
+- *Patrol route* — путь на карте: кликните точки маршрута, враг обходит их по порядку;
+- *Sprite offset X/Y*, *Sprite scale* — положение картинки относительно хитбокса.
 
-**Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.
+`Zelda: Enemy From NPC` — *NPC* (список NPC на карте), *Template*, *Group*, *Health*, *Damage*, *Speed* (см. ниже).
+
+`Zelda: Define Enemy` — свой тип: *Enemy type* (Custom enemy 1–6), *Based on*, *Look*, *Health*, *Damage*, *Speed*, *Sight range*, *Boss*, *Immune to* (несколько типов урона), *Sprite offset/scale*. Затем выберите этот тип в *Template* у `Create Enemy`.
+
+Побеждённый босс запоминается по месту на карте — id не нужен.
 
 ## Встроенные шаблоны
 
@@ -52,8 +62,8 @@
 ## Свой шаблон
 
 ```
-Zelda: Define Enemy   Template name: fire_soldier  Based on: soldier  Health: 6  Immune to: fire
-Zelda: Create Enemy   Template: fire_soldier  Position: …
+Zelda: Define Enemy   Enemy type: Custom enemy 1  Based on: soldier  Health: 6  Immune to: [fire]
+Zelda: Create Enemy   Template: Custom enemy 1  Position: ●
 ```
 
 Из кода — поля, которых нет в форме (стрелок с веером из трёх снарядов):

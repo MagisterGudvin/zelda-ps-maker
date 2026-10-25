@@ -2,8 +2,9 @@ import type { EnemyConfig } from "../enemies/templates.ts";
 import type { Condition, RuleAction } from "../puzzles/ruleTypes.ts";
 
 // ---- parameter definitions ----------------------------------------------------------------
-// Forms never ask for JSON: choices are dropdowns (PS Maker's "string-enum", below),
-// switches are checkboxes, and ids or lists are short text.
+// The editor is a constructor: settings are numbers with an explanation, checkboxes,
+// dropdowns and PS Maker's own pickers (map point, path, area, variable, animation, key).
+// Text is only asked for content: sign text, messages, item names.
 // `label` is used by the official CLI templates but missing from the 0.0.3
 // typings; it is passed through untyped and is harmless if ignored.
 
@@ -40,14 +41,105 @@ export const inMapNpc = (label: string, description: string) => ({ type: "in-map
 /** "player-animation-picker": one of the player's PS Maker animations. Raw value: animation id. */
 export const playerAnim = (label: string, description: string) => ({ type: "player-animation-picker", label, description, defaultValue: "" }) as unknown as ReturnType<typeof str>;
 
-export const ENEMY_TEMPLATES = ["slime", "soldier", "spitter", "knight", "sentry", "ogre"] as const;
+/** "map-rectangle-area": an area drawn on the map. Raw value `{ x, y, width, height }`. */
+export const mapArea = (label: string, description: string) => ({ type: "map-rectangle-area", label, description }) as unknown as ReturnType<typeof pos>;
 
-/** Template dropdown plus an optional custom name (from Define Enemy) that wins. */
+/** "path": points clicked on the map in order. Raw value `[{ x, y }, ...]`. */
+export const mapPath = (label: string, description: string) => ({ type: "path", label, description }) as unknown as ReturnType<typeof pos>;
+
+/** "string-enum-multi": several options. Raw value `string[]`. */
+export const multi = (label: string, description: string, options: readonly (string | readonly [string, string])[]) =>
+  ({
+    type: "string-enum-multi",
+    label,
+    description,
+    defaultValue: [],
+    options: options.map((o) => (typeof o === "string" ? { label: o, value: o } : { value: o[0], label: o[1] })),
+  }) as unknown as ReturnType<typeof pos>;
+
+/** "variable": a dropdown of the project's variables. Raw value: variable id. */
+export const variable = (label: string, description: string) => ({ type: "variable", label, description, defaultValue: "" }) as unknown as ReturnType<typeof str>;
+
+/** "key-bindings": PS Maker's key picker. Raw value `[{ type: "key", key: "KeyX" } | { type: "control", controlId }]`. */
+export const keys = (label: string, description: string) => ({ type: "key-bindings", label, description, defaultValue: [] }) as unknown as ReturnType<typeof pos>;
+
+/** "animation": any PS Maker animation. Raw value: animation id. */
+export const animation = (label: string, description: string) => ({ type: "animation", label, description, defaultValue: "" }) as unknown as ReturnType<typeof str>;
+
+/** A point picked on the map, or null. */
+export function pointOf(v: unknown): { x: number; y: number } | null {
+  const o = v as { x?: unknown; y?: unknown } | null;
+  return o && typeof o === "object" && typeof o.x === "number" && typeof o.y === "number" && Number.isFinite(o.x) && Number.isFinite(o.y) ? { x: o.x, y: o.y } : null;
+}
+
+/** Points of a path, or []. */
+export function pathOf(v: unknown): { x: number; y: number }[] {
+  return Array.isArray(v) ? v.map(pointOf).filter((p): p is { x: number; y: number } => p !== null) : [];
+}
+
+/** An area drawn on the map, or null. */
+export function areaOf(v: unknown): { x: number; y: number; width: number; height: number } | null {
+  const o = v as { x?: unknown; y?: unknown; width?: unknown; height?: unknown } | null;
+  if (!o || typeof o !== "object") return null;
+  const [x, y, w, h] = [o.x, o.y, o.width, o.height].map(Number);
+  return [x, y, w, h].every(Number.isFinite) && w > 0 && h > 0 ? { x, y, width: w, height: h } : null;
+}
+
+/** Options of a multi-select (or a legacy comma list). */
+export function multiOf(v: unknown): string[] {
+  return Array.isArray(v) ? v.map(String).filter(Boolean) : listOf(v);
+}
+
+// ---- option lists -------------------------------------------------------------------------
+
+export const ENEMY_TEMPLATES = ["slime", "soldier", "spitter", "knight", "sentry", "ogre"] as const;
+/** Enemy types made with Zelda: Define Enemy (slots instead of typed names). */
+export const CUSTOM_ENEMY_SLOTS = [1, 2, 3, 4, 5, 6].map((n) => [`custom_enemy_${n}`, `Custom enemy ${n}`] as const);
+export const TEMPLATE_OPTIONS = [...ENEMY_TEMPLATES, ...CUSTOM_ENEMY_SLOTS];
+
+/** Items made with Zelda: Define Item. */
+export const CUSTOM_ITEM_SLOTS = [1, 2, 3, 4].map((n) => [`custom_item_${n}`, `Custom item ${n}`] as const);
+
+/** Everything that can be given, found in chests or placed on the ground. */
+export const ITEM_OPTIONS = [
+  ["rupees", "Rupees"],
+  ["heart", "Heart (refill)"],
+  ["heart_container", "Heart container (+1 max)"],
+  ["magic", "Magic (refill)"],
+  ["bombs", "Bombs"],
+  ["arrows", "Arrows"],
+  ["key", "Small key"],
+  ["big_key", "Big Key"],
+  ["map", "Dungeon map"],
+  ["compass", "Compass"],
+  ["sword", "Sword"],
+  ["shield", "Shield"],
+  ["glove", "Power glove (lift rocks)"],
+  ["bomb", "Bomb bag (use bombs)"],
+  ["boomerang", "Boomerang"],
+  ["bow", "Bow"],
+  ["hookshot", "Hookshot"],
+  ["fire_rod", "Fire rod"],
+  ["healing_spell", "Healing spell"],
+  ...CUSTOM_ITEM_SLOTS,
+] as const;
+
+/** Items the player equips or that can be switched off (abilities). */
+export const ABILITY_OPTIONS = [["sword", "Sword"], ["shield", "Shield"], ["glove", "Power glove"], ["bomb", "Bombs"], ["boomerang", "Boomerang"], ["bow", "Bow"], ["hookshot", "Hookshot"], ["fire_rod", "Fire rod"], ["healing_spell", "Healing spell"], ...CUSTOM_ITEM_SLOTS] as const;
+
+export const RESOURCE_OPTIONS = [["rupees", "Rupees"], ["bombs", "Bombs"], ["arrows", "Arrows"], ["magic", "Magic"], ["key", "Small keys"]] as const;
+
+/** Enemy groups by number (rules wait for a whole group). */
+export const GROUP_OPTIONS = [["", "No group"], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [String(n), `Group ${n}`] as const)] as const;
+
+export const DUNGEON_OPTIONS = [["", "Overworld (no dungeon)"], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`dungeon_${n}`, `Dungeon ${n}`] as const)] as const;
+
+export const SLOT_OPTIONS = [["default", "Slot 1"], ["2", "Slot 2"], ["3", "Slot 3"]] as const;
+
+/** Template dropdown (an older saved "Custom template" name still wins). */
 export function templateOf(p: Record<string, unknown>, fallback: string): string {
   return textOf(p.customTemplate) || textOf(p.template) || fallback;
 }
-
-export const customTemplate = () => str("Custom template", "Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон.", "");
 
 // ---- reading values -------------------------------------------------------------------------
 // PS Maker passes only the fields saved with the action: an action saved by an older
@@ -81,23 +173,24 @@ export function listOf(v: unknown): string[] {
 
 /** Conditions: every filled field must hold (empty = always). */
 export const WHEN_FIELDS = {
-  whenDefeated: str("When group defeated", "Every enemy of this group is beaten (Group of Create Enemy). / Побеждены все враги группы.", ""),
-  whenActive: str("When objects active", "Object ids, comma-separated: switches and plates on, doors and chests open, torches lit. / Объекты включены или открыты.", ""),
-  whenFlag: str("When flag set", "Flag name. / Флаг установлен.", ""),
-  whenItem: str("When player has", "Item id, e.g. bow or big_key. / У игрока есть предмет.", ""),
+  whenGroup: choice("When group defeated", "Every enemy of this group is beaten (Group of Create Enemy). / Побеждена вся группа врагов.", GROUP_OPTIONS, ""),
+  whenObjectAt: mapPos("When object at", "Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт."),
+  whenObjectAt2: mapPos("…and object at", "Optional second object. / Второй объект."),
+  whenVariable: variable("When variable is on", "A project variable that must be true (or not 0). / Переменная проекта включена."),
+  whenItem: choice("When player has", "Item the player must have. / У игрока есть предмет.", [["", "—"], ...ITEM_OPTIONS], ""),
   whenBoss: bool("When boss defeated", "The boss of the current dungeon (Enter Dungeon) is beaten. / Побеждён босс подземелья.", false),
 };
 
 /** Actions: every filled field runs. */
 export const THEN_FIELDS = {
-  openDoors: str("Open doors", "Door ids, comma-separated. / Открыть двери.", ""),
-  reveal: str("Reveal", "Hidden object ids (chests, passages), comma-separated. / Показать скрытые объекты.", ""),
-  setFlag: str("Set flag", "Flag to set. / Установить флаг.", ""),
-  giveItem: str("Give item", "Item or resource id. / Выдать предмет.", ""),
-  giveCount: num("Item count", "How many to give.", 1),
+  openDoorAt: mapPos("Open door at", "Pick a door on the map. / Открыть дверь."),
+  revealAt: mapPos("Reveal object at", "Pick a hidden chest or passage on the map. / Показать скрытый объект."),
+  turnOnVariable: variable("Turn on variable", "Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта."),
+  giveItem: choice("Give item", "Item to give. / Выдать предмет.", [["", "—"], ...ITEM_OPTIONS], ""),
+  giveCount: num("Item count", "How many to give (rupees, bombs, arrows...). / Сколько.", 1),
   message: str("Message", "Text to show. / Показать сообщение.", ""),
-  spawnEnemy: str("Spawn enemy", "Enemy template to create, e.g. ogre. / Создать врага.", ""),
-  spawnAt: str("Spawn at marker", "Marker id (Zelda: Place Marker) where it appears. / Маркер появления.", ""),
+  spawnEnemy: choice("Spawn enemy", "Enemy to create. / Создать врага.", [["", "—"], ...TEMPLATE_OPTIONS], ""),
+  spawnAt: mapPos("Spawn at", "Where the enemy appears. / Где появится."),
 };
 
 /** Enemy stat changes: 0 keeps the template value. */
@@ -116,22 +209,34 @@ export const SPRITE_FIELDS = {
 
 export function buildWhen(p: Record<string, unknown>): Condition {
   const when: Condition = {};
-  if (textOf(p.whenDefeated)) when.enemiesDefeated = textOf(p.whenDefeated);
-  if (listOf(p.whenActive).length) when.objectActive = listOf(p.whenActive);
-  if (textOf(p.whenFlag)) when.flag = textOf(p.whenFlag);
+  const group = textOf(p.whenGroup) || textOf(p.whenDefeated);
+  if (group) when.enemiesDefeated = group;
+  const points = [pointOf(p.whenObjectAt), pointOf(p.whenObjectAt2)].filter(Boolean);
+  if (points.length) when.objectActiveAt = points;
+  if (textOf(p.whenVariable)) when.variableOn = textOf(p.whenVariable);
   if (textOf(p.whenItem)) when.hasItem = textOf(p.whenItem);
   if (boolOr(p.whenBoss, false)) when.bossDefeated = true;
+  // Fields saved by 0.5.x (ids and flag names typed as text).
+  if (listOf(p.whenActive).length) when.objectActive = listOf(p.whenActive);
+  if (textOf(p.whenFlag)) when.flag = textOf(p.whenFlag);
   return when;
 }
 
 export function buildThen(p: Record<string, unknown>): RuleAction[] {
   const then: RuleAction[] = [];
+  const door = pointOf(p.openDoorAt);
+  if (door) then.push({ openDoorAt: door });
+  const hidden = pointOf(p.revealAt);
+  if (hidden) then.push({ revealAt: hidden });
+  if (textOf(p.turnOnVariable)) then.push({ setVariable: { id: textOf(p.turnOnVariable), value: true } });
+  if (textOf(p.giveItem)) then.push({ giveItem: { item: textOf(p.giveItem), count: Math.max(1, Math.round(numOr(p.giveCount, 1))) } });
+  if (textOf(p.message)) then.push({ message: textOf(p.message) });
+  const spawnAt = pointOf(p.spawnAt);
+  if (textOf(p.spawnEnemy)) then.push({ spawnEnemy: spawnAt ? { template: textOf(p.spawnEnemy), x: spawnAt.x, y: spawnAt.y } : { template: textOf(p.spawnEnemy), at: textOf(p.spawnAt) } });
+  // Fields saved by 0.5.x.
   if (listOf(p.openDoors).length) then.push({ openDoor: listOf(p.openDoors) });
   if (listOf(p.reveal).length) then.push({ reveal: listOf(p.reveal) });
   if (textOf(p.setFlag)) then.push({ setFlag: textOf(p.setFlag) });
-  if (textOf(p.giveItem)) then.push({ giveItem: { item: textOf(p.giveItem), count: Math.max(1, Math.round(numOr(p.giveCount, 1))) } });
-  if (textOf(p.message)) then.push({ message: textOf(p.message) });
-  if (textOf(p.spawnEnemy)) then.push({ spawnEnemy: { template: textOf(p.spawnEnemy), at: textOf(p.spawnAt) } });
   return then;
 }
 

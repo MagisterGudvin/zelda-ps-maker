@@ -90,6 +90,8 @@ Z.save();  Z.load();
 // Текущая карта
 Z.spawnEnemy("slime", 120, 80, { id: "s1", group: "room1" });
 Z.createObject("chest", 64, 64, { id: "c9", overrides: { contents: { item: "key", count: 1 } } });
+Z.addRule({ id: "hint", when: { playerHealth: { lte: 2 } }, then: [{ message: "Low health!" }] }); // полный словарь правил (RULES.md)
+Z.runActions([{ giveItem: { item: "bombs", count: 5 } }]);
 Z.session;   // текущая Session (или null)
 Z.toolkit;   // экземпляр Toolkit (для продвинутых расширений)
 ```

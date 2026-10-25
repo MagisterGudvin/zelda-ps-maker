@@ -35,21 +35,21 @@
 
 | Поле | Смысл |
 |---|---|
-| Item ID, Name, Icon | имя предмета, название в сообщениях, иконка (картинка PS Maker) |
-| Uses, Cost | что тратит одно использование: `magic`, `arrows`, `bombs`, `rupees` или пусто (бесплатно) и сколько |
-| Damage, Damage type | урон выстрела; тип урона (`magic`, `fire`, `ice`…) — враги могут быть к нему устойчивы |
+| Item, Name, Icon | какой из своих предметов (Custom item 1–4), название в сообщениях, иконка (картинка PS Maker) |
+| Uses, Cost | что тратит одно использование (список: ничего, рупии, бомбы, стрелы, магия, ключи) и сколько |
+| Damage, Damage type | урон выстрела; тип урона (список) — враги могут быть к нему устойчивы |
 | Area attack | бить всё вокруг игрока вместо выстрела |
 | Stun (ms) | оглушить врагов при попадании |
 | Heal | восстановить половинок сердца (предмет становится лечебным) |
 | Give now | сразу выдать игроку |
 
-Что получится: *Heal* > 0 — лечебный предмет; иначе *Damage* > 0 — выстрел (или удар вокруг с *Area attack*); иначе — сюжетный предмет для условий *When player has*.
+Что получится: *Heal* > 0 — лечебный предмет; иначе *Damage* > 0 — выстрел (или удар вокруг с *Area attack*); иначе — сюжетный предмет для условий *When player has*. Свой предмет выбирается как Custom item 1–4 во всех списках предметов (Give Item, сундуки, правила).
 
-Пример «Ледяной жезл»: Item ID `ice_rod`, Name `Ледяной жезл`, Uses `magic`, Cost `4`, Damage `3`, Damage type `ice`, Stun `1200`.
+Пример «Ледяной жезл»: Item *Custom item 1*, Name `Ледяной жезл`, Uses *Magic*, Cost `4`, Damage `3`, Damage type *ice*, Stun `1200`.
 
 Из кода доступны все поля (скорость и дальность выстрела, пробивание, эффекты `restoreMagic`, `setFlag`, `emit`, перевод названия): `ZeldaMakerToolkit.defineItem({ id, name: { en, ru }, effect: "projectile", projectile: { speed, range, pierce } })`.
 
-Свой ресурс (например, «семена») пока объявляется из кода: `ZeldaMakerToolkit.configure({ inventory: { capacities: { seeds: 50 } } })`; затем *Uses* = `seeds`, пополнение — `Give Item`. Названия ресурсов для сообщений — через строки `item.seeds.name` (`ZeldaMakerToolkit.extendStrings`) или поле `name` у предмета с `"stackable": true`.
+Свой ресурс (например, «семена») пока доступен только из кода: `ZeldaMakerToolkit.configure({ inventory: { capacities: { seeds: 50 } } })` и `ZeldaMakerToolkit.defineItem({ resource: "seeds", ... })`. Названия ресурсов для сообщений — через строки `item.seeds.name` (`ZeldaMakerToolkit.extendStrings`) или поле `name` у предмета с `"stackable": true`.
 
 ## Предмет из кода
 

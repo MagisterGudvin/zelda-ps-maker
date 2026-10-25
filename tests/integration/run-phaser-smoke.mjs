@@ -85,7 +85,7 @@ await check("NPC placed in the editor is adopted as an enemy visual", async () =
   const r = await ev(() => {
     const s = window.__harness.scene();
     const npc = s.children.list.find((o) => o.name === "npc_guard");
-    const enemy = window.ZeldaMakerToolkit.session.world.get("knight_1");
+    const enemy = window.ZeldaMakerToolkit.session.world.get("npc_enemy@120,184");
     return { found: !!npc, bodyDisabled: npc?.body?.enable === false, same: npc && enemy && Math.abs(npc.x - enemy.x) < 0.01 };
   });
   assert(r.found && r.bodyDisabled && r.same, JSON.stringify(r));
@@ -148,7 +148,7 @@ await check("toolkit solids block the player (walking up into a chest)", async (
   await page.keyboard.up("ArrowUp");
   const r = await ev(() => {
     const b = window.__harness.player().body;
-    const chest = window.ZeldaMakerToolkit.session.world.get("boomerang_chest");
+    const chest = window.ZeldaMakerToolkit.session.world.get("chest@200,40");
     return { top: b.y, chestBottom: chest.y + chest.hh };
   });
   assert(r.top >= r.chestBottom - 1, JSON.stringify(r));
@@ -172,7 +172,7 @@ await check("bomb spends one bomb and opens the cracked wall; the passage is wal
   const bombs = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.count("bombs"));
   await teleport(56, 140);
   await sleep(2800);
-  const wall = await ev(() => window.ZeldaMakerToolkit.session.world.get("secret_wall").objState);
+  const wall = await ev(() => window.ZeldaMakerToolkit.session.world.get("bombable_wall@56,88").objState);
   await teleport(56, 110);
   await page.keyboard.down("ArrowUp");
   await sleep(500);
@@ -190,7 +190,7 @@ await check("boomerang over the pits hits the switch; the rule opens the gate", 
   await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.equip("boomerang"));
   await tapKey("c");
   await sleep(1600);
-  const r = await ev(() => ({ sw: window.ZeldaMakerToolkit.session.world.get("gate_switch").objState, gate: window.ZeldaMakerToolkit.session.world.get("gate").objState }));
+  const r = await ev(() => ({ sw: window.ZeldaMakerToolkit.session.world.get("button@340,40").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,120").objState }));
   assert(r.sw === "on" && r.gate === "opened", JSON.stringify(r));
 });
 
@@ -237,10 +237,10 @@ await check("map transfer restarts the scene without leaking listeners", async (
 await check("dungeon: push the block onto the plate, the shutter opens", async () => {
   await teleport(66, 168);
   await page.keyboard.down("ArrowRight");
-  await page.waitForFunction(() => window.ZeldaMakerToolkit.session.world.get("plate_1").objState === "on", null, { timeout: 4000 });
+  await page.waitForFunction(() => window.ZeldaMakerToolkit.session.world.get("pressure_plate@104,168").objState === "on", null, { timeout: 4000 });
   await page.keyboard.up("ArrowRight");
   await sleep(200);
-  const door = await ev(() => window.ZeldaMakerToolkit.session.world.get("puzzle_door").objState);
+  const door = await ev(() => window.ZeldaMakerToolkit.session.world.get("door@100,112").objState);
   assert(door === "opened", `door ${door}`);
 });
 
@@ -255,7 +255,7 @@ await check("dungeon: key from the chest opens the locked door", async () => {
   await page.keyboard.down("ArrowRight");
   await sleep(500);
   await page.keyboard.up("ArrowRight");
-  const r = await ev(() => ({ door: window.ZeldaMakerToolkit.session.world.get("key_door").objState, keys: window.ZeldaMakerToolkit.toolkit.inventory.count("key") }));
+  const r = await ev(() => ({ door: window.ZeldaMakerToolkit.session.world.get("door@200,120").objState, keys: window.ZeldaMakerToolkit.toolkit.inventory.count("key") }));
   assert(keys === 1, `keys after chest ${keys}`);
   assert(r.door === "unlocked" && r.keys === 0, JSON.stringify(r));
 });
@@ -274,7 +274,7 @@ await page.screenshot({ path: `${ARTIFACTS}dungeon.png` });
 await check("progress persists across maps (opened chests stay open)", async () => {
   await teleport(4, 200);
   await waitForMap("field");
-  const r = await ev(() => ({ chest: window.ZeldaMakerToolkit.session.world.get("boomerang_chest").objState, wall: window.ZeldaMakerToolkit.session.world.get("secret_wall").objState, gate: window.ZeldaMakerToolkit.session.world.get("gate").objState }));
+  const r = await ev(() => ({ chest: window.ZeldaMakerToolkit.session.world.get("chest@200,40").objState, wall: window.ZeldaMakerToolkit.session.world.get("bombable_wall@56,88").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,120").objState }));
   assert(r.chest === "opened" && r.wall === "destroyed" && r.gate === "opened", JSON.stringify(r));
 });
 
@@ -292,27 +292,40 @@ await check("save (F5) and load (F8) restore progress from localStorage", async 
   return `rupees restored to ${r0}`;
 });
 
-await check("sprite sheets: data-URL and texture-key sheets, attack overlay, enemy animation, preview", async () => {
+await check("PS Maker animations: picked player attack overlays the swing, picked walk animates an enemy", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
     const scene = H.scene();
-    // A 4x2 sheet of 16x16 frames with distinct colors, as a texture and as a data URL.
-    const c = document.createElement("canvas");
-    c.width = 64;
-    c.height = 32;
-    const g = c.getContext("2d");
-    for (let i = 0; i < 8; i++) {
-      g.fillStyle = `hsl(${i * 45},80%,50%)`;
-      g.fillRect((i % 4) * 16, Math.floor(i / 4) * 16, 16, 16);
-    }
-    scene.textures.addCanvas("test_sheet_tex", c);
-    H.run("Zelda: Define Sprite Sheet", { id: "hero", image: "test_sheet_tex", imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
-    H.run("Zelda: Define Sprite Sheet", { id: "url_sheet", image: { url: c.toDataURL() }, imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
-    H.run("Zelda: Define Animation", { id: "slash", sheet: "hero", frames: "0, 1, 2, 3", framesUp: "", framesLeft: "", framesRight: "4, 5, 6, 7", fps: 0, loop: false });
-    H.run("Zelda: Define Animation", { id: "blob_walk", sheet: "url_sheet", frames: "1,2", fps: 6, loop: true });
-    H.run("Zelda: Set Player Sprites", { attack: "slash", weaponAttack: "", spin: "", weaponSpin: "", charge: "", weaponCharge: "", hurt: "", behindUp: true, behindDown: false, behindLeft: false, behindRight: false, hidePlayer: true, offsetX: 0, offsetY: 0 });
-    H.run("Zelda: Define Enemy", { name: "blind_slime", basedOn: "slime", hp: 0, damage: 0, speed: 0, detectRange: 1, boss: false, immuneTo: "" });
-    H.run("Zelda: Create Enemy", { template: "blind_slime", position: { x: 60, y: 200 }, id: "anim_slime", group: "", hp: 0, damage: 0, speed: 0, walkAnimation: "blob_walk", attackAnimation: "", hurtAnimation: "", deathAnimation: "", patrol: "" });
+    // Two PS Maker sheets (4x4 frames of 16x16, rows = down, left, right, up) loaded the way
+    // PS Maker 1.2.1 does: texture "<animationId>frames", project data in scene.sys.settings.data.story.
+    const sheetCanvas = (hueBase) => {
+      const c = document.createElement("canvas");
+      c.width = 64;
+      c.height = 64;
+      const g = c.getContext("2d");
+      for (let i = 0; i < 16; i++) {
+        g.fillStyle = `hsl(${hueBase + i * 20},80%,50%)`;
+        g.fillRect((i % 4) * 16, Math.floor(i / 4) * 16, 16, 16);
+      }
+      return c;
+    };
+    scene.textures.addCanvas("ATK0frames", sheetCanvas(0));
+    scene.textures.addCanvas("WLK0frames", sheetCanvas(180));
+    const rows = (id) => [0, 1, 2, 3].map((row) => ({ id: id + row, startCol: 0, startRow: row, endCol: 3, endRow: row }));
+    scene.sys.settings.data = {
+      ...(scene.sys.settings.data ?? {}),
+      story: {
+        characters: [{ id: "MOB", name: "Mob", animationSets: [{ id: "m", animations: { down: "WLK0", left: "WLK1", right: "WLK2", up: "WLK3" } }] }],
+        spritesheetAnimations: [
+          { id: "ATK", name: "Sword Attack", src: "atk.png", frameWidth: 16, frameHeight: 16, frameRate: 8, ownerRef: { type: "player" }, animations: rows("ATK") },
+          { id: "WLK", name: "Mob Walk", src: "wlk.png", frameWidth: 16, frameHeight: 16, frameRate: 6, ownerRef: { type: "npc", id: "MOB" }, animations: rows("WLK") },
+        ],
+        player: { animationSets: [{ id: "p", animations: { down: "ATK0", left: "ATK1", right: "ATK2", up: "ATK3" } }] },
+      },
+    };
+    H.run("Zelda: Set Player Sprites", { attack: "ATK1", hidePlayer: true });
+    H.run("Zelda: Define Enemy", { slot: "custom_enemy_6", basedOn: "slime", detectRange: 1 });
+    H.run("Zelda: Create Enemy", { template: "custom_enemy_6", position: { x: 60, y: 200 }, walkAnimation: "WLK0" });
     await new Promise((ok) => setTimeout(ok, 400));
     const p = H.player();
     const before = p.alpha;
@@ -320,25 +333,19 @@ await check("sprite sheets: data-URL and texture-key sheets, attack overlay, ene
     scene.input.keyboard.emit("keyup", { code: "KeyX" });
     await new Promise((ok) => setTimeout(ok, 120));
     const during = p.alpha;
-    const overlay = scene.children.list.filter((o) => o.type === "Image" && o.visible && o.texture?.key === "test_sheet_tex" && String(o.frame?.name).startsWith("zmt_16x16_"));
+    const overlay = scene.children.list.filter((o) => o.type === "Image" && o.visible && o.texture?.key === "ATK0frames" && String(o.frame?.name).startsWith("zmt_16x16_"));
     await new Promise((ok) => setTimeout(ok, 600));
     const after = p.alpha;
-    const enemyImg = scene.children.list.find((o) => o.type === "Image" && String(o.texture?.key).startsWith("zmt_sheet_url_sheet"));
-    H.run("Zelda: Preview Sprite Sheet", { sheet: "hero", show: true });
-    await new Promise((ok) => setTimeout(ok, 100));
-    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
-    const labels = hud.children.list.filter((o) => o.type === "Text" && o.visible && /^[0-7]$/.test(o.text)).length;
-    H.run("Zelda: Preview Sprite Sheet", { sheet: "hero", show: false });
-    return { before, during, after, overlay: overlay.length, overlayFrame: overlay[0]?.frame?.name, enemyFrame: enemyImg?.frame?.name ?? null, labels };
+    const enemyImg = scene.children.list.find((o) => o.type === "Image" && o.texture?.key === "WLK0frames");
+    return { before, during, after, overlay: overlay.length, overlayFrame: overlay[0]?.frame?.name, enemyFrame: enemyImg?.frame?.name ?? null };
   });
   assert(r.during === 0 && r.after === r.before, `player alpha ${r.before} → ${r.during} → ${r.after}`);
   assert(r.overlay >= 1, "attack overlay image not shown");
-  assert(r.enemyFrame === "zmt_16x16_1" || r.enemyFrame === "zmt_16x16_2", `enemy frame ${r.enemyFrame}`);
-  assert(r.labels === 8, `preview labels ${r.labels}`);
-  return `overlay ${r.overlayFrame}, enemy ${r.enemyFrame}, preview ${r.labels} frames`;
+  assert(/^zmt_16x16_\d+$/.test(r.enemyFrame ?? ""), `enemy frame ${r.enemyFrame}`);
+  return `overlay ${r.overlayFrame}, enemy ${r.enemyFrame}`;
 });
 
-await check("PS Maker project data: a character's sheets animate a Create Enemy (real Phaser scene search)", async () => {
+await check("PS Maker project data: a character's sheets and collision box shape a Create Enemy", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
     const scene = H.scene();
@@ -356,10 +363,10 @@ await check("PS Maker project data: a character's sheets animate a Create Enemy 
     // PS Maker 1.2.1 loads each animation row as a whole-sheet texture "<animationId>frames".
     scene.textures.addCanvas("RUN10frames", c);
     const rowsOf = (id) => [0, 1, 2, 3].map((row) => ({ id: id + row, startCol: 0, startRow: row, endCol: 3, endRow: row }));
-    H.game.cache.json.add("story", {
-      characters: [{ id: "BLOB", name: "Blob", animationSets: [{ id: "s", animations: { down: "RUN10", left: "RUN11", right: "RUN12", up: "RUN13" }, collision: { enabled: true, box: { x: 10, y: 14, width: 12, height: 12 } } }] }],
-      spritesheetAnimations: [{ id: "RUN1", name: "Blob Run", src, frameWidth: 32, frameHeight: 32, frameRate: 8, ownerRef: { type: "npc", id: "BLOB" }, animations: rowsOf("RUN1") }],
-    });
+    // Added to the project data where PS Maker 1.2.1 keeps it (the previous check created it).
+    const story = scene.sys.settings.data.story;
+    story.characters.push({ id: "BLOB", name: "Blob", animationSets: [{ id: "s", animations: { down: "RUN10", left: "RUN11", right: "RUN12", up: "RUN13" }, collision: { enabled: true, box: { x: 10, y: 14, width: 12, height: 12 } } }] });
+    story.spritesheetAnimations.push({ id: "RUN1", name: "Blob Run", src, frameWidth: 32, frameHeight: 32, frameRate: 8, ownerRef: { type: "npc", id: "BLOB" }, animations: rowsOf("RUN1") });
     const t0 = performance.now();
     H.run("Zelda: Create Enemy", { template: "slime", position: { x: 80, y: 60 }, id: "ps_blob", character: "BLOB" });
     const searchMs = performance.now() - t0;
@@ -371,7 +378,7 @@ await check("PS Maker project data: a character's sheets animate a Create Enemy 
   });
   assert(r.frame && r.frame.startsWith("zmt_32x32_"), `enemy frame ${r.frame}`);
   assert(r.w === 12, `hitbox width ${r.w}`);
-  assert(/cache\.json/.test(r.diag), r.diag);
+  assert(/scene\.data/.test(r.diag), r.diag);
   return `${r.frame}, ${r.diag}, search ${r.searchMs} ms`;
 });
 

@@ -16,7 +16,10 @@ for (const e of plugin.events) {
     continue;
   }
   md += `| Параметр | Тип | По умолчанию | Описание |\n|---|---|---|---|\n`;
-  for (const [key, p] of params) md += `| \`${key}\` (${esc(p.label ?? key)}) | ${p.type} | ${p.defaultValue === undefined ? "—" : `\`${esc(JSON.stringify(p.defaultValue))}\``} | ${esc(p.description)} |\n`;
+  for (const [key, p] of params) {
+    const options = Array.isArray(p.options) ? ` Варианты: ${p.options.map((o) => o.label).join(", ")}.` : "";
+    md += `| \`${key}\` (${esc(p.label ?? key)}) | ${p.type} | ${p.defaultValue === undefined ? "—" : `\`${esc(JSON.stringify(p.defaultValue))}\``} | ${esc(p.description + options)} |\n`;
+  }
   md += "\n";
 }
 await writeFile(new URL("../docs/ACTIONS.md", import.meta.url), md);

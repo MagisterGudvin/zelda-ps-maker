@@ -141,9 +141,12 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
 
   // Picked in the editor's player-animation picker: one row (Sword Attack facing left) → all directions.
   run("Zelda: Set Player Sprites", { attackAnimation: "sa1", hurtAnimation: "sh0" });
-  assert.equal(tk.config.player.sprites.attack, "ps_player_attack");
-  assert.equal(tk.config.sprites.animations.ps_player_attack?.sheet, "ps_sa");
-  assert.equal(tk.config.sprites.animations.ps_player_hurt?.sheet, "ps_sh");
+  assert.equal(tk.config.player.sprites.attack, "ps_anim_sa1");
+  assert.equal(tk.config.sprites.animations.ps_anim_sa1?.sheet, "ps_sa");
+  assert.equal(tk.config.sprites.animations.ps_anim_sh0?.sheet, "ps_sh");
+  // The same through the new picker field.
+  run("Zelda: Set Player Sprites", { attack: "sa2", hurt: "", spin: "" });
+  assert.equal(tk.config.player.sprites.attack, "ps_anim_sa2");
 
   // Missing Position (PS Maker does not save an untouched one): next to the player.
   run("Zelda: Create Enemy", { template: "slime", id: "near" });

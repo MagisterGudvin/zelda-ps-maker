@@ -1,24 +1,28 @@
 # Интерактивные объекты
 
-Создаются действием `Zelda: Create Object` или специализированными `Zelda: Create Chest`, `Zelda: Create Door`. Все поля — обычные поля формы, JSON не нужен.
+Создаются действием `Zelda: Create Object` или специализированными `Zelda: Create Chest`, `Zelda: Create Door`. Всё выбирается в форме: тип и замок — из списков, точки — на карте, переменные — из переменных проекта.
 
 ## Поля `Zelda: Create Object`
 
 | Поле | Смысл |
 |---|---|
-| Type | тип объекта (таблица ниже) |
-| Position, ID | точка и имя (ID нужен для сохранения состояния и ссылок из других действий) |
+| Type | тип объекта (список; таблица ниже) |
+| Position | точка на карте |
 | Sprite | своя картинка вместо встроенной |
-| Hidden | создать скрытым (показать — *Reveal* в правиле или `Change Object` → reveal) |
+| Hidden | создать скрытым (показать — *Reveal object at* в правиле или `Change Object` → Reveal) |
 | Stays on | плита остаётся нажатой, рычаг/кнопка не выключаются обратно |
 | Width, Height | размер в пикселях; 0 = 16 |
 | Text | текст таблички или сообщение при использовании |
-| Reacts to | чем можно воздействовать: `sword, arrow, bomb, boomerang, fire…` (для `reactive`, кнопок, разрушаемых) |
-| On use: set flag | флаг при активации |
-| On use: open doors | двери, которые открываются при активации |
-| On use: reveal | скрытые объекты, которые появляются при активации |
+| Reacts to | чем можно воздействовать (несколько вариантов): меч, стрела, бомба, бумеранг, огонь… — для `reactive`, кнопок, разрушаемых |
+| On use: turn on variable | переменная проекта, которая включается при активации |
+| On use: open door at | дверь (выбрать на карте), которая открывается при активации |
+| On use: reveal object at | скрытый объект (выбрать на карте), который появляется при активации |
 
-`Zelda: Create Door`: галочки *Needs a small key*, *Needs the Big Key*, *Opened by switch* (только переключатель, правило или `Change Object`); без галочек дверь открывается клавишей действия. *Width*/*Height* — для широких ворот (например, высота 32).
+Состояние объекта (открыт, включён, разрушен) запоминается по его типу и месту на карте — id вводить не нужно.
+
+`Zelda: Create Door`: *Lock* — None (открывается клавишей действия), Small key, Big Key, Switch / rule (только переключатель, правило или `Change Object`); *Width*/*Height* — для широких ворот (например, высота 32).
+
+`Zelda: Create Chest`: *Item* (список), *Count*, *Needs Big Key*, *Hidden*. `Zelda: Place Item`: *Item*, *Count*, *Only once* (взятый предмет не появляется снова).
 
 Внутри все типы — один класс `Interactable` с конфигурацией `ObjectConfig` (таблица полей ниже); поля, которых нет в форме, доступны из кода (`ZeldaMakerToolkit.createObject(type, x, y, { overrides })`).
 
@@ -77,19 +81,19 @@
 
 ## Состояния
 
-`idle, destroyed, on, off, opened, closed, locked, unlocked, lit, revealed, hidden, carried`. Активные (для условий `switchOn` и др.): `on, opened, unlocked, lit, destroyed, revealed`. Изменить вручную — `Zelda: Change Object` (операции open, close, on, off, toggle, reveal, hide, destroy, state); сбросить в исходное и забыть сохранённое — та же операция `reset`.
+`idle, destroyed, on, off, opened, closed, locked, unlocked, lit, revealed, hidden, carried`. Активные (для условий `switchOn` и др.): `on, opened, unlocked, lit, destroyed, revealed`. Изменить вручную — `Zelda: Change Object`: *Object at* (выбрать на карте) и *Operation* из списка: Open, Close, Switch on/off, Toggle, Light, Unlock, Reveal, Hide, Reset (забыть сохранённое), Destroy.
 
 ## Примеры
 
 Глаз-мишень, реагирующий только на стрелы и открывающий дверь:
 ```
-Zelda: Create Object  Type: reactive  ID: eye  Reacts to: arrow  [x] Stays on  On use: open doors: eye_door  Text: Щёлк!
+Zelda: Create Object  Type: Reactive  Reacts to: Arrow  [x] Stays on  On use: open door at: ●  Text: Щёлк!
 ```
 
 Плита, которая остаётся нажатой, и ворота высотой в два тайла:
 ```
-Zelda: Create Object  Type: pressure_plate  ID: plate_1  [x] Stays on  On use: open doors: gate
-Zelda: Create Door    ID: gate  [x] Opened by switch  Height: 32
+Zelda: Create Object  Type: Pressure plate  [x] Stays on  On use: open door at: ● (ворота)
+Zelda: Create Door    Lock: Switch / rule   Height: 32
 ```
 
 Из кода — поля, которых нет в форме (блок толкается только вверх и один раз):

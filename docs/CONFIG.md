@@ -6,9 +6,9 @@
 
 | Где | Поля |
 |---|---|
-| `Zelda: Start Toolkit` | Difficulty (список: Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
-| `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря (`X`, `Space`, `Shift`, `Tab`, `Up`…; несколько — через запятую) |
-| `Zelda: Set Player Sprites` | анимации атаки, слой оружия, центр взмаха |
+| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря — штатным выбором клавиш PS Maker (можно выбрать и управление проекта, например Interact) |
+| `Zelda: Set Player Sprites` | анимации атаки из PS Maker, слой оружия, центр взмаха |
 | `Zelda: Set Sound` | звуки моментов |
 
 Поля *Hearts* и *Sword damage* применяются поверх сложности. Если действие `Start Toolkit` сохранено старой версией плагина и новых полей у него нет, они не применяются — ничего не сбрасывается.

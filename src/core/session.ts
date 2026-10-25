@@ -149,6 +149,36 @@ export class Session {
     }
   }
 
+  private readonly linkedLast = new Map<string, number>();
+
+  /** Current value of a stat mirrored into a project variable. */
+  statValue(stat: string): number {
+    const st = this.state.player;
+    const heart = Math.max(1, this.config.player.heartValue);
+    switch (stat) {
+      case "hearts":
+        return st.hp / heart;
+      case "maxHearts":
+        return st.maxHp / heart;
+      case "enemies":
+        return this.world.list("enemy").filter((e) => e.alive && !e.removed).length;
+      default:
+        return this.toolkit.inventory.count(stat);
+    }
+  }
+
+  /** Writes linked stats into PS Maker variables when they change (a few times a second). */
+  private syncLinkedVariables(): void {
+    const links = this.toolkit.variableLinks;
+    if (links.size === 0 || !this.host.setVariable || this.tick % 6 !== 0) return;
+    for (const [id, stat] of links) {
+      const v = this.statValue(stat);
+      if (this.linkedLast.get(id) === v) continue;
+      this.linkedLast.set(id, v);
+      this.host.setVariable(id, v);
+    }
+  }
+
   /** One fixed simulation tick. Public for tests. */
   step(dtMs: number): void {
     if (this.disposed) return;
@@ -173,6 +203,7 @@ export class Session {
     }
 
     this.syncViews();
+    this.syncLinkedVariables();
     this.hud?.tick(dtMs);
     this.debug?.tick(dtMs);
   }

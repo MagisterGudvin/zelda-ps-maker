@@ -162,14 +162,14 @@ PS Maker получает просто объект `export default { name, desc
 | U-2 | ~~Формат значения параметра `position`.~~ **Решено (раздел 11):** `{ x, y }` в пикселях; тип `"position"` — два числовых поля, `"map-position"` — поля с кнопкой выбора на карте. Toolkit с 0.6.0 использует `"map-position"` | `paramResolvers.resolvePosition` принимает `{x,y}`, `[x,y]`, `"x,y"`; единицы — `positionUnits` в конфигурации (`pixels` по умолчанию, `tiles` с `tileSize`). |
 | U-3 | ~~Формат значения параметра `npc`~~ **Решено (раздел 11):** `"npc"` — строка id персонажа библиотеки, `"in-map-npc"` — `inGameCharacterId` NPC на карте | Принимаются: объект Phaser, строковый/числовой id, имя; поиск по `name`, `data`, `id`, `npcId`, `instanceId` среди объектов сцены. Неудача логируется. |
 | U-4 | Формат параметра `image` | Принимается ключ текстуры, объект с `key`/`textureKey`/`url`; при отсутствии — процедурная текстура. |
-| U-5 | Пересоздаётся ли GameMap scene при смене карты | Подписка на `shutdown`/`destroy` + явный `Map ID` в `Zelda: Start Toolkit`. |
+| U-5 | Пересоздаётся ли GameMap scene при смене карты | Подписка на `shutdown`/`destroy`; карта узнаётся по id карты PS Maker. |
 | U-6 | Порядок обновления контроллера игрока PS Maker | Toolkit работает в `postupdate`. |
 | U-7 | Какая версия Phaser в PS Maker | Используется только API Phaser 3, стабильный с 3.50; интеграционный тест — на Phaser 3.90.0. |
 | U-8 | ~~Блокирует ли открытый диалог PS Maker обновление сцены~~ **Решено (раздел 11):** нет; открытый диалог виден как `GameMap.playingDialogue` | С 0.6.0 бой ставится на паузу сам (`combat.pauseDuringDialogue`). |
 
 ## 8. Проверка после реализации
 
-- Сборка официальным CLI проходит; бандл импортируется без побочных эффектов, `default` = `{ name, description, version, events, actions }`, 42 действия.
+- Сборка официальным CLI проходит; бандл импортируется без побочных эффектов, `default` = `{ name, description, version, events, actions }`, 37 действий.
 - Работа адаптера Phaser (клавиатура через события `keydown/keyup`, синхронизация с Arcade Body в `postupdate`, коллизии по `staticBodies`, HUD-сцена, отписка на `shutdown`) подтверждена интеграционным тестом в Phaser 3.90.0 / Chromium через эмулятор хоста — см. [TESTING.md](TESTING.md).
 - Открытые вопросы U-1…U-8 остаются до проверки в самом PS Maker (ручные сценарии M-01…M-13 в TESTING.md).
 
@@ -232,7 +232,13 @@ PS Maker получает просто объект `export default { name, desc
 | `npc` | список персонажей библиотеки | id персонажа |
 | `in-map-npc` | список NPC на карте («Spawned NPC») | `inGameCharacterId` |
 | `player-animation-picker` | выбор анимации игрока | id анимации |
-Есть и другие (`map-rectangle-area`, `path`, `variable`, `string-enum-multi`…); Toolkit их пока не использует. Как редактор рисует эти типы именно для плагинов, по рантайму не видно (кода редактора в экспорте нет), но `position` и `npc` у плагинов выглядели ровно как у встроенных действий.
+| `map-rectangle-area` | область на карте | `{ x, y, width, height }` |
+| `path` | путь по карте | `[{ x, y }, …]` |
+| `string-enum-multi` | множественный выбор | `string[]` |
+| `variable` | список переменных проекта | id переменной |
+| `key-bindings` | выбор клавиш / управления проекта | `[{ type: "key", key: "KeyX" } \| { type: "control", controlId }]` |
+| `animation` | любая анимация проекта | id анимации |
+Все они используются Toolkit с 0.7.0. Переменные проекта: `game.variables.get(id)` → `{ type: "boolean" \| "number" \| "string", value }`, `game.variables.set(id, value)`. Как редактор рисует эти типы именно для плагинов, по рантайму не видно (кода редактора в экспорте нет), но `position` и `npc` у плагинов выглядели ровно как у встроенных действий.
 
 **Карта и персонажи** (`game/Maps/GameMap/*`, `game/classes/*`)
 - `GameMap`: `player`, `NPCs` (у NPC — `inGameCharacterId`), `collisions` (прямоугольники `GameMapCollision` со статическими телами Arcade и коллайдером с игроком), `story`, `map`, `playingDialogue`.

@@ -34,6 +34,8 @@ export class Toolkit {
 
   state: GameState;
   session: Session | null = null;
+  /** Project variable id → toolkit stat mirrored into it (Zelda: Show Stat In Variable). */
+  readonly variableLinks = new Map<string, string>();
   /** Executed editor actions by name (shown by the diagnostics panel). */
   readonly actionCounts = new Map<string, number>();
   /** True once a game has been started or loaded (start items granted). */

@@ -19,6 +19,10 @@ export interface HostAdapter {
   setPlayerOverlay(layers: OverlayLayer[] | null): void;
   /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */
   previewSheet(sheetId: string | null): boolean;
+  /** Optional: a project variable of the engine (PS Maker variables), undefined when unknown. */
+  getVariable?(id: string): string | number | boolean | undefined;
+  /** Optional: sets a project variable; the value is converted to the variable's type. False when unknown. */
+  setVariable?(id: string, value: string | number | boolean): boolean;
   /** Optional: true while the engine shows a dialogue (combat pauses, see combat.pauseDuringDialogue). */
   isDialogueOpen?(): boolean;
   /** Host facts for the diagnostics panel (scene, camera, player). */

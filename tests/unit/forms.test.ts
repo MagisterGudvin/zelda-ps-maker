@@ -10,6 +10,12 @@ async function setup(startParams: Record<string, unknown>) {
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   resetToolkitForTests();
   const f = createFakeScene();
+  // PS Maker project variables (game.variables: get(id) → { type, value }, set(id, value)).
+  const vars = new Map<string, { id: string; type: string; value: unknown }>([
+    ["var_gate", { id: "var_gate", type: "boolean", value: false }],
+    ["var_rupees", { id: "var_rupees", type: "number", value: 0 }],
+  ]);
+  f.game.variables = { get: (id: string) => vars.get(id), set: (id: string, v: unknown) => (vars.get(id)!.value = v) };
   const ctx = { game: f.game, scene: f.scene, player: f.player };
   const actions = plugin.events as unknown as AnyAction[];
   const run = (name: string, params: Record<string, unknown>) => {
@@ -20,7 +26,7 @@ async function setup(startParams: Record<string, unknown>) {
   run("Zelda: Start Toolkit", { mapId: "forms", language: "en", debugHitboxes: false, diagnostics: false, ...startParams });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" }, save: { autoSave: false } });
-  return { run, tk, s: tk.session!, actions, done: resetToolkitForTests };
+  return { run, tk, s: tk.session!, actions, vars, done: resetToolkitForTests };
 }
 
 test("no editor field asks for JSON", async () => {
@@ -34,11 +40,22 @@ test("no editor field asks for JSON", async () => {
   }
 });
 
+test("constructor: text is asked only for content (sign text, messages, item names)", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  for (const e of plugin.events as unknown as AnyAction[]) {
+    for (const [key, def] of Object.entries(e.parameterDefs)) {
+      if (def.type === "string") assert.ok(["text", "message", "name"].includes(key), `${e.name}.${key} is a text field`);
+      if (def.type === "number") assert.ok(def.description.length > 12, `${e.name}.${key}: a number needs an explanation`);
+    }
+  }
+});
+
 test("action names stay stable (PS Maker saves actions under a key derived from the name)", async () => {
   const { default: plugin } = await import("../../src/index.ts");
   const names = new Set((plugin.events as unknown as AnyAction[]).map((e) => e.name));
   // As saved in a PS Maker 1.2.1 project: "plugin:zelda-maker-toolkit:zelda-create-enemy".
-  const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Place Marker", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Start Waves", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Set Flag", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Save Progress", "Load Progress", "Reset Progress", "Define Item", "Define Enemy", "Define Sprite Sheet", "Define Animation", "Set Player Sprites", "Preview Sprite Sheet", "Set Sound"];
+  const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Show Stat In Variable", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Save Progress", "Load Progress", "Reset Progress", "Define Item", "Define Enemy", "Set Player Sprites", "Set Sound"];
+  // Removed in 0.7.0 (PS Maker does it itself): Place Marker, Start Waves, Set Flag, Define Sprite Sheet, Define Animation, Preview Sprite Sheet.
   for (const n of saved) assert.ok(names.has(`Zelda: ${n}`), `"Zelda: ${n}" was renamed or removed — saved projects would lose it`);
 });
 
@@ -62,9 +79,10 @@ test("dropdowns: difficulty, door lock; Position is a map picker", async () => {
   const enemy = actions.find((a) => a.name === "Zelda: Create Enemy")!;
   assert.equal(enemy.parameterDefs.position.type, "map-position");
   assert.equal(enemy.parameterDefs.template.type, "string-enum");
-  run("Zelda: Define Enemy", { name: "boss_slime", basedOn: "slime", hp: 12 });
-  run("Zelda: Create Enemy", { template: "soldier", customTemplate: "boss_slime", id: "bs", position: { x: 90, y: 90 } });
-  assert.equal((s.world.get("bs") as unknown as { hp: number }).hp, 12, "custom template wins over the dropdown");
+  run("Zelda: Define Enemy", { slot: "custom_enemy_2", basedOn: "slime", hp: 12 });
+  run("Zelda: Create Enemy", { template: "custom_enemy_2", position: { x: 90, y: 90 } });
+  const e = s.world.get("custom_enemy_2@90,90") as unknown as { hp: number };
+  assert.equal(e.hp, 12, "custom enemy slot from Define Enemy, id made from the position");
   done();
 });
 
@@ -75,10 +93,11 @@ test("Start Toolkit saved by an older version keeps its preset values", async ()
   done();
 });
 
-test("Set Controls: friendly key names", async () => {
+test("Set Controls: PS Maker key picker (and older comma lists)", async () => {
   const { run, tk, done } = await setup({});
-  run("Zelda: Set Controls", { sword: "Space, j", useItem: "", shield: "shift", action: "", nextItem: "", prevItem: "", inventory: "Tab" });
-  assert.deepEqual(tk.config.controls.sword, ["Space", "j"]);
+  run("Zelda: Set Controls", { sword: [{ type: "key", key: "Space" }, { type: "key", key: "KeyJ" }], useItem: [], inventory: "Tab" });
+  assert.deepEqual(tk.config.controls.sword, ["Space", "KeyJ"]);
+  assert.deepEqual(tk.config.controls.inventory, ["Tab"]);
   assert.deepEqual(tk.config.controls.useItem, ["KeyC"], "empty = keep");
   assert.equal(normalizeKey("j"), "KeyJ");
   assert.equal(normalizeKey("shift"), "Shift");
@@ -87,89 +106,108 @@ test("Set Controls: friendly key names", async () => {
   done();
 });
 
-test("doors, objects and rules without JSON", async () => {
-  const { run, s, done } = await setup({});
+test("objects are picked on the map: doors, rules, variables, automatic ids", async () => {
+  const { run, s, vars, done } = await setup({});
   const obj = (id: string) => s.world.get(id) as unknown as { objState: string; isActive: boolean; visible: boolean; cfg: Record<string, unknown>; setState(v: string): void };
-  run("Zelda: Create Door", { id: "boss_door", position: { x: 40, y: 40 }, smallKey: true, bigKey: true, bySwitch: false, startOpen: false, width: 0, height: 0 });
-  run("Zelda: Create Door", { id: "plain", position: { x: 70, y: 40 }, smallKey: false, bigKey: false, bySwitch: false, startOpen: false, width: 0, height: 0 });
-  run("Zelda: Create Door", { id: "gate", position: { x: 100, y: 40 }, smallKey: true, bigKey: false, bySwitch: true, startOpen: false, width: 0, height: 32 });
-  assert.equal(obj("boss_door").cfg.lock, "big_key");
-  assert.equal(obj("plain").cfg.lock, "none");
-  assert.equal(obj("gate").cfg.lock, "switch", "switch wins over the key boxes");
-  assert.equal(obj("gate").cfg.height, 32);
+  run("Zelda: Create Door", { position: { x: 100, y: 40 }, lock: "switch", startOpen: false, height: 32 });
+  run("Zelda: Create Door", { position: { x: 160, y: 40 }, lock: "none" });
+  assert.equal(obj("door@100,40").cfg.lock, "switch");
+  assert.equal(obj("door@100,40").cfg.height, 32);
+  run("Zelda: Create Object", { type: "pressure_plate", position: { x: 40, y: 90 }, staysOn: true });
+  run("Zelda: Create Object", { type: "reactive", position: { x: 80, y: 90 }, reactsTo: ["arrow", "fire"], turnOnVariable: "var_gate", openDoorAt: { x: 161, y: 41 }, revealAt: { x: 200, y: 90 } });
+  run("Zelda: Create Chest", { position: { x: 200, y: 90 }, item: "rupees", count: 5, hidden: true });
+  assert.equal(obj("pressure_plate@40,90").cfg.plateMode, "latch");
+  assert.deepEqual(obj("reactive@80,90").cfg.tools, ["arrow", "fire"]);
+  assert.deepEqual(obj("reactive@80,90").cfg.onActivate, [{ openDoorAt: { x: 161, y: 41 } }, { revealAt: { x: 200, y: 90 } }, { setVariable: { id: "var_gate", value: true } }]);
 
-  run("Zelda: Create Object", { type: "pressure_plate", position: { x: 40, y: 90 }, id: "plate", hidden: false, staysOn: true, width: 0, height: 0, text: "", reactsTo: "", setFlag: "", openDoors: "", reveal: "" });
-  run("Zelda: Create Object", { type: "reactive", position: { x: 80, y: 90 }, id: "eye", hidden: false, staysOn: false, width: 24, height: 0, text: "", reactsTo: "arrow, fire", setFlag: "eye_hit", openDoors: "plain", reveal: "secret" });
-  run("Zelda: Create Object", { type: "sign", position: { x: 120, y: 90 }, id: "sign", text: "Hello" });
-  run("Zelda: Create Chest", { id: "secret", position: { x: 160, y: 90 }, item: "rupees", count: 5, requiresBigKey: false, hidden: true });
-  assert.equal(obj("plate").cfg.plateMode, "latch");
-  assert.deepEqual(obj("eye").cfg.tools, ["arrow", "fire"]);
-  assert.equal(obj("eye").cfg.width, 24);
-  assert.equal(obj("eye").cfg.setFlag, "eye_hit");
-  assert.deepEqual(obj("eye").cfg.onActivate, [{ openDoor: ["plain"] }, { reveal: ["secret"] }]);
-  assert.equal(obj("sign").cfg.message, "Hello");
-
-  run("Zelda: Add Rule", { id: "r1", whenDefeated: "", whenActive: "plate", whenFlag: "", whenItem: "", whenBoss: false, openDoors: "gate", reveal: "", setFlag: "gate_open", giveItem: "bombs", giveCount: 3, message: "Open!", spawnEnemy: "", spawnAt: "", once: true });
-  run("Zelda: Add Rule", { id: "empty", openDoors: "gate" });
+  // Rule: the plate (picked on the map) opens the gate (picked on the map) and turns on a project variable.
+  run("Zelda: Add Rule", { whenObjectAt: { x: 42, y: 88 }, openDoorAt: { x: 100, y: 45 }, giveItem: "bombs", giveCount: 3, message: "Open!", once: true });
+  run("Zelda: Add Rule", { openDoorAt: { x: 100, y: 45 } });
   assert.match(s.logger.history.at(-1)!.text, /no condition/);
-  obj("plate").setState("on");
+  obj("pressure_plate@40,90").setState("on");
   s.update(50);
-  assert.equal(obj("gate").objState, "opened");
-  assert.equal(s.state.flags.gate_open, true);
+  assert.equal(obj("door@100,40").objState, "opened");
   assert.equal(s.toolkit.inventory.count("bombs"), 3);
 
-  // Run Actions: a condition that does not hold does nothing.
-  run("Zelda: Run Actions", { whenItem: "bow", giveItem: "arrows", giveCount: 10 });
-  assert.equal(s.toolkit.inventory.count("arrows"), 0);
-  run("Zelda: Run Actions", { whenFlag: "gate_open", setFlag: "ran" });
-  assert.equal(s.state.flags.ran, true);
+  // Activating the eye opens the other door, reveals the chest and sets the variable.
+  obj("reactive@80,90").setState("on");
+  s.update(50);
+  assert.equal(obj("door@160,40").objState, "opened");
+  assert.equal(obj("chest@200,90").visible, true);
+  assert.equal(vars.get("var_gate")!.value, true);
 
-  // Spawning from an action field at a marker.
-  run("Zelda: Place Marker", { id: "spot", position: { x: 200, y: 200 } });
-  run("Zelda: Run Actions", { spawnEnemy: "ogre", spawnAt: "spot" });
-  const ogre = s.world.list("enemy").find((e) => (e as unknown as { cfg: { template: string } }).cfg.template === "ogre");
-  assert.ok(ogre && Math.round(ogre.x) === 200 && Math.round(ogre.y) === 200, "ogre at the marker");
+  // Conditions on project variables (PS Maker can set them too).
+  run("Zelda: Run Actions", { whenVariable: "var_gate", giveItem: "arrows", giveCount: 10 });
+  assert.equal(s.toolkit.inventory.count("arrows"), 10);
+  vars.get("var_gate")!.value = false;
+  run("Zelda: Run Actions", { whenVariable: "var_gate", giveItem: "arrows", giveCount: 10 });
+  assert.equal(s.toolkit.inventory.count("arrows"), 10, "variable off: nothing");
+
+  // A block pushed onto a plate stands on the same point: the plate still counts.
+  run("Zelda: Create Object", { type: "pressure_plate", position: { x: 300, y: 300 }, staysOn: true });
+  run("Zelda: Create Door", { position: { x: 340, y: 300 }, lock: "switch" });
+  run("Zelda: Create Object", { type: "block", position: { x: 300, y: 300 } });
+  run("Zelda: Add Rule", { whenObjectAt: { x: 300, y: 300 }, openDoorAt: { x: 340, y: 300 } });
+  obj("pressure_plate@300,300").setState("on");
+  s.update(50);
+  assert.equal(obj("door@340,300").objState, "opened", "plate under a block");
+
+  // Spawning at a picked point; Change Object / Damage Target by point.
+  run("Zelda: Run Actions", { spawnEnemy: "ogre", spawnAt: { x: 220, y: 200 } });
+  assert.ok(s.world.list("enemy").some((e) => Math.round(e.x) === 220 && Math.round(e.y) === 200), "ogre at the point");
+  run("Zelda: Change Object", { objectAt: { x: 100, y: 40 }, operation: "close" });
+  assert.equal(obj("door@100,40").objState, "closed");
   done();
 });
 
-test("player stats, items, enemy types and animations without JSON", async () => {
-  const { run, tk, s, done } = await setup({ hearts: 3 });
+test("switch order is a path on the map; wave rooms are areas", async () => {
+  const { run, s, done } = await setup({});
+  for (const x of [40, 80, 120]) run("Zelda: Create Object", { type: "button", position: { x, y: 60 } });
+  run("Zelda: Create Door", { position: { x: 160, y: 60 }, lock: "switch" });
+  run("Zelda: Create Switch Sequence", { order: [{ x: 80, y: 60 }, { x: 40, y: 60 }, { x: 120, y: 60 }], resetOnWrong: true, openDoorAt: { x: 160, y: 60 } });
+  for (const x of [80, 40, 120]) (s.world.get(`button@${x},60`) as unknown as { setState(v: string): void }).setState("on");
+  s.update(50);
+  assert.equal((s.world.get("door@160,60") as unknown as { objState: string }).objState, "opened");
+
+  // Wave room: an area; a door inside locks; enemies inside belong to it; walking in starts it.
+  run("Zelda: Create Door", { position: { x: 400, y: 300 }, lock: "none", startOpen: true });
+  run("Zelda: Add Wave Enemy", { wave: 1, template: "slime", position: { x: 450, y: 320 } });
+  run("Zelda: Create Wave Room", { area: { x: 380, y: 280, width: 160, height: 120 }, delayMs: 100, giveItem: "rupees", giveCount: 20 });
+  s.update(50);
+  assert.equal(s.world.count("enemy"), 0, "not started before the player walks in");
+  s.host.setPlayerPosition(460, 340);
+  (s.host as unknown as { walk?(dx: number, dy: number): void }).walk?.(0, 0);
+  for (let i = 0; i < 5; i++) s.update(20);
+  assert.equal(s.world.count("enemy"), 1, "walking in starts the waves");
+  assert.equal((s.world.get("door@400,300") as unknown as { objState: string }).objState, "closed", "door inside the area locks");
+  done();
+});
+
+test("items and enemy types by slot; stats into project variables; animations picked in PS Maker", async () => {
+  const { run, tk, s, vars, done } = await setup({ hearts: 3 });
   run("Zelda: Change Player Stats", { health: 0, maxHealth: 2, magic: 0, set: false });
   assert.equal(tk.state.player.maxHp, 8);
-  run("Zelda: Change Player Stats", { health: 3, maxHealth: 0, magic: 5, set: true });
-  assert.equal(tk.state.player.hp, 3);
-  assert.equal(tk.state.player.magic, 5);
+  run("Zelda: Define Item", { slot: "custom_item_1", name: "Ice Rod", resource: "magic", cost: 4, damage: 3, damageType: "ice", stunMs: 1000, give: true });
+  run("Zelda: Define Item", { slot: "custom_item_2", name: "Herb", resource: "", heal: 4 });
+  assert.equal(tk.items.get("custom_item_1")?.resource, "magic");
+  assert.equal(typeof tk.items.get("custom_item_2")?.use, "function");
+  assert.ok(tk.inventory.has("custom_item_1"));
+  run("Zelda: Give Item", { item: "custom_item_2", count: 1, silent: true });
+  assert.ok(tk.inventory.has("custom_item_2"));
 
-  run("Zelda: Define Item", { id: "ice_rod", name: "Ice Rod", icon: "", resource: "magic", cost: 4, damage: 3, damageType: "ice", area: false, stunMs: 1000, heal: 0, give: true });
-  run("Zelda: Define Item", { id: "herb", name: "Herb", icon: "", resource: "", cost: 0, damage: 0, damageType: "", area: false, stunMs: 0, heal: 4, give: false });
-  assert.equal(tk.items.get("ice_rod")?.resource, "magic");
-  assert.equal(tk.items.get("ice_rod")?.cost, 4);
-  assert.equal(typeof tk.items.get("ice_rod")?.use, "function");
-  assert.equal(typeof tk.items.get("herb")?.use, "function");
-  assert.ok(tk.inventory.has("ice_rod"));
-
-  run("Zelda: Define Enemy", { name: "tough_slime", basedOn: "slime", hp: 9, damage: 2, speed: 30, detectRange: 0, boss: true, immuneTo: "arrow" });
-  run("Zelda: Create Enemy", { template: "tough_slime", position: { x: 120, y: 120 }, id: "ts", group: "", hp: 0, damage: 0, speed: 0, walkAnimation: "", attackAnimation: "", hurtAnimation: "", deathAnimation: "", patrol: "" });
-  const e = s.world.get("ts") as unknown as { hp: number; cfg: { damage: number; speed: number; boss: boolean; resistances: Record<string, number>; animations: Record<string, string> } };
+  run("Zelda: Define Enemy", { slot: "custom_enemy_1", basedOn: "slime", hp: 9, damage: 2, speed: 30, boss: true, immuneTo: ["arrow"] });
+  run("Zelda: Create Enemy", { template: "custom_enemy_1", position: { x: 120, y: 120 }, group: "3", patrol: [{ x: 120, y: 120 }, { x: 160, y: 120 }] });
+  const e = s.world.get("custom_enemy_1@120,120") as unknown as { hp: number; group: string; cfg: { boss: boolean; resistances: Record<string, number>; patrol: { mode: string; points: unknown[] } } };
   assert.equal(e.hp, 9);
-  assert.equal(e.cfg.damage, 2);
-  assert.equal(e.cfg.speed, 30);
+  assert.equal(e.group, "3");
   assert.equal(e.cfg.boss, true);
   assert.equal(e.cfg.resistances.arrow, 0);
-  run("Zelda: Create Enemy", { template: "slime", position: { x: 150, y: 120 }, id: "fast", hp: 5, speed: 90, walkAnimation: "w", attackAnimation: "a", spriteOffsetY: -16, spriteScale: 2 });
-  const fast = s.world.get("fast") as unknown as typeof e;
-  assert.equal(fast.hp, 5);
-  assert.equal(fast.cfg.speed, 90);
-  assert.equal(fast.cfg.animations.walk, "w");
-  assert.equal(fast.cfg.animations.attack, "a");
-  assert.equal((fast.cfg as unknown as { spriteOffsetY: number }).spriteOffsetY, -16);
-  assert.equal((fast.cfg as unknown as { spriteScale: number }).spriteScale, 2);
+  assert.equal(e.cfg.patrol.mode, "path");
+  assert.deepEqual(e.cfg.patrol.points, [{ x: 120, y: 120 }, { x: 160, y: 120 }]);
 
-  run("Zelda: Define Sprite Sheet", { id: "hero", image: "", imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
-  run("Zelda: Define Animation", { id: "walk4", sheet: "hero", frames: "0, 1", framesUp: "2 3", framesLeft: "", framesRight: "4,5", fps: 8, loop: true });
-  assert.deepEqual(tk.config.sprites.animations.walk4?.frames, { down: [0, 1], up: [2, 3], right: [4, 5] });
-  run("Zelda: Set Player Sprites", { attack: "walk4", behindUp: true, behindDown: false, behindLeft: true, behindRight: false, pivotY: 4 });
-  assert.equal(tk.config.sword.pivotOffsetY, 4);
-  assert.deepEqual(tk.config.player.sprites.weaponBehind, ["up", "left"]);
+  run("Zelda: Show Stat In Variable", { stat: "rupees", variableId: "var_rupees" });
+  tk.inventory.give("rupees", 42, { silent: true });
+  for (let i = 0; i < 8; i++) s.update(17);
+  assert.equal(vars.get("var_rupees")!.value, 42);
   done();
 });

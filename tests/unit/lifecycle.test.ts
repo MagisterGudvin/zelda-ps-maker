@@ -12,7 +12,7 @@ test("importing the plugin has no global side effects and exposes the PS Maker p
   const plugin = mod.default as { name: string; version: string; description: string; events: { name: string; parameterDefs: object; execute: unknown }[]; actions: unknown };
   assert.equal(plugin.name, "Zelda Maker Toolkit");
   assert.match(plugin.version, /^\d+\.\d+\.\d+$/);
-  assert.ok(plugin.events.length >= 40);
+  assert.ok(plugin.events.length >= 35);
   assert.equal(plugin.actions, plugin.events);
   const names = new Set<string>();
   for (const e of plugin.events) {
@@ -22,7 +22,7 @@ test("importing the plugin has no global side effects and exposes the PS Maker p
     assert.equal(typeof e.execute, "function");
     for (const [key, def] of Object.entries(e.parameterDefs)) {
       const d = def as { type: string; description: string };
-      assert.ok(["string", "number", "boolean", "position", "image", "audio", "npc", "map-position", "string-enum", "in-map-npc", "player-animation-picker"].includes(d.type), `${e.name}.${key} type`);
+      assert.ok(["string", "number", "boolean", "position", "image", "audio", "npc", "map-position", "string-enum", "in-map-npc", "player-animation-picker", "map-rectangle-area", "path", "string-enum-multi", "variable", "key-bindings", "animation"].includes(d.type), `${e.name}.${key} type`);
       if (d.type === "string-enum") assert.ok(Array.isArray((d as { options?: unknown }).options) && ((d as unknown as { options: { value: string }[] }).options).some((o) => o.value === (d as { defaultValue?: string }).defaultValue), `${e.name}.${key} default is one of the options`);
       assert.equal(typeof d.description, "string");
     }

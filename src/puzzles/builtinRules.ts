@@ -1,5 +1,6 @@
 import type { FlagValue } from "../core/events.ts";
 import { getDungeon } from "../core/state.ts";
+import type { Entity } from "../core/entity.ts";
 import type { Session } from "../core/session.ts";
 import { aliveInGroup, spawnEnemy } from "../enemies/spawn.ts";
 import { Enemy } from "../enemies/enemy.ts";
@@ -49,6 +50,20 @@ function eachObject(ctx: RuleContext, arg: unknown, what: string, fn: (o: Intera
   }
 }
 
+const notBlock = (e: Entity) => !(e instanceof Interactable && e.cfg.type === "block");
+
+/** The object at a picked point, preferring the kind the action is about. */
+function objectAt(ctx: RuleContext, arg: unknown, what: string, prefer?: (e: Entity) => boolean): Interactable | null {
+  const p = asObj(arg);
+  const w = ctx.session.world;
+  const o = typeof p.x === "number" && typeof p.y === "number" ? ((prefer && w.at("object", p.x, p.y, 12, prefer)) || w.at("object", p.x, p.y, 12, notBlock) || w.at("object", p.x, p.y)) : null;
+  if (!(o instanceof Interactable)) {
+    ctx.session.logger.warn(`${what}: no toolkit object at ${String(p.x)}, ${String(p.y)} on map "${ctx.session.mapId}".`);
+    return null;
+  }
+  return o;
+}
+
 /** Built-in condition/action vocabulary. See docs/RULES.md for the reference. */
 export function registerBuiltinRules(reg: RuleRegistry): void {
   // ---- logic ----
@@ -79,6 +94,16 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
   reg.registerCondition("objectState", (arg, ctx) => {
     const o = asObj(arg);
     return object(ctx.session, String(o.id))?.objState === o.state;
+  });
+  // Objects picked on the map by position (editor map pickers), resolved when evaluated.
+  reg.registerCondition("objectActiveAt", (arg, ctx) => {
+    const pts = (Array.isArray(arg) ? arg : [arg]) as { x: number; y: number }[];
+    // A block pushed onto a plate stands on the same point: look past movable blocks.
+    return pts.length > 0 && pts.every((p) => (ctx.session.world.at("object", p.x, p.y, 12, notBlock) as Interactable | null)?.isActive === true);
+  });
+  reg.registerCondition("variableOn", (arg, ctx) => {
+    const v = ctx.session.host.getVariable?.(String(arg));
+    return v === true || (typeof v === "number" && v !== 0) || (typeof v === "string" && v !== "" && v !== "false" && v !== "0");
   });
   reg.registerCondition("objectDestroyed", (arg, ctx) => asList(arg).every((id) => object(ctx.session, id)?.objState === "destroyed"));
 
@@ -124,6 +149,12 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
     }),
   );
   reg.registerAction("reveal", (arg, ctx) => eachObject(ctx, arg, "reveal", (o) => o.reveal()));
+  reg.registerAction("openDoorAt", (arg, ctx) => objectAt(ctx, arg, "openDoorAt", (e) => (e as Interactable).cfg?.type === "door")?.open());
+  reg.registerAction("revealAt", (arg, ctx) => objectAt(ctx, arg, "revealAt", (e) => !(e as Interactable).visible)?.reveal());
+  reg.registerAction("setVariable", (arg, ctx) => {
+    const o = asObj(arg);
+    if (!ctx.session.host.setVariable?.(String(o.id), (o.value ?? true) as string | number | boolean)) ctx.session.logger.warn(`setVariable: project variable "${String(o.id)}" not found.`);
+  });
   reg.registerAction("hide", (arg, ctx) => eachObject(ctx, arg, "hide", (o) => o.hide()));
   reg.registerAction("destroyObject", (arg, ctx) => eachObject(ctx, arg, "destroyObject", (o) => o.destroy()));
   reg.registerAction("resetObject", (arg, ctx) => eachObject(ctx, arg, "resetObject", (o) => o.reset()));

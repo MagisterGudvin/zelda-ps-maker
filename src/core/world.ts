@@ -58,6 +58,25 @@ export class World {
     return e && !e.removed ? e : undefined;
   }
 
+  /**
+   * The entity of a kind at a point picked on the map: one whose box contains the
+   * point, else the nearest centre within `radius` pixels.
+   */
+  at(kind: EntityKind, x: number, y: number, radius = 12, accept?: (e: Entity) => boolean): Entity | null {
+    let best: Entity | null = null;
+    let bestD = radius * radius;
+    for (const e of this.list(kind)) {
+      if (e.removed || (accept && !accept(e))) continue;
+      if (Math.abs(e.x - x) <= e.hw && Math.abs(e.y - y) <= e.hh) return e;
+      const d = (e.x - x) ** 2 + (e.y - y) ** 2;
+      if (d <= bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+
   list(kind: EntityKind): readonly Entity[] {
     return this.lists[kind];
   }

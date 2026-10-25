@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.6.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.7.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **42**. Все имена начинаются с `Zelda: `.
+Всего действий: **37**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -17,7 +17,6 @@
 - [Zelda: Create Chest](#zelda-create-chest)
 - [Zelda: Create Door](#zelda-create-door)
 - [Zelda: Place Item](#zelda-place-item)
-- [Zelda: Place Marker](#zelda-place-marker)
 - [Zelda: Change Object](#zelda-change-object)
 - [Zelda: Remove Target](#zelda-remove-target)
 - [Zelda: Damage Target](#zelda-damage-target)
@@ -26,16 +25,15 @@
 - [Zelda: Create Switch Sequence](#zelda-create-switch-sequence)
 - [Zelda: Create Wave Room](#zelda-create-wave-room)
 - [Zelda: Add Wave Enemy](#zelda-add-wave-enemy)
-- [Zelda: Start Waves](#zelda-start-waves)
 - [Zelda: Enter Dungeon](#zelda-enter-dungeon)
 - [Zelda: Give Item](#zelda-give-item)
 - [Zelda: Spend Resource](#zelda-spend-resource)
 - [Zelda: Remove Item](#zelda-remove-item)
 - [Zelda: Equip Item](#zelda-equip-item)
 - [Zelda: Change Player Stats](#zelda-change-player-stats)
-- [Zelda: Set Flag](#zelda-set-flag)
 - [Zelda: Set Ability](#zelda-set-ability)
 - [Zelda: Show Message](#zelda-show-message)
+- [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
 - [Zelda: Set Respawn Point](#zelda-set-respawn-point)
 - [Zelda: Respawn Player](#zelda-respawn-player)
 - [Zelda: Save Progress](#zelda-save-progress)
@@ -43,10 +41,7 @@
 - [Zelda: Reset Progress](#zelda-reset-progress)
 - [Zelda: Define Item](#zelda-define-item)
 - [Zelda: Define Enemy](#zelda-define-enemy)
-- [Zelda: Define Sprite Sheet](#zelda-define-sprite-sheet)
-- [Zelda: Define Animation](#zelda-define-animation)
 - [Zelda: Set Player Sprites](#zelda-set-player-sprites)
-- [Zelda: Preview Sprite Sheet](#zelda-preview-sprite-sheet)
 - [Zelda: Set Sound](#zelda-set-sound)
 
 ## Zelda: Start Toolkit
@@ -55,8 +50,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `mapId` (Map ID) | string | `""` | Unique map name used to remember chests, doors and switches. / Уникальное имя карты для сохранения прогресса. |
-| `difficulty` (Difficulty) | string-enum | `"alttp"` | Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность. |
+| `difficulty` (Difficulty) | string-enum | `"alttp"` | Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность. Варианты: Easy, Normal, Hard. |
 | `hearts` (Hearts) | number | `3` | Starting and maximum hearts. / Сердца в начале игры. |
 | `swordDamage` (Sword damage) | number | `2` | Damage of one sword hit (a slime has 2 HP). / Урон меча. |
 | `hud` (Show HUD) | boolean | `true` | Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit. |
@@ -64,24 +58,24 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `shieldButton` (Shield on a button) | boolean | `false` | Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке. |
 | `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
 | `autosave` (Autosave) | boolean | `true` | Save after chests, doors, new items and dungeons. / Автосохранение. |
-| `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. |
+| `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
 | `diagnostics` (Show diagnostics) | boolean | `false` | On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики. |
 
 ## Zelda: Set Controls
 
-Changes the keys. Key names: X, Z, C, Space, Enter, Shift, Tab, Up, 1... Several keys: X, Space. Empty = keep. / Клавиши управления (пусто — не менять).
+Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I. / Клавиши Toolkit (пусто — не менять).
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `sword` (Sword) | string | `""` | Default: X. |
-| `useItem` (Use item) | string | `""` | Default: C. |
-| `shield` (Shield) | string | `""` | Only with Shield on a button. Default: V. |
-| `action` (Action) | string | `""` | Open, lift, read. Default: Z. |
-| `nextItem` (Next item) | string | `""` | Default: E. |
-| `prevItem` (Previous item) | string | `""` | Default: Q. |
-| `inventory` (Inventory) | string | `""` | Default: I. |
+| `sword` (Sword) | key-bindings | `[]` | Default: X. |
+| `useItem` (Use item) | key-bindings | `[]` | Default: C. |
+| `shield` (Shield) | key-bindings | `[]` | Only with Shield on a button. Default: V. |
+| `action` (Action) | key-bindings | `[]` | Open, lift, read. Default: Z. |
+| `nextItem` (Next item) | key-bindings | `[]` | Default: E. |
+| `prevItem` (Previous item) | key-bindings | `[]` | Default: Q. |
+| `inventory` (Inventory) | key-bindings | `[]` | Default: I. |
 
 ## Zelda: Stop Toolkit
 
@@ -112,23 +106,21 @@ Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre o
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `template` (Template) | string-enum | `"slime"` | Behaviour and stats. / Шаблон врага. |
-| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
+| `template` (Template) | string-enum | `"slime"` | Behaviour and stats; Custom enemy 1–6 are made with Zelda: Define Enemy. / Шаблон врага. Варианты: slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
 | `position` (Position) | map-position | — | Where to spawn: pick it on the map. Empty = next to the player. / Точка появления. |
 | `character` (Look (PS Maker character)) | npc | — | Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker. |
-| `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses). |
-| `group` (Group) | string | `""` | Optional group name: rules can wait until the whole group is defeated. / Группа врагов. |
+| `group` (Group) | string-enum | `""` | Rules can wait until the whole group is defeated. / Группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
-| `walkAnimation` (Walk animation) | string | `""` | Optional animation id (Zelda: Define Animation); also used when standing. / Анимация ходьбы. |
-| `attackAnimation` (Attack animation) | string | `""` | Optional animation id. / Анимация атаки. |
-| `hurtAnimation` (Hurt animation) | string | `""` | Optional animation id. / Анимация урона. |
-| `deathAnimation` (Death animation) | string | `""` | Optional animation id. / Анимация смерти. |
+| `walkAnimation` (Walk animation) | animation | `""` | Optional: a PS Maker animation (any direction; the whole sheet is used); also used when standing. Overrides Look. / Анимация ходьбы. |
+| `attackAnimation` (Attack animation) | animation | `""` | Optional PS Maker animation. / Анимация атаки. |
+| `hurtAnimation` (Hurt animation) | animation | `""` | Optional PS Maker animation. / Анимация урона. |
+| `deathAnimation` (Death animation) | animation | `""` | Optional PS Maker animation. / Анимация смерти. |
 | `spriteOffsetX` (Sprite offset X) | number | `0` | Move the picture relative to the hitbox, pixels. / Сдвиг картинки по X. |
 | `spriteOffsetY` (Sprite offset Y) | number | `0` | e.g. -16 when the feet are low in a 64x64 frame. / Сдвиг картинки по Y. |
 | `spriteScale` (Sprite scale) | number | `0` | 0 = template value (1). / Масштаб картинки. |
-| `patrol` (Patrol markers) | string | `""` | Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1, p2, p3. / Маршрут патруля по маркерам. |
+| `patrol` (Patrol route) | path | — | Optional: click the points of the route on the map; the enemy walks them in order. / Маршрут патруля. |
 
 ## Zelda: Enemy From NPC
 
@@ -137,33 +129,30 @@ Turns an NPC already on this map (placed or spawned earlier) into an enemy that 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `npc` (NPC) | in-map-npc | `""` | An NPC on this map (placed or spawned earlier) that becomes the enemy. / NPC на карте, который станет врагом. |
-| `template` (Template) | string-enum | `"soldier"` | Behaviour and stats. / Шаблон врага. |
-| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
-| `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses). |
-| `group` (Group) | string | `""` | Optional group name for rules. / Группа врагов. |
+| `template` (Template) | string-enum | `"soldier"` | Behaviour and stats. / Шаблон врага. Варианты: slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `group` (Group) | string-enum | `""` | Rules can wait until the whole group is defeated. / Группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
 
 ## Zelda: Create Object
 
-Creates an interactive object: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, hook_post, sign. / Создаёт интерактивный объект.
+Creates an interactive object: bushes, pots, rocks, walls to bomb, levers, buttons, plates, blocks, torches, chests, doors, hidden passages, spikes, pits, signs... / Создаёт интерактивный объект.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. |
-| `position` (Position) | map-position | — | Object center. |
-| `id` (ID) | string | `""` | Unique id (needed for saving and for other actions to refer to it). |
+| `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. Варианты: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, hook_post, sign. |
+| `position` (Position) | map-position | — | Object center: pick it on the map. / Центр объекта. |
 | `sprite` (Sprite) | image | — | Optional custom image for the object. |
-| `hidden` (Hidden) | boolean | `false` | Starts invisible; Reveal it later. / Скрыт до открытия. |
+| `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it later. / Скрыт до открытия. |
 | `staysOn` (Stays on) | boolean | `false` | Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым. |
 | `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
 | `height` (Height) | number | `0` | Pixels; 0 = normal size (16). / Высота. |
 | `text` (Text) | string | `""` | Sign text, or a message shown when the object is used. / Текст таблички или сообщение. |
-| `reactsTo` (Reacts to) | string | `""` | For reactive objects (eye switches, crystals): sword, arrow, bomb, boomerang, fire... comma-separated. / Реагирует на. |
-| `setFlag` (On use: set flag) | string | `""` | Flag set when the object is activated (opened, switched on, lit, destroyed). / Флаг при активации. |
-| `openDoors` (On use: open doors) | string | `""` | Door ids opened when the object is activated. / Открыть двери при активации. |
-| `reveal` (On use: reveal) | string | `""` | Hidden object ids revealed when the object is activated. / Показать объекты при активации. |
+| `reactsTo` (Reacts to) | string-enum-multi | `[]` | For eye switches, crystals and breakables: what hits it. / Реагирует на. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `turnOnVariable` (On use: turn on variable) | variable | `""` | Project variable set to true when the object is activated (opened, switched on, lit, destroyed). / Включить переменную при активации. |
+| `openDoorAt` (On use: open door at) | map-position | — | Door picked on the map, opened when the object is activated. / Открыть дверь при активации. |
+| `revealAt` (On use: reveal object at) | map-position | — | Hidden object picked on the map, revealed when the object is activated. / Показать объект при активации. |
 
 ## Zelda: Create Chest
 
@@ -171,10 +160,9 @@ Places a treasure chest with an item inside. Opened chests stay open. / Сунд
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (ID) | string | `"chest_1"` | Unique chest id. |
 | `position` (Position) | map-position | — | Chest center. |
-| `item` (Item) | string | `"key"` | Item or resource id: key, big_key, bombs, arrows, rupees, boomerang, bow, heart_container... |
-| `count` (Count) | number | `1` | How many. |
+| `item` (Item) | string-enum | `"key"` | What is inside. / Что внутри. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `requiresBigKey` (Needs Big Key) | boolean | `false` | Big chest that needs the dungeon's Big Key. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it with a rule or Zelda: Change Object (reveal). |
 
@@ -184,83 +172,74 @@ Places a door. Lock: none (opens by action), small key, Big Key, or switch (only
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (ID) | string | `"door_1"` | Unique door id. |
 | `position` (Position) | map-position | — | Door center. |
-| `lock` (Lock) | string-enum | `"small_key"` | What opens it. / Замок. |
+| `lock` (Lock) | string-enum | `"small_key"` | What opens it. / Замок. Варианты: None, Small key, Big Key, Switch / rule. |
 | `startOpen` (Start open) | boolean | `false` | Shutter doors that close when a fight starts. |
 | `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
 | `height` (Height) | number | `0` | Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота. |
 
 ## Zelda: Place Item
 
-Puts a collectible on the ground (key, heart, bombs...). With an ID it never respawns once taken. / Предмет на земле.
+Puts a collectible on the ground (key, heart, rupees, bombs...). / Предмет на земле.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string | `"key"` | Item or resource id. |
-| `count` (Count) | number | `1` | How many. |
-| `position` (Position) | map-position | — | Where. |
-| `id` (ID) | string | `""` | Optional id to make it persistent. |
-
-## Zelda: Place Marker
-
-Names a map point once (tip: press F9 in playtest and click the map to get X/Y), e.g. for patrol routes (Patrol markers of Create Enemy). / Именованная точка карты, например для маршрута патруля.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `id` (Marker ID) | string | `"marker_1"` | Name of the point, e.g. boss_spot. |
-| `position` (Position) | map-position | — | Point on the map. / Точка на карте. |
+| `item` (Item) | string-enum | `"key"` | What lies there. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
+| `position` (Position) | map-position | — | Where it lies: pick it on the map. / Где лежит. |
+| `once` (Only once) | boolean | `true` | Once taken it never comes back (keys, heart containers). / Не появляется снова. |
 
 ## Zelda: Change Object
 
-Changes an object by id. Operation: open, close (doors, chests), on, off, toggle (levers, buttons, plates), reveal, hide, reset (forget saved progress), destroy, or state (any state name). / Изменить объект.
+Changes a toolkit object picked on the map: open or close doors and chests, switch levers and plates, light torches, reveal, hide, reset or destroy. / Изменить объект.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (ID) | string | `""` | Object id. |
-| `operation` (Operation) | string-enum | `"open"` | What to do with the object. / Действие. |
-| `state` (State) | string | `""` | Only for operation "state": on, off, opened, closed, locked, unlocked, lit, destroyed, revealed, hidden. |
+| `objectAt` (Object at) | map-position | — | Pick the object on the map. / Объект на карте. |
+| `operation` (Operation) | string-enum | `"open"` | What to do with it. / Действие. Варианты: Open, Close, Switch on, Switch off, Toggle, Light (torch), Unlock, Reveal, Hide, Reset (forget saved state), Destroy. |
 
 ## Zelda: Remove Target
 
-Removes an enemy or object by id, or every enemy of a group. Defeat = counts as beaten in battle (drops, rules, boss rewards). / Убрать или победить цель.
+Removes every enemy of a group, or the object picked on the map. Defeat = counts as beaten in battle (drops, rules, boss rewards). / Убрать или победить цель.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (ID) | string | `""` | Enemy or object id (empty to use Group). |
-| `group` (Group) | string | `""` | Enemy group. |
+| `group` (Enemy group) | string-enum | `""` | All enemies of this group. / Группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
+| `objectAt` (Object at) | map-position | — | Or an object picked on the map. / Или объект на карте. |
 | `defeat` (Defeat) | boolean | `true` | Enemies die with drops and events instead of vanishing. |
 
 ## Zelda: Damage Target
 
-Deals damage to an enemy or object by id (use 'player' for the player). / Наносит урон по id.
+Deals damage to the player, to every enemy of a group, or to an object picked on the map. / Наносит урон.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (ID) | string | `""` | Enemy/object id or 'player'. |
-| `amount` (Amount) | number | `1` | Damage points. |
-| `damageType` (Damage type) | string-enum | `"script"` | Enemies may resist some types. / Тип урона. |
+| `player` (Hit the player) | boolean | `false` | Damage the player. / Урон игроку. |
+| `group` (Enemy group) | string-enum | `""` | Damage every enemy of this group. / Урон группе врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
+| `objectAt` (Object at) | map-position | — | Or an object picked on the map. / Или объект на карте. |
+| `amount` (Amount) | number | `1` | Damage points (2 = one heart for the player). / Урон. |
+| `damageType` (Damage type) | string-enum | `"script"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 
 ## Zelda: Add Rule
 
-When the conditions become true (every filled When field), do the filled actions. E.g. When objects active: plate_1 → Open doors: door_2. / Правило «условие → действия».
+When the conditions become true (every filled When field), do the filled actions. E.g. When object at: the plate → Open door at: the door. / Правило «условие → действия».
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (Rule ID) | string | `"rule_1"` | Unique rule id. |
-| `whenDefeated` (When group defeated) | string | `""` | Every enemy of this group is beaten (Group of Create Enemy). / Побеждены все враги группы. |
-| `whenActive` (When objects active) | string | `""` | Object ids, comma-separated: switches and plates on, doors and chests open, torches lit. / Объекты включены или открыты. |
-| `whenFlag` (When flag set) | string | `""` | Flag name. / Флаг установлен. |
-| `whenItem` (When player has) | string | `""` | Item id, e.g. bow or big_key. / У игрока есть предмет. |
+| `whenGroup` (When group defeated) | string-enum | `""` | Every enemy of this group is beaten (Group of Create Enemy). / Побеждена вся группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
+| `whenObjectAt` (When object at) | map-position | — | Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт. |
+| `whenObjectAt2` (…and object at) | map-position | — | Optional second object. / Второй объект. |
+| `whenVariable` (When variable is on) | variable | `""` | A project variable that must be true (or not 0). / Переменная проекта включена. |
+| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `whenBoss` (When boss defeated) | boolean | `false` | The boss of the current dungeon (Enter Dungeon) is beaten. / Побеждён босс подземелья. |
-| `openDoors` (Open doors) | string | `""` | Door ids, comma-separated. / Открыть двери. |
-| `reveal` (Reveal) | string | `""` | Hidden object ids (chests, passages), comma-separated. / Показать скрытые объекты. |
-| `setFlag` (Set flag) | string | `""` | Flag to set. / Установить флаг. |
-| `giveItem` (Give item) | string | `""` | Item or resource id. / Выдать предмет. |
-| `giveCount` (Item count) | number | `1` | How many to give. |
+| `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
+| `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
+| `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
-| `spawnEnemy` (Spawn enemy) | string | `""` | Enemy template to create, e.g. ogre. / Создать врага. |
-| `spawnAt` (Spawn at marker) | string | `""` | Marker id (Zelda: Place Marker) where it appears. / Маркер появления. |
+| `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `spawnAt` (Spawn at) | map-position | — | Where the enemy appears. / Где появится. |
 | `once` (Once) | boolean | `true` | Fire only the first time (remembered in saves). |
 
 ## Zelda: Run Actions
@@ -269,97 +248,86 @@ Does several things at once, optionally only when a toolkit condition holds (PS 
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `whenDefeated` (When group defeated) | string | `""` | Every enemy of this group is beaten (Group of Create Enemy). / Побеждены все враги группы. |
-| `whenActive` (When objects active) | string | `""` | Object ids, comma-separated: switches and plates on, doors and chests open, torches lit. / Объекты включены или открыты. |
-| `whenFlag` (When flag set) | string | `""` | Flag name. / Флаг установлен. |
-| `whenItem` (When player has) | string | `""` | Item id, e.g. bow or big_key. / У игрока есть предмет. |
+| `whenGroup` (When group defeated) | string-enum | `""` | Every enemy of this group is beaten (Group of Create Enemy). / Побеждена вся группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
+| `whenObjectAt` (When object at) | map-position | — | Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт. |
+| `whenObjectAt2` (…and object at) | map-position | — | Optional second object. / Второй объект. |
+| `whenVariable` (When variable is on) | variable | `""` | A project variable that must be true (or not 0). / Переменная проекта включена. |
+| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `whenBoss` (When boss defeated) | boolean | `false` | The boss of the current dungeon (Enter Dungeon) is beaten. / Побеждён босс подземелья. |
-| `openDoors` (Open doors) | string | `""` | Door ids, comma-separated. / Открыть двери. |
-| `reveal` (Reveal) | string | `""` | Hidden object ids (chests, passages), comma-separated. / Показать скрытые объекты. |
-| `setFlag` (Set flag) | string | `""` | Flag to set. / Установить флаг. |
-| `giveItem` (Give item) | string | `""` | Item or resource id. / Выдать предмет. |
-| `giveCount` (Item count) | number | `1` | How many to give. |
+| `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
+| `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
+| `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
-| `spawnEnemy` (Spawn enemy) | string | `""` | Enemy template to create, e.g. ogre. / Создать врага. |
-| `spawnAt` (Spawn at marker) | string | `""` | Marker id (Zelda: Place Marker) where it appears. / Маркер появления. |
+| `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `spawnAt` (Spawn at) | map-position | — | Where the enemy appears. / Где появится. |
 
 ## Zelda: Create Switch Sequence
 
-Switches must be activated in this order; a wrong one resets them. When solved, the filled actions run. / Переключатели в заданном порядке.
+Switches must be activated in this order; a wrong one resets them. When solved, the filled actions run. Put it after the switches. / Переключатели в заданном порядке (ставить после них).
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (Puzzle ID) | string | `"sequence_1"` | Unique id; solved state is saved as flag puzzle:<id>. |
-| `switches` (Switch IDs) | string | `"switch_a,switch_b,switch_c"` | Comma-separated ids in the correct order. |
+| `order` (Switches in order) | path | — | Click the switches on the map in the right order. / Переключатели по порядку. |
 | `resetOnWrong` (Reset on wrong) | boolean | `true` | Turn all switches off after a wrong one. |
-| `openDoors` (Open doors) | string | `""` | Door ids, comma-separated. / Открыть двери. |
-| `reveal` (Reveal) | string | `""` | Hidden object ids (chests, passages), comma-separated. / Показать скрытые объекты. |
-| `setFlag` (Set flag) | string | `""` | Flag to set. / Установить флаг. |
-| `giveItem` (Give item) | string | `""` | Item or resource id. / Выдать предмет. |
-| `giveCount` (Item count) | number | `1` | How many to give. |
+| `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
+| `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
+| `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
-| `spawnEnemy` (Spawn enemy) | string | `""` | Enemy template to create, e.g. ogre. / Создать врага. |
-| `spawnAt` (Spawn at marker) | string | `""` | Marker id (Zelda: Place Marker) where it appears. / Маркер появления. |
+| `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `spawnAt` (Spawn at) | map-position | — | Where the enemy appears. / Где появится. |
 
 ## Zelda: Create Wave Room
 
-Room with enemy waves: doors stay shut until every wave is beaten, then the filled actions run. Add enemies with Zelda: Add Wave Enemy. / Комната с волнами врагов.
+A room with enemy waves: draw its area on the map. Doors inside the area stay shut until every wave is beaten; waves start when the player walks in. Add enemies with Zelda: Add Wave Enemy inside the area. / Комната с волнами врагов.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (Room ID) | string | `"arena"` | Unique room id (cleared state is saved). |
-| `lockDoors` (Doors to lock) | string | `""` | Comma-separated door ids closed during the fight. |
-| `autoStart` (Start at once) | boolean | `false` | Start when the map loads; otherwise use Zelda: Start Waves (e.g. from a trigger area). |
-| `delayMs` (Pause between waves (ms)) | number | `800` | 1000 = one second. |
-| `openDoors` (Open doors) | string | `""` | Door ids, comma-separated. / Открыть двери. |
-| `reveal` (Reveal) | string | `""` | Hidden object ids (chests, passages), comma-separated. / Показать скрытые объекты. |
-| `setFlag` (Set flag) | string | `""` | Flag to set. / Установить флаг. |
-| `giveItem` (Give item) | string | `""` | Item or resource id. / Выдать предмет. |
-| `giveCount` (Item count) | number | `1` | How many to give. |
+| `area` (Room area) | map-rectangle-area | — | Draw the room on the map. / Область комнаты. |
+| `startAtOnce` (Start at once) | boolean | `false` | Start when the map loads instead of when the player walks in. / Начать сразу. |
+| `delayMs` (Pause between waves (ms)) | number | `800` | Time before the next wave: 1000 = one second. / Пауза между волнами. |
+| `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
+| `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
+| `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
-| `spawnEnemy` (Spawn enemy) | string | `""` | Enemy template to create, e.g. ogre. / Создать врага. |
-| `spawnAt` (Spawn at marker) | string | `""` | Marker id (Zelda: Place Marker) where it appears. / Маркер появления. |
+| `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `spawnAt` (Spawn at) | map-position | — | Where the enemy appears. / Где появится. |
 
 ## Zelda: Add Wave Enemy
 
-Adds one enemy to a wave of a wave room at the given point. / Добавляет врага в волну.
+Adds one enemy to a wave: it belongs to the wave room whose area contains its position. / Добавляет врага в волну комнаты, в которой стоит.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `roomId` (Room ID) | string | `"arena"` | Wave room id. |
-| `wave` (Wave) | number | `1` | Wave number: 1, 2, 3... |
-| `template` (Template) | string-enum | `"slime"` | Behaviour and stats. / Шаблон врага. |
-| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
-| `position` (Position) | map-position | — | Spawn point. |
+| `wave` (Wave) | number | `1` | Wave number: 1 = first wave, 2 = second... / Номер волны. |
+| `template` (Template) | string-enum | `"slime"` | Behaviour and stats. / Шаблон врага. Варианты: slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `position` (Position) | map-position | — | Spawn point inside the room: pick it on the map. / Точка появления. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
 
-## Zelda: Start Waves
-
-Starts a wave room (e.g. from a trigger area at the room entrance). / Запускает волны врагов.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `roomId` (Room ID) | string | `""` | Wave room id. |
-
 ## Zelda: Enter Dungeon
 
-Marks the current dungeon: small keys and the Big Key are counted per dungeon. Empty ID = back to the overworld. / Вход в подземелье (пусто — выход).
+Marks the current dungeon: small keys and the Big Key are counted per dungeon. Overworld = back outside. / Вход в подземелье.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `dungeonId` (Dungeon ID) | string | `"dungeon_1"` | Unique dungeon id; empty to leave. |
+| `dungeonId` (Dungeon) | string-enum | `"dungeon_1"` | Keys, map and boss are counted per dungeon. / Подземелье. Варианты: Overworld (no dungeon), Dungeon 1, Dungeon 2, Dungeon 3, Dungeon 4, Dungeon 5, Dungeon 6, Dungeon 7, Dungeon 8, Dungeon 9. |
 | `completeOnBoss` (Complete on boss) | boolean | `true` | Defeating a boss enemy completes the dungeon. |
 
 ## Zelda: Give Item
 
-Gives an item or resource (sword, shield, bow, boomerang, bombs, arrows, rupees, key, big_key, heart_container, magic...). / Выдаёт предмет.
+Gives an item or resource. / Выдаёт предмет.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string | `"bombs"` | Item or resource id. |
-| `count` (Count) | number | `1` | How many. |
+| `item` (Item) | string-enum | `"bombs"` | What to give. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `silent` (Silent) | boolean | `false` | Do not show the 'You got...' message. |
 
 ## Zelda: Spend Resource
@@ -368,8 +336,8 @@ Removes resources if there are enough (rupees, bombs, arrows, magic, key). / Т�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `resource` (Resource) | string | `"rupees"` | Resource id. |
-| `amount` (Amount) | number | `1` | How many. |
+| `resource` (Resource) | string-enum | `"rupees"` | What to spend. / Ресурс. Варианты: Rupees, Bombs, Arrows, Magic, Small keys. |
+| `amount` (Amount) | number | `1` | How many. / Сколько. |
 
 ## Zelda: Remove Item
 
@@ -377,7 +345,7 @@ Takes an owned item away. / Забирает предмет.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string | `""` | Item id. |
+| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 
 ## Zelda: Equip Item
 
@@ -385,7 +353,7 @@ Puts an owned item into the quick-use slot. / Ставит предмет в б�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string | `""` | Item id. |
+| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 
 ## Zelda: Change Player Stats
 
@@ -398,23 +366,14 @@ Adds to (or, with Set, replaces) the player's health, maximum health and magic. 
 | `magic` (Magic) | number | `0` | Magic points to add. / Магия. |
 | `set` (Set instead of add) | boolean | `false` | Use the numbers as new values (fields left at 0 are not changed). / Установить вместо прибавления. |
 
-## Zelda: Set Flag
-
-Sets a toolkit flag used by rules (true/false/number/text). / Устанавливает флаг.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `flag` (Flag) | string | `""` | Flag name. |
-| `value` (Value) | string | `"true"` | true, false, a number or text. |
-
 ## Zelda: Set Ability
 
 Enables or disables an ability/item (sword, shield, bow, bomb...). / Включает/отключает способность.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `ability` (Ability) | string | `"sword"` | Item/ability id. |
-| `enabled` (Enabled) | boolean | `true` | Allow using it. |
+| `ability` (Ability) | string-enum | `"sword"` | Which item or ability. / Способность. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `enabled` (Enabled) | boolean | `true` | Allow using it. / Разрешить. |
 
 ## Zelda: Show Message
 
@@ -422,8 +381,17 @@ Shows a short HUD message (not a PS Maker dialogue box). / Короткое со
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `text` (Text) | string | `""` | Message text or localization key. |
-| `durationMs` (Duration (ms)) | number | `2200` | How long. |
+| `text` (Text) | string | `""` | Message to show. / Текст сообщения. |
+| `durationMs` (Duration (ms)) | number | `2200` | How long it stays: 1000 = one second. / Сколько показывать. |
+
+## Zelda: Show Stat In Variable
+
+Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use it in PS Maker conditions (a shop: if Rupees ≥ 50) or in UI components. Stays on for the whole game. / Значение Toolkit в переменной проекта.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `stat` (Value) | string-enum | `"rupees"` | What to copy. / Что показывать. Варианты: Rupees, Bombs, Arrows, Small keys (this dungeon), Hearts, Max hearts, Magic, Enemies left on the map. |
+| `variableId` (Variable) | variable | `""` | A number variable of the project (true/false for 0 / not 0). / Переменная проекта. |
 
 ## Zelda: Set Respawn Point
 
@@ -445,7 +413,7 @@ Saves toolkit progress (health, items, chests, doors, switches, dungeons) to the
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `slot` (Slot) | string | `"default"` | Save slot name. |
+| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
 
 ## Zelda: Load Progress
 
@@ -453,7 +421,7 @@ Loads toolkit progress saved earlier. / Загружает прогресс.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `slot` (Slot) | string | `"default"` | Save slot name. |
+| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
 
 ## Zelda: Reset Progress
 
@@ -461,7 +429,7 @@ Deletes a save slot and optionally starts a new game. / Удаляет сохр�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `slot` (Slot) | string | `"default"` | Save slot name. |
+| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
 | `newGame` (New game) | boolean | `true` | Also reset current progress. |
 
 ## Zelda: Define Item
@@ -470,13 +438,13 @@ Adds a usable item without code: a shot (Damage > 0), a burst around the player 
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `id` (Item ID) | string | `"ice_rod"` | Unique id, e.g. ice_rod. |
+| `slot` (Item) | string-enum | `"custom_item_1"` | Which custom item this defines; then pick it in Give Item, chests, rules. / Какой свой предмет. Варианты: Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `name` (Name) | string | `"Ice Rod"` | Shown in messages and the inventory. / Название. |
 | `icon` (Icon) | image | — | Optional icon image. / Иконка. |
-| `resource` (Uses) | string-enum | `"magic"` | What one use costs. / Что расходует. |
-| `cost` (Cost) | number | `4` | How much of it per use. |
+| `resource` (Uses) | string-enum | `"magic"` | What one use costs. / Что расходует. Варианты: Nothing, Rupees, Bombs, Arrows, Magic, Small keys. |
+| `cost` (Cost) | number | `4` | How much of it per use (magic meter: 32 points). / Стоимость. |
 | `damage` (Damage) | number | `3` | Damage of the shot or burst; 0 = no attack. / Урон. |
-| `damageType` (Damage type) | string-enum | `"magic"` | Enemies may resist some types. / Тип урона. |
+| `damageType` (Damage type) | string-enum | `"magic"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 | `area` (Area attack) | boolean | `false` | Hit everything around the player instead of shooting. / Удар вокруг игрока. |
 | `stunMs` (Stun (ms)) | number | `0` | Freeze hit enemies; 1000 = one second. |
 | `heal` (Heal) | number | `0` | Half-hearts restored per use (makes it a healing item). / Лечение. |
@@ -484,84 +452,45 @@ Adds a usable item without code: a shot (Damage > 0), a burst around the player 
 
 ## Zelda: Define Enemy
 
-Makes a new enemy type from an existing one with other stats; use its name as the Template of Create Enemy. / Новый тип врага на основе существующего.
+Makes your own enemy type from an existing one: other stats and a PS Maker character's look. Then choose it as Template in Create Enemy. / Свой тип врага.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `name` (Template name) | string | `"red_soldier"` | New template name. |
-| `basedOn` (Based on) | string-enum | `"soldier"` | Template to start from. / На основе шаблона. |
+| `slot` (Enemy type) | string-enum | `"custom_enemy_1"` | Which custom type this defines. / Какой свой тип. Варианты: Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `basedOn` (Based on) | string-enum | `"soldier"` | Behaviour to start from. / На основе шаблона. Варианты: slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
+| `look` (Look (PS Maker character)) | npc | — | Optional: a character from your library; its animations and collision box are used. / Внешний вид — персонаж PS Maker. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
 | `detectRange` (Sight range) | number | `0` | Pixels at which it notices the player; 0 = template value. / Дальность обзора. |
 | `boss` (Boss) | boolean | `false` | Defeating it completes the dungeon (with Enter Dungeon). / Босс. |
-| `immuneTo` (Immune to) | string | `""` | Damage types that do nothing, comma-separated: arrow, fire, bomb... / Неуязвим к. |
+| `immuneTo` (Immune to) | string-enum-multi | `[]` | Damage types that do nothing to it. / Неуязвим к. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 | `spriteOffsetX` (Sprite offset X) | number | `0` | Move the picture relative to the hitbox, pixels. / Сдвиг картинки по X. |
 | `spriteOffsetY` (Sprite offset Y) | number | `0` | e.g. -16 when the feet are low in a 64x64 frame. / Сдвиг картинки по Y. |
 | `spriteScale` (Sprite scale) | number | `0` | 0 = template value (1). / Масштаб картинки. |
 
-## Zelda: Define Sprite Sheet
-
-Registers a sprite sheet image cut into equal frames (Mana Seed: 64x64). Frames are numbered from 0, left to right, top to bottom; check them with Zelda: Preview Sprite Sheet. / Спрайт-лист.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `id` (Sheet ID) | string | `"hero"` | Name used by animations, e.g. hero. |
-| `image` (Image) | image | — | The sheet image. |
-| `imageKey` (Image key or URL) | string | `""` | Optional: texture key or image URL if the Image picker does not work. |
-| `frameWidth` (Frame width) | number | `64` | Pixels. |
-| `frameHeight` (Frame height) | number | `64` | Pixels. |
-| `margin` (Margin) | number | `0` | Empty pixels around the sheet. |
-| `spacing` (Spacing) | number | `0` | Empty pixels between frames. |
-
-## Zelda: Define Animation
-
-Names frames of a sprite sheet (numbers from Preview Sprite Sheet). Fill only Frames for one animation in every direction, or the four direction fields; Left mirrors Right when empty. FPS 0 = stretch over the action. / Анимация из кадров.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `id` (Animation ID) | string | `"hero_slash"` | e.g. hero_slash. |
-| `sheet` (Sheet ID) | string | `"hero"` | From Zelda: Define Sprite Sheet. |
-| `frames` (Frames (facing down)) | string | `""` | Frame numbers, e.g. 0, 1, 2, 3. Used for every direction that has no own frames. / Кадры (вниз или для всех). |
-| `framesUp` (Frames facing up) | string | `""` | Optional, e.g. 8, 9, 10. |
-| `framesLeft` (Frames facing left) | string | `""` | Optional; empty = mirrored Right. |
-| `framesRight` (Frames facing right) | string | `""` | Optional, e.g. 16, 17, 18. |
-| `fps` (FPS) | number | `0` | Frames per second; 0 = fit the action duration (attacks). |
-| `loop` (Loop) | boolean | `false` | Repeat (walk/idle). |
-
 ## Zelda: Set Player Sprites
 
-Uses sprite-sheet animations for the player's attacks (body and weapon layers, e.g. Mana Seed character + weapon sheets). Empty = built-in blade. / Анимации атаки игрока.
+Player attack animations from PS Maker (e.g. Mana Seed Sword Attack): pick any direction, all directions of that sheet are used. Empty = built-in blade. / Анимации атаки игрока из PS Maker.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `attackAnimation` (Attack animation (PS Maker)) | player-animation-picker | `""` | Pick one of the player's animations, e.g. Sword Attack (any direction): all directions of that sheet are used. / Анимация атаки из PS Maker. |
-| `hurtAnimation` (Hurt animation (PS Maker)) | player-animation-picker | `""` | Optional, e.g. Sword Hurt. / Анимация урона из PS Maker. |
-| `attack` (Attack (body)) | string | `""` | Animation id for the sword swing. |
-| `weaponAttack` (Attack (weapon)) | string | `""` | Weapon layer for the swing. |
-| `spin` (Spin (body)) | string | `""` | Spin attack; empty = attack. |
-| `weaponSpin` (Spin (weapon)) | string | `""` |  |
-| `charge` (Charge (body)) | string | `""` | While charging; empty = last attack frame. |
-| `weaponCharge` (Charge (weapon)) | string | `""` |  |
-| `hurt` (Hurt (body)) | string | `""` | While knocked back. |
+| `attack` (Attack) | player-animation-picker | `""` | Sword swing, e.g. Sword Attack. / Удар мечом. |
+| `spin` (Spin attack) | player-animation-picker | `""` | Optional; empty = Attack. / Круговой удар. |
+| `charge` (Charging) | player-animation-picker | `""` | Optional: while the sword is held; empty = last Attack frame. / Зарядка удара. |
+| `hurt` (Hurt) | player-animation-picker | `""` | Optional, e.g. Sword Hurt. / Получение урона. |
+| `weaponAttack` (Weapon layer: attack) | animation | `""` | Optional: a separate weapon sheet drawn over the body (when the weapon is not in the body frames). / Слой оружия: удар. |
+| `weaponSpin` (Weapon layer: spin) | animation | `""` | Optional. / Слой оружия: круговой. |
+| `weaponCharge` (Weapon layer: charging) | animation | `""` | Optional. / Слой оружия: зарядка. |
 | `behindUp` (Weapon behind when facing up) | boolean | `true` | Draw the weapon layer behind the body. / Оружие за телом (вверх). |
-| `behindDown` (Weapon behind when facing down) | boolean | `false` |  |
-| `behindLeft` (Weapon behind when facing left) | boolean | `false` |  |
-| `behindRight` (Weapon behind when facing right) | boolean | `false` |  |
-| `hidePlayer` (Hide PS Maker sprite) | boolean | `true` | Hide the normal sprite while an animation plays. |
-| `offsetX` (Offset X) | number | `0` | Pixels. |
-| `offsetY` (Offset Y) | number | `0` | Pixels. |
+| `behindDown` (Weapon behind when facing down) | boolean | `false` | Draw the weapon layer behind the body. / Оружие за телом (вниз). |
+| `behindLeft` (Weapon behind when facing left) | boolean | `false` | Draw the weapon layer behind the body. / Оружие за телом (влево). |
+| `behindRight` (Weapon behind when facing right) | boolean | `false` | Draw the weapon layer behind the body. / Оружие за телом (вправо). |
+| `hidePlayer` (Hide PS Maker sprite) | boolean | `true` | Hide the normal sprite while an animation plays. / Скрывать обычный спрайт. |
+| `offsetX` (Offset X) | number | `0` | Move the animation, pixels. / Сдвиг по X. |
+| `offsetY` (Offset Y) | number | `0` | Move the animation, pixels. / Сдвиг по Y. |
 | `pivotX` (Swing center X) | number | `0` | Move the point the sword swings around, pixels. / Центр взмаха по X. |
 | `pivotY` (Swing center Y) | number | `0` | e.g. 4 to swing from lower on the body. / Центр взмаха по Y. |
-
-## Zelda: Preview Sprite Sheet
-
-Shows a sprite sheet full screen with every frame number, to pick frames for Define Animation. Run it again with Show off to close. / Просмотр кадров.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `sheet` (Sheet ID) | string | `"hero"` | Sheet to show. |
-| `show` (Show) | boolean | `true` | Open or close. |
 
 ## Zelda: Set Sound
 
@@ -569,8 +498,7 @@ Plays a sound at a toolkit moment: swordSwing, spinAttack, enemyHurt, enemyDefea
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `moment` (Moment) | string-enum | `"swordSwing"` | When the sound plays. / Когда звучит. |
+| `moment` (Moment) | string-enum | `"swordSwing"` | When the sound plays. / Когда звучит. Варианты: swordSwing, spinAttack, enemyHurt, enemyDefeated, playerHurt, playerDie, shieldBlock, bombExplode, objectBreak, pickup, itemGet, chestOpen, doorUnlock, puzzleSolved. |
 | `sound` (Sound) | audio | — | Audio asset. |
-| `soundKey` (Sound key or URL) | string | `""` | Optional: audio key or file URL if the Sound picker does not work. |
-| `volume` (Volume) | number | `1` | 0..1 |
+| `volume` (Volume) | number | `1` | 0 = silent, 1 = full volume, 0.5 = half. / Громкость. |
 

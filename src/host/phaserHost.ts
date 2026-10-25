@@ -634,6 +634,20 @@ export class PhaserHost implements HostAdapter, DepthSource {
     return this.story;
   }
 
+  /** PS Maker project variables (game.variables: get(id) → { type, value }, set(id, value)). */
+  getVariable(id: string): string | number | boolean | undefined {
+    return this.game?.variables?.get?.(id)?.value;
+  }
+
+  setVariable(id: string, value: string | number | boolean): boolean {
+    const vars = this.game?.variables;
+    const v = vars?.get?.(id);
+    if (!v || typeof vars.set !== "function") return false;
+    const typed = v.type === "boolean" ? (typeof value === "boolean" ? value : Number(value) !== 0 && value !== "false" && value !== "") : v.type === "number" ? (typeof value === "boolean" ? (value ? 1 : 0) : Number(value) || 0) : String(value);
+    vars.set(id, typed);
+    return true;
+  }
+
   /** True while a PS Maker dialogue is on screen (GameMap.playingDialogue). */
   isDialogueOpen(): boolean {
     return this.scene?.playingDialogue === true;

@@ -291,9 +291,23 @@ export function playerSheetAnim(story: PsStory, name: string, loop = false, colu
  * row, e.g. Sword Attack facing down) as a directional animation over all its rows.
  */
 export function playerAnimFromPick(story: PsStory, animationId: unknown, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
+  return animFromPick(story, animationId, false, columnsOf);
+}
+
+/**
+ * Any picked PS Maker animation ("animation" / "player-animation-picker" fields) as a
+ * directional animation over its whole sheet, with the row order of the sheet's owner
+ * (the player's or the character's default animation set).
+ */
+export function animFromPick(story: PsStory, animationId: unknown, loop: boolean, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
   if (typeof animationId !== "string" || !animationId) return null;
   const sheet = story.spritesheetAnimations.find((s) => s.animations.some((a) => a.id === animationId));
-  return sheet ? playerAnimOf(story, sheet, false, columnsOf) : null;
+  if (!sheet) return null;
+  const owner = sheet.ownerRef?.type === "npc" ? story.characters.find((c) => c.id === sheet.ownerRef?.id) : undefined;
+  const set = owner ? defaultSet(owner.animationSets, owner.defaultAnimationSetId) : defaultSet(story.player?.animationSets, story.player?.defaultAnimationSetId);
+  const anim: AnimDef = { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set), columnsOf), loop };
+  if (loop) anim.fps = sheet.frameRate || 8;
+  return { sheetKey: sheetId(sheet), sheet, anim };
 }
 
 function playerAnimOf(story: PsStory, sheet: PsSheet, loop: boolean, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } {

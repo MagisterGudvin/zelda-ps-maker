@@ -24,6 +24,13 @@ export interface WaveRoomSpec {
   lockDoors?: string[];
   onCleared?: RuleAction[];
   delayMs?: number;
+  /**
+   * Room drawn on the map: doors inside it lock during the fight, wave enemies
+   * placed inside it belong to it, and (with `startOnEnter`) the waves start when
+   * the player walks in.
+   */
+  area?: { x: number; y: number; width: number; height: number };
+  startOnEnter?: boolean;
 }
 
 interface WaveRoomEntry {
@@ -44,6 +51,8 @@ export class DungeonSystem {
   readonly name = "dungeons";
   private readonly s: Session;
   private readonly rooms = new Map<string, WaveRoomEntry>();
+  /** Wave enemies placed by position, waiting for the room whose area contains them. */
+  private readonly looseSpawns: { wave: number; spawn: WaveSpawn & { x: number; y: number } }[] = [];
   private readonly completeOnBoss = new Map<string, boolean>();
   private readonly offBoss: () => void;
   private readonly offDefeat: () => void;
@@ -105,6 +114,34 @@ export class DungeonSystem {
     entry.pendingStart = spec.autoStart !== false;
   }
 
+  /** Adds one enemy to wave `wave` (1-based) of whichever room's area contains its position. */
+  addWaveSpawnAt(wave: number, spawn: WaveSpawn & { x: number; y: number }): void {
+    this.looseSpawns.push({ wave, spawn });
+  }
+
+  private static inside(area: WaveRoomSpec["area"], x: number, y: number): boolean {
+    return !!area && x >= area.x && x <= area.x + area.width && y >= area.y && y <= area.y + area.height;
+  }
+
+  /** Moves position-placed enemies into the room whose area contains them. */
+  private claimSpawns(room: WaveRoomEntry): void {
+    for (let i = this.looseSpawns.length - 1; i >= 0; i--) {
+      const { wave, spawn } = this.looseSpawns[i];
+      if (!DungeonSystem.inside(room.spec.area, spawn.x, spawn.y)) continue;
+      (room.waves[Math.max(0, Math.round(wave) - 1)] ??= []).unshift(spawn);
+      this.looseSpawns.splice(i, 1);
+    }
+  }
+
+  /** Doors inside the room's area (when no door ids were given). */
+  private doorsOf(spec: WaveRoomSpec): string[] {
+    if (spec.lockDoors?.length || !spec.area) return spec.lockDoors ?? [];
+    return this.s.world
+      .list("object")
+      .filter((o) => o instanceof Interactable && o.cfg.type === "door" && DungeonSystem.inside(spec.area, o.x, o.y))
+      .map((o) => o.id);
+  }
+
   /** Adds one enemy to wave `wave` (1-based) of a room; creates the room entry if needed. */
   addWaveSpawn(roomId: string, wave: number, spawn: WaveSpawn): void {
     let room = this.rooms.get(roomId);
@@ -124,8 +161,9 @@ export class DungeonSystem {
     }
     if (room.running || this.s.state.flags[`waves:${roomId}`]) return;
     room.pendingStart = false;
+    this.claimSpawns(room);
     if (room.waves.filter(Boolean).length === 0) {
-      this.s.logger.warn(`startWaves: wave room "${roomId}" has no enemies (add them with Zelda: Add Wave Enemy).`);
+      this.s.logger.warnOnce(`waves-empty-${roomId}`, `startWaves: wave room "${roomId}" has no enemies (add them with Zelda: Add Wave Enemy inside its area).`);
       return;
     }
     room.running = true;
@@ -158,7 +196,7 @@ export class DungeonSystem {
   }
 
   private setDoors(spec: WaveRoomSpec, open: boolean): void {
-    for (const id of spec.lockDoors ?? []) {
+    for (const id of this.doorsOf(spec)) {
       const d = this.s.world.get(id);
       if (!(d instanceof Interactable)) continue;
       if (open) d.open();
@@ -167,8 +205,10 @@ export class DungeonSystem {
   }
 
   tick(dtMs: number): void {
+    const p = this.s.player;
     for (const room of this.rooms.values()) {
       if (room.pendingStart) this.startWaves(room.spec.id);
+      else if (room.spec.startOnEnter && !room.running && p.present && DungeonSystem.inside(room.spec.area, p.box.x, p.box.y) && !this.s.state.flags[`waves:${room.spec.id}`]) this.startWaves(room.spec.id);
       if (!room.running || room.delayMs <= 0) continue;
       room.delayMs -= dtMs;
       if (room.delayMs <= 0) this.nextWave(room);

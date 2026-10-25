@@ -1,95 +1,101 @@
 # Правила, головоломки и подземелья
 
-Ветвить события PS Maker по состоянию плагина нельзя (API не даёт регистрировать условия), поэтому логика уровней собирается из **правил Toolkit**: «когда условие станет истинным — выполнить действия». С версии 0.5.0 всё заполняется обычными полями формы — JSON писать не нужно.
+Логика уровней собирается как в конструкторе: объекты выбираются кликом по карте, группы и предметы — из списков, состояние для PS Maker — через переменные проекта. Писать имена и id не нужно.
 
-## Позиции: координаты и маркеры
+## Как выбираются объекты
 
-*Position* выбирается на карте кнопкой, как у встроенных событий (с 0.6.0). Запасной способ — в игре **F9** и клик по карте: «X: … Y: …» копируется в буфер обмена. На картах PS Maker начало координат может быть в центре карты, поэтому отрицательные X/Y — нормально.
+- **Position** и все поля «… at» — кнопка выбора точки на карте. Toolkit находит объект в этой точке (или ближайший в 12 px), причём учитывает, о чём поле: *Open door at* ищет дверь, *Reveal object at* — скрытый объект, условия не путают плиту с блоком, задвинутым на неё. Поэтому ставьте объект и правило про него в любом порядке — объект ищется, когда правило проверяется.
+- Прогресс (открытые сундуки и двери, побеждённые боссы) запоминается по типу и месту объекта на карте, отдельно для каждой карты.
+- Запасной способ узнать координаты — в игре **F9** и клик по карте: «X: … Y: …» копируется в буфер обмена. Отрицательные X/Y на картах PS Maker — норма.
 
-`Zelda: Place Marker` даёт точке имя: его используют *Patrol markers* у `Create Enemy` и поле *Spawn at marker* у правил. Маркеры принадлежат карте — ставьте их **до** действий, которые на них ссылаются.
+## Связь с PS Maker: переменные проекта
+
+- *When variable is on* — условие по переменной проекта (истинно: `true`, число ≠ 0).
+- *Turn on variable* и *On use: turn on variable* у объектов — Toolkit ставит переменной `true` (или 1). Её видят условия PS Maker (if/else в событиях), UI-компоненты и сохранения PS Maker.
+- `Zelda: Show Stat In Variable` — держит переменную равной значению Toolkit: рупии, бомбы, стрелы, ключи, сердца, магия, оставшиеся враги. Пример — магазин на событиях PS Maker: условие «Рупии ≥ 50» → `Zelda: Spend Resource` 50 + `Zelda: Give Item`.
 
 ## Поля условий и действий
 
-Одинаковые у `Zelda: Add Rule`, `Zelda: Run Actions` (только «Then»-часть у `Create Switch Sequence` и `Create Wave Room`). Пустое поле не участвует.
+Одинаковые у `Zelda: Add Rule` и `Zelda: Run Actions` (только действия — у `Create Switch Sequence` и `Create Wave Room`). Пустое поле не участвует.
 
 **Условия (When)** — должны выполняться все заполненные:
 
 | Поле | Истинно, когда |
 |---|---|
-| When group defeated | побеждены все враги группы (поле *Group* у `Create Enemy`) |
-| When objects active | все перечисленные объекты активны: переключатели и плиты включены, двери и сундуки открыты, факелы горят, разрушаемое разрушено (`plate_1, plate_2`) |
-| When flag set | флаг установлен (`Set Flag`, поле *On use: set flag* у объектов, решённая последовательность — `puzzle:<id>`, зачищенная комната — `waves:<id>`) |
-| When player has | у игрока есть предмет (`bow`, `big_key`) |
+| When group defeated | побеждены все враги группы (Group 1–9 у `Create Enemy`) |
+| When object at / …and object at | выбранные на карте объекты активны: переключатель или плита включены, дверь или сундук открыты, факел горит, разрушаемое разрушено |
+| When variable is on | переменная проекта включена |
+| When player has | у игрока есть предмет (список) |
 | When boss defeated | побеждён босс текущего подземелья (`Enter Dungeon`) |
 
 **Действия (Then)** — выполняются все заполненные:
 
 | Поле | Что делает |
 |---|---|
-| Open doors | открывает двери (`door_1, door_2`) |
-| Reveal | показывает скрытые объекты (сундук с *Hidden*, `hidden_passage`) |
-| Set flag | ставит флаг |
+| Open door at | открывает дверь, выбранную на карте |
+| Reveal object at | показывает скрытый объект (сундук с *Hidden*, `hidden_passage`) |
+| Turn on variable | включает переменную проекта |
 | Give item + Item count | выдаёт предмет или ресурс |
 | Message | показывает сообщение |
-| Spawn enemy + Spawn at marker | создаёт врага по шаблону в точке маркера |
+| Spawn enemy + Spawn at | создаёт врага в точке на карте |
 
 ## Правило
 
-`Zelda: Add Rule`: *Rule ID*, поля условий, поля действий, *Once* (сработать один раз; запоминается в сохранении флагом `rule:<id>`). Без хотя бы одного условия правило не создаётся — в диагностике будет предупреждение.
+`Zelda: Add Rule`: поля условий, поля действий, *Once* (сработать один раз; запоминается в сохранении). Без хотя бы одного условия правило не создаётся — в диагностике будет предупреждение. Правила проверяются после событий Toolkit (не каждый кадр) и срабатывают по фронту: переход «ложно → истинно» запускает действия.
 
-Правила вычисляются только после событий Toolkit (не каждый кадр) и срабатывают по фронту: переход `false → true` запускает действия.
-
-`Zelda: Run Actions` — то же без ожидания: проверить условия сейчас и выполнить действия (пустые условия = выполнить всегда). Нужен там, где событие PS Maker (триггер, диалог) должно сделать что-то в Toolkit с проверкой его состояния.
+`Zelda: Run Actions` — то же без ожидания: проверить условия сейчас и выполнить действия (пустые условия = всегда). Нужен там, где событие PS Maker (триггер, диалог) должно сделать что-то в Toolkit.
 
 ## Последовательность переключателей
 
-`Zelda: Create Switch Sequence`: *Puzzle ID* `seq_1`, *Switch IDs* `s1, s2, s3`, *Reset on wrong*, плюс поля действий (например, *Open doors* `door_3`). Неверный переключатель выключает все переключатели последовательности; решение запоминается флагом `puzzle:seq_1`.
+`Zelda: Create Switch Sequence`: *Switches in order* — путь по карте: кликните переключатели в правильном порядке; *Reset on wrong*; поля действий (например, *Open door at*). Ставьте действие **после** переключателей. Неверный переключатель выключает все переключатели последовательности; решение запоминается.
 
 ## Комнаты с волнами
 
-1. `Zelda: Create Wave Room`: *Room ID* `arena`, *Doors to lock* `arena_door`, *Start at once*, *Pause between waves (ms)*, плюс поля действий после последней волны (например, *Reveal* `arena_chest` или *Spawn enemy* `ogre` + *Spawn at marker* `boss_spot`).
-2. Для каждого врага — `Zelda: Add Wave Enemy`: *Room ID*, *Wave* `1`/`2`/…, *Template*, **Position**, при желании *Health*/*Damage*/*Speed*.
-3. На входе в комнату — триггерная зона PS Maker с действием `Zelda: Start Waves` (`arena`). С *Start at once* волны начнутся сразу после загрузки карты (после всех действий начала карты).
-
-Двери из списка закрываются на время боя и открываются после последней волны. Зачищенная комната запоминается флагом `waves:<id>`.
+1. `Zelda: Create Wave Room`: *Room area* — нарисуйте комнату на карте; *Pause between waves (ms)*; поля действий после последней волны (например, *Reveal object at* — сундук или *Spawn enemy* `ogre` + *Spawn at*).
+2. Для каждого врага — `Zelda: Add Wave Enemy`: *Wave* (1, 2, …), *Template*, **Position** внутри комнаты; при желании *Health* / *Damage* / *Speed*. Комната определяется по точке — указывать её не нужно.
+3. Волны начинаются, когда игрок входит в область (или сразу с *Start at once*). Двери внутри области закрываются на время боя и открываются после последней волны. Зачищенная комната запоминается.
 
 ## Подземелья
 
-`Zelda: Enter Dungeon` (ID, Complete on boss) — малые ключи, большой ключ, карта и компас считаются отдельно для каждого подземелья. Враг с `boss: true` (шаблон `ogre` или свой) при победе отмечает босса побеждённым и (по умолчанию) завершает подземелье: событие `zelda:dungeon:completed`, сообщение, автосохранение. `Zelda: Enter Dungeon` с пустым ID — вернуться к «наземному» счётчику ключей.
+`Zelda: Enter Dungeon` (*Dungeon*: Dungeon 1–9 или Overworld, *Complete on boss*) — малые ключи, большой ключ, карта и компас считаются отдельно для каждого подземелья. Враг с `boss: true` (шаблон `ogre` или свой) при победе отмечает босса побеждённым и (по умолчанию) завершает подземелье: событие `zelda:dungeon:completed`, сообщение, автосохранение. *Overworld* — вернуться к «наземному» счётчику ключей.
 
 ## Готовые рецепты
 
 **Блок на плиту → дверь**
 ```
-Zelda: Create Object  Type: block            ID: block_1
-Zelda: Create Object  Type: pressure_plate   ID: plate_1   [x] Stays on
-Zelda: Create Door    ID: door_1             [x] Opened by switch
-Zelda: Add Rule       When objects active: plate_1    Open doors: door_1
+Zelda: Create Object  Type: Block           Position: ●
+Zelda: Create Object  Type: Pressure plate  Position: ●   [x] Stays on   On use: open door at: ● (дверь)
+Zelda: Create Door    Lock: Switch / rule   Position: ●
 ```
-Короче — без правила: у плиты *On use: open doors* = `door_1`.
 
 **Бомба в стену → проход**
 ```
-Zelda: Create Object  Type: bombable_wall  ID: crack_1   (разрушенная стена становится проходом сама)
+Zelda: Create Object  Type: Bombable wall  Position: ●   (разрушенная стена становится проходом сама)
 ```
 
 **Победить всех → появляется сундук**
 ```
-Zelda: Create Enemy   Template: soldier  Group: room1   (×3)
-Zelda: Create Chest   ID: reward  Item: key  [x] Hidden
-Zelda: Add Rule       When group defeated: room1    Reveal: reward
+Zelda: Create Enemy   Template: Soldier  Group: Group 1  Position: ●   (×3)
+Zelda: Create Chest   Item: Small key  [x] Hidden  Position: ●
+Zelda: Add Rule       When group defeated: Group 1    Reveal object at: ● (сундук)
 ```
 
-**Зажечь все факелы → лестница**
+**Зажечь два факела → лестница**
 ```
-Zelda: Create Object  Type: torch  ID: t1 / t2
-Zelda: Create Object  Type: hidden_passage  ID: stairs  [x] Hidden
-Zelda: Add Rule       When objects active: t1, t2    Reveal: stairs
+Zelda: Create Object  Type: Torch           Position: ●  (×2)
+Zelda: Create Object  Type: Hidden passage  Position: ●
+Zelda: Add Rule       When object at: ● (факел 1)  …and object at: ● (факел 2)   Reveal object at: ● (лестница)
 ```
 
 **Глаз-переключатель от стрелы**
 ```
-Zelda: Create Object  Type: reactive  ID: eye  Reacts to: arrow  On use: open doors: door_2
+Zelda: Create Object  Type: Reactive  Reacts to: Arrow  On use: open door at: ●
+```
+
+**Магазин на событиях PS Maker**
+```
+Zelda: Show Stat In Variable   Value: Rupees  Variable: Рупии        (один раз, в начале игры)
+Событие продавца: Если «Рупии» ≥ 50 → Zelda: Spend Resource (Rupees, 50) → Zelda: Give Item (Bow)
 ```
 
 ## Для кода: полный словарь правил
