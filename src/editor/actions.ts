@@ -17,7 +17,7 @@ import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
-import { characterFromParam, characterPlan, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { actionsAfterStart, characterFromParam, characterPlan, findMap, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { audio, bool, boolOr, buildThen, buildWhen, enemyStats, img, listOf, npc, num, numOr, pos, SPRITE_FIELDS, STAT_FIELDS, str, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
@@ -37,9 +37,64 @@ function describeParams(params: unknown): string {
   }
 }
 
+// ---- map-data fallback -------------------------------------------------------------------
+// Playtests showed PS Maker calling "Zelda: Start Toolkit" but not the toolkit actions saved
+// right after it, without any error. The project data (scene.data.story) holds the map's
+// saved event lists, so the toolkit can run those actions itself when PS Maker does not.
+
+/** Delay before the toolkit runs the actions PS Maker has not called. */
+export const MAP_FALLBACK_MS = 500;
+let fromMapData = false;
+/** PS Maker calls per action since the last Start Toolkit. */
+const calledSinceStart = new Map<string, number>();
+/** Actions the toolkit already ran from the map data: a late PS Maker call is skipped. */
+const ranFromMap = new Map<string, number>();
+
+function scheduleMapFallback(ctx: Ctx, s: Session): void {
+  calledSinceStart.clear();
+  ranFromMap.clear();
+  const story = (s.host as PsHost).psMakerStory?.()?.story;
+  const map = story ? findMap(story, (s.host as { scene?: { sys?: { settings?: { key?: string } } } }).scene?.sys?.settings?.key) : null;
+  const block = map ? actionsAfterStart(map) : null;
+  if (!block || block.actions.length === 0) return;
+  setTimeout(() => {
+    const tk = getToolkit();
+    if (s.isDisposed || tk.session !== s) return;
+    const seen = new Map(calledSinceStart);
+    const ran: string[] = [];
+    for (const a of block.actions) {
+      const left = seen.get(a.name) ?? 0;
+      if (left > 0) {
+        seen.set(a.name, left - 1);
+        continue;
+      }
+      const def = ZELDA_ACTIONS.find((e) => e.name === a.name);
+      if (!def) continue;
+      fromMapData = true;
+      try {
+        def.execute(a.params as never, ctx);
+      } finally {
+        fromMapData = false;
+      }
+      ranFromMap.set(a.name, (ranFromMap.get(a.name) ?? 0) + 1);
+      ran.push(a.name.replace("Zelda: ", ""));
+    }
+    if (ran.length) tk.logger.warn(`PS Maker did not call ${ran.join(", ")} (saved after Start Toolkit in ${block.list}); ran from the map data.`);
+  }, MAP_FALLBACK_MS);
+}
+
 function run(name: string, ctx: Ctx, params: unknown, body: (s: Session, tk: Toolkit) => void): void {
   const tk = getToolkit();
-  tk.noteAction(name.replace("Zelda: ", ""));
+  if (!fromMapData) {
+    const done = ranFromMap.get(name) ?? 0;
+    if (done > 0) {
+      ranFromMap.set(name, done - 1);
+      tk.logger.info(`${name.replace("Zelda: ", "")}: already run from the map data; PS Maker's later call skipped.`);
+      return;
+    }
+    calledSinceStart.set(name, (calledSinceStart.get(name) ?? 0) + 1);
+  }
+  tk.noteAction(`${name.replace("Zelda: ", "")}${fromMapData ? " (map data)" : ""}`);
   tk.logger.info(`${name.replace("Zelda: ", "")} ${describeParams(params)}`);
   try {
     body(ensureSession(ctx), tk);
@@ -205,7 +260,7 @@ const startToolkit = defineEvent({
         ensureSession(ctx);
         return;
       }
-      startSession(ctx, mapId ?? deriveMapId(ctx.scene), reason);
+      scheduleMapFallback(ctx, startSession(ctx, mapId ?? deriveMapId(ctx.scene), reason));
     } catch (err) {
       tk.logger.error('Action "Zelda: Start Toolkit" failed:', err);
       if (tk.config.debug.rethrowErrors) throw err;

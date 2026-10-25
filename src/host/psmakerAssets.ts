@@ -45,10 +45,74 @@ export interface PsCharacter {
   defaultAnimationSetId?: string;
 }
 
+/** An action saved in a map's event list. Plugin actions carry `pluginName`, `actionName`, `pluginParams`. */
+export interface PsSavedAction {
+  id?: string;
+  type?: string;
+  name?: string;
+  pluginName?: string;
+  actionName?: string;
+  pluginParams?: Record<string, unknown>;
+}
+
+export interface PsMap {
+  id: string;
+  name?: string;
+  setupActions?: PsSavedAction[];
+  initialActions?: PsSavedAction[];
+  enterActions?: PsSavedAction[];
+  leaveActions?: PsSavedAction[];
+}
+
 export interface PsStory {
   characters: PsCharacter[];
   spritesheetAnimations: PsSheet[];
   player?: { animationSets: PsAnimationSet[]; defaultAnimationSetId?: string };
+  maps?: PsMap[];
+}
+
+export const MAP_ACTION_LISTS = ["setupActions", "initialActions", "enterActions", "leaveActions"] as const;
+const TOOLKIT_TYPE_PREFIX = "plugin:zelda-maker-toolkit:";
+
+export function isToolkitAction(a: PsSavedAction | null | undefined): boolean {
+  return !!a && ((typeof a.type === "string" && a.type.startsWith(TOOLKIT_TYPE_PREFIX)) || a.pluginName === "Zelda Maker Toolkit");
+}
+
+const actionLabel = (a: PsSavedAction) => a.actionName ?? a.name ?? a.type ?? "?";
+
+/** The map a scene shows: PS Maker uses the map id as the scene key. */
+export function findMap(story: PsStory, sceneKey: string | undefined): PsMap | null {
+  return (sceneKey && story.maps?.find((m) => m.id === sceneKey)) || null;
+}
+
+/**
+ * Toolkit actions saved directly after "Zelda: Start Toolkit" in the same list,
+ * stopping at the first other action (a wait, a dialogue...), so only actions
+ * PS Maker would have run immediately are returned.
+ */
+export function actionsAfterStart(map: PsMap): { list: string; actions: { name: string; params: Record<string, unknown> }[] } | null {
+  for (const list of MAP_ACTION_LISTS) {
+    const arr = map[list] ?? [];
+    const at = arr.findIndex((a) => isToolkitAction(a) && actionLabel(a) === "Zelda: Start Toolkit");
+    if (at < 0) continue;
+    const actions: { name: string; params: Record<string, unknown> }[] = [];
+    for (const a of arr.slice(at + 1)) {
+      if (!isToolkitAction(a) || actionLabel(a) === "Zelda: Start Toolkit") break;
+      actions.push({ name: actionLabel(a), params: { ...(a.pluginParams ?? {}) } });
+    }
+    return { list, actions };
+  }
+  return null;
+}
+
+/** "initialActions: Start Toolkit, Create Enemy" for the diagnostics panel. */
+export function mapActionSummary(map: PsMap): string {
+  const parts: string[] = [];
+  for (const list of MAP_ACTION_LISTS) {
+    const arr = map[list] ?? [];
+    if (arr.length) parts.push(`${list}: ${arr.map((a) => actionLabel(a).replace("Zelda: ", "")).join(", ")}`);
+  }
+  return parts.join("; ") || "no events";
 }
 
 export function isStory(v: unknown): v is PsStory {
