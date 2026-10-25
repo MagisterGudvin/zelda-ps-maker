@@ -19,6 +19,8 @@ export interface HostAdapter {
   setPlayerOverlay(layers: OverlayLayer[] | null): void;
   /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */
   previewSheet(sheetId: string | null): boolean;
+  /** Optional: true while the engine shows a dialogue (combat pauses, see combat.pauseDuringDialogue). */
+  isDialogueOpen?(): boolean;
   /** Host facts for the diagnostics panel (scene, camera, player). */
   describe(): string[];
   /** Plays a sound by audio key or URL (loaded on first use). */

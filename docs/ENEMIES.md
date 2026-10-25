@@ -1,7 +1,7 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position (X/Y; пусто — рядом с игроком), Look (PS Maker character) — выпадающий список персонажей (экспериментально: внешний вид и коллизия персонажа из библиотеки PS Maker, см. [SPRITES.md](SPRITES.md)), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
-`Zelda: Enemy From NPC` — NPC, Template, ID, Group, Health, Damage, Speed (см. ниже).
+`Zelda: Create Enemy` — Template (выпадающий список; *Custom template* — имя из `Define Enemy`), Position (выбор на карте; пусто — рядом с игроком), Look (PS Maker character) — выпадающий список персонажей (экспериментально: внешний вид и коллизия персонажа из библиотеки PS Maker, см. [SPRITES.md](SPRITES.md)), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
+`Zelda: Enemy From NPC` — NPC (список NPC на карте), Template, ID, Group, Health, Damage, Speed (см. ниже).
 `Zelda: Define Enemy` — новый тип на основе существующего: Template name, Based on, Health, Damage, Speed, Sight range, Boss, Immune to (`arrow, fire`). Дальше его имя пишется в *Template* у `Create Enemy`.
 
 **Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.

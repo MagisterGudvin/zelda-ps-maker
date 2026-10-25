@@ -6,7 +6,7 @@
 
 | Где | Поля |
 |---|---|
-| `Zelda: Start Toolkit` | Difficulty (1 лёгкая, 2 обычная, 3 сложная), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Start Toolkit` | Difficulty (список: Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
 | `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря (`X`, `Space`, `Shift`, `Tab`, `Up`…; несколько — через запятую) |
 | `Zelda: Set Player Sprites` | анимации атаки, слой оружия, центр взмаха |
 | `Zelda: Set Sound` | звуки моментов |
@@ -19,7 +19,7 @@
 
 ## Пресеты
 
-Поле *Difficulty* в `Zelda: Start Toolkit`: 2 — `alttp` (по умолчанию, ничего не меняет), 1 — `casual` (длиннее неуязвимость и меч, щит блокирует магию, бомбы не ранят игрока), 3 — `hardcore` (короткая неуязвимость, меньше дропа). Здоровье и урон меча берутся из полей *Hearts* и *Sword damage*.
+Поле *Difficulty* в `Zelda: Start Toolkit`: Normal — `alttp` (по умолчанию, ничего не меняет), Easy — `casual` (длиннее неуязвимость и меч, щит блокирует магию, бомбы не ранят игрока), Hard — `hardcore` (короткая неуязвимость, меньше дропа). Здоровье и урон меча берутся из полей *Hearts* и *Sword damage*.
 
 ## Разделы
 
@@ -63,7 +63,7 @@
 `enabled true, mode "passive"` (поднят, пока игрок не атакует) или `"hold"` (клавиша щита), `blocks ["projectile","arrow"]` — блокируемые типы урона, `frontalDot 0.5` — ширина сектора (косинус половины угла), `blockPushback 60`.
 
 ### `combat`
-`enemyHitCooldownMs 250, flashMs 250, bombsHurtPlayer true, damageTable {}` — глобальные множители по типам урона, например `{"arrow":1.5,"fire":0.5}`.
+`enemyHitCooldownMs 250, flashMs 250, bombsHurtPlayer true, pauseDuringDialogue true` (враги и снаряды замирают, пока открыт диалог PS Maker), `damageTable {}` — глобальные множители по типам урона, например `{"arrow":1.5,"fire":0.5}`.
 
 Типы урона: `sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script`.
 

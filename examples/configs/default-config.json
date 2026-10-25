@@ -171,7 +171,8 @@
     "enemyHitCooldownMs": 250,
     "flashMs": 250,
     "damageTable": {},
-    "bombsHurtPlayer": true
+    "bombsHurtPlayer": true,
+    "pauseDuringDialogue": true
   },
   "items": {
     "bomb": {

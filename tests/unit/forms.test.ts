@@ -54,6 +54,20 @@ test("Start Toolkit: game settings from numbers and checkboxes", async () => {
   done();
 });
 
+test("dropdowns: difficulty, door lock; Position is a map picker", async () => {
+  const { tk, run, s, actions, done } = await setup({ difficulty: "hardcore" });
+  assert.equal(tk.config.player.invulnerableMs, 600, "Hard");
+  run("Zelda: Create Door", { id: "bd", position: { x: 40, y: 40 }, lock: "big_key", startOpen: false });
+  assert.equal((s.world.get("bd") as unknown as { cfg: { lock: string } }).cfg.lock, "big_key");
+  const enemy = actions.find((a) => a.name === "Zelda: Create Enemy")!;
+  assert.equal(enemy.parameterDefs.position.type, "map-position");
+  assert.equal(enemy.parameterDefs.template.type, "string-enum");
+  run("Zelda: Define Enemy", { name: "boss_slime", basedOn: "slime", hp: 12 });
+  run("Zelda: Create Enemy", { template: "soldier", customTemplate: "boss_slime", id: "bs", position: { x: 90, y: 90 } });
+  assert.equal((s.world.get("bs") as unknown as { hp: number }).hp, 12, "custom template wins over the dropdown");
+  done();
+});
+
 test("Start Toolkit saved by an older version keeps its preset values", async () => {
   const { tk, done } = await setup({ preset: "casual", config: "" });
   assert.equal(tk.config.player.maxHealth, 10, "casual health is not reset by the new Hearts default");

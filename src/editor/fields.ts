@@ -2,9 +2,8 @@ import type { EnemyConfig } from "../enemies/templates.ts";
 import type { Condition, RuleAction } from "../puzzles/ruleTypes.ts";
 
 // ---- parameter definitions ----------------------------------------------------------------
-// The plugin API (0.0.3) offers text, number, checkbox, position, image, audio and
-// NPC fields: no dropdowns or buttons. Forms use checkboxes and numbers wherever a
-// choice allows it, and short text (ids, comma lists) otherwise — never JSON.
+// Forms never ask for JSON: choices are dropdowns (PS Maker's "string-enum", below),
+// switches are checkboxes, and ids or lists are short text.
 // `label` is used by the official CLI templates but missing from the 0.0.3
 // typings; it is passed through untyped and is harmless if ignored.
 
@@ -15,6 +14,40 @@ export const pos = (label: string, description: string) => ({ type: "position" a
 export const npc = (label: string, description: string) => ({ type: "npc" as const, label, description });
 export const img = (label: string, description: string) => ({ type: "image" as const, label, description });
 export const audio = (label: string, description: string) => ({ type: "audio" as const, label, description });
+
+// PS Maker's own field types, read from the PS Maker 1.2.1 runtime (StoryActions/api/types.ts,
+// `ParamType`): the editor draws plugin parameters with the same widgets, which is why
+// "position" showed two number inputs and "npc" a character dropdown. The 0.0.3 typings
+// only list seven types, so these are cast to the closest one for TypeScript.
+
+/** "map-position": X/Y with the editor's click-in-map picker button. Raw value `{ x, y }`. */
+export const mapPos = (label: string, description: string) => ({ type: "map-position", label, description }) as unknown as ReturnType<typeof pos>;
+
+/** "string-enum" with `ui: "dropdown"`. Raw value: the chosen option's value. */
+export const choice = (label: string, description: string, options: readonly (string | readonly [string, string])[], defaultValue: string) =>
+  ({
+    type: "string-enum",
+    ui: "dropdown",
+    label,
+    description,
+    defaultValue,
+    options: options.map((o) => (typeof o === "string" ? { label: o, value: o } : { value: o[0], label: o[1] })),
+  }) as unknown as ReturnType<typeof str>;
+
+/** "in-map-npc": an NPC placed on this map ("Spawned NPC"). Raw value: its inGameCharacterId. */
+export const inMapNpc = (label: string, description: string) => ({ type: "in-map-npc", label, description, defaultValue: "" }) as unknown as ReturnType<typeof npc>;
+
+/** "player-animation-picker": one of the player's PS Maker animations. Raw value: animation id. */
+export const playerAnim = (label: string, description: string) => ({ type: "player-animation-picker", label, description, defaultValue: "" }) as unknown as ReturnType<typeof str>;
+
+export const ENEMY_TEMPLATES = ["slime", "soldier", "spitter", "knight", "sentry", "ogre"] as const;
+
+/** Template dropdown plus an optional custom name (from Define Enemy) that wins. */
+export function templateOf(p: Record<string, unknown>, fallback: string): string {
+  return textOf(p.customTemplate) || textOf(p.template) || fallback;
+}
+
+export const customTemplate = () => str("Custom template", "Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон.", "");
 
 // ---- reading values -------------------------------------------------------------------------
 // PS Maker passes only the fields saved with the action: an action saved by an older

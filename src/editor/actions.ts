@@ -17,10 +17,11 @@ import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
-import { actionsAfterStart, characterFromParam, characterPlan, findMap, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
+import { characterFromParam, characterPlan, playerAnimFromPick, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
-import { audio, bool, boolOr, buildThen, buildWhen, enemyStats, img, listOf, npc, num, numOr, pos, SPRITE_FIELDS, STAT_FIELDS, str, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
+import { audio, bool, boolOr, buildThen, buildWhen, choice, customTemplate, ENEMY_TEMPLATES, enemyStats, img, inMapNpc, listOf, mapPos, npc, num, numOr, playerAnim, SPRITE_FIELDS, STAT_FIELDS, str, templateOf, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -37,64 +38,9 @@ function describeParams(params: unknown): string {
   }
 }
 
-// ---- map-data fallback -------------------------------------------------------------------
-// Playtests showed PS Maker calling "Zelda: Start Toolkit" but not the toolkit actions saved
-// right after it, without any error. The project data (scene.data.story) holds the map's
-// saved event lists, so the toolkit can run those actions itself when PS Maker does not.
-
-/** Delay before the toolkit runs the actions PS Maker has not called. */
-export const MAP_FALLBACK_MS = 500;
-let fromMapData = false;
-/** PS Maker calls per action since the last Start Toolkit. */
-const calledSinceStart = new Map<string, number>();
-/** Actions the toolkit already ran from the map data: a late PS Maker call is skipped. */
-const ranFromMap = new Map<string, number>();
-
-function scheduleMapFallback(ctx: Ctx, s: Session): void {
-  calledSinceStart.clear();
-  ranFromMap.clear();
-  const story = (s.host as PsHost).psMakerStory?.()?.story;
-  const map = story ? findMap(story, (s.host as { scene?: { sys?: { settings?: { key?: string } } } }).scene?.sys?.settings?.key) : null;
-  const block = map ? actionsAfterStart(map) : null;
-  if (!block || block.actions.length === 0) return;
-  setTimeout(() => {
-    const tk = getToolkit();
-    if (s.isDisposed || tk.session !== s) return;
-    const seen = new Map(calledSinceStart);
-    const ran: string[] = [];
-    for (const a of block.actions) {
-      const left = seen.get(a.name) ?? 0;
-      if (left > 0) {
-        seen.set(a.name, left - 1);
-        continue;
-      }
-      const def = ZELDA_ACTIONS.find((e) => e.name === a.name);
-      if (!def) continue;
-      fromMapData = true;
-      try {
-        def.execute(a.params as never, ctx);
-      } finally {
-        fromMapData = false;
-      }
-      ranFromMap.set(a.name, (ranFromMap.get(a.name) ?? 0) + 1);
-      ran.push(a.name.replace("Zelda: ", ""));
-    }
-    if (ran.length) tk.logger.warn(`PS Maker did not call ${ran.join(", ")} (saved after Start Toolkit in ${block.list}); ran from the map data.`);
-  }, MAP_FALLBACK_MS);
-}
-
 function run(name: string, ctx: Ctx, params: unknown, body: (s: Session, tk: Toolkit) => void): void {
   const tk = getToolkit();
-  if (!fromMapData) {
-    const done = ranFromMap.get(name) ?? 0;
-    if (done > 0) {
-      ranFromMap.set(name, done - 1);
-      tk.logger.info(`${name.replace("Zelda: ", "")}: already run from the map data; PS Maker's later call skipped.`);
-      return;
-    }
-    calledSinceStart.set(name, (calledSinceStart.get(name) ?? 0) + 1);
-  }
-  tk.noteAction(`${name.replace("Zelda: ", "")}${fromMapData ? " (map data)" : ""}`);
+  tk.noteAction(name.replace("Zelda: ", ""));
   tk.logger.info(`${name.replace("Zelda: ", "")} ${describeParams(params)}`);
   try {
     body(ensureSession(ctx), tk);
@@ -129,7 +75,13 @@ function asList<T>(v: T | T[] | null): T[] {
   return v === null ? [] : Array.isArray(v) ? v : [v];
 }
 
-type PsHost = { psMakerStory?(): { story: PsStory; where: string } | null; psMakerSheetImage?(sheet: PsSheet, story: PsStory): string | null };
+type PsHost = {
+  psMakerStory?(): { story: PsStory; where: string } | null;
+  psMakerSheetImage?(sheet: PsSheet, story: PsStory): string | null;
+  psMakerSheetColumns?(sheet: PsSheet, story: PsStory): number | null;
+};
+
+const columnsOf = (s: Session, story: PsStory) => (sheet: PsSheet) => (s.host as PsHost).psMakerSheetColumns?.(sheet, story) ?? null;
 
 /** PS Maker project data via the host, warning once when it is not reachable. */
 function psStory(s: Session, what: string): PsStory | null {
@@ -196,6 +148,7 @@ function objectById(s: Session, id: string, what: string): Interactable | null {
 
 // ---- lifecycle & configuration -------------------------------------------------------------
 
+/** Difficulty numbers saved by 0.5.0–0.5.3 (1 easy, 2 normal, 3 hard). */
 const DIFFICULTY_PRESETS = ["casual", "casual", "alttp", "hardcore"];
 
 const startToolkit = defineEvent({
@@ -203,7 +156,7 @@ const startToolkit = defineEvent({
   description: "Starts Zelda Maker Toolkit on this map with the main game settings. Put it first in the map's start events (same settings on every map). / Запускает Toolkit на карте (первым в событиях начала карты).",
   parameterDefs: {
     mapId: str("Map ID", "Unique map name used to remember chests, doors and switches. / Уникальное имя карты для сохранения прогресса.", ""),
-    difficulty: num("Difficulty", "1 = easy (longer invulnerability and sword, shield blocks magic, own bombs harmless), 2 = normal, 3 = hard (short invulnerability, fewer drops). / Сложность: 1 лёгкая, 2 обычная, 3 сложная.", 2),
+    difficulty: choice("Difficulty", "Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность.", [["casual", "Easy"], ["alttp", "Normal"], ["hardcore", "Hard"]], "alttp"),
     hearts: num("Hearts", "Starting and maximum hearts. / Сердца в начале игры.", 3),
     swordDamage: num("Sword damage", "Damage of one sword hit (a slime has 2 HP). / Урон меча.", 2),
     hud: bool("Show HUD", "Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit.", true),
@@ -211,7 +164,7 @@ const startToolkit = defineEvent({
     shieldButton: bool("Shield on a button", "Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке.", false),
     hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
     autosave: bool("Autosave", "Save after chests, doors, new items and dungeons. / Автосохранение.", true),
-    language: str("Language", "auto, en or ru. / Язык интерфейса.", "auto"),
+    language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
     tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
     debugHitboxes: bool("Show hitboxes", "Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы.", false),
     diagnostics: bool("Show diagnostics", "On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики.", false),
@@ -223,7 +176,13 @@ const startToolkit = defineEvent({
     try {
       const old = params as Record<string, unknown>;
       // Before 0.5.0: a "preset" text field instead of the Difficulty number.
-      const preset = params.difficulty === undefined && typeof old.preset === "string" && old.preset ? old.preset : DIFFICULTY_PRESETS[Math.round(numOr(params.difficulty, 2))] ?? "alttp";
+      const d = old.difficulty;
+      const preset =
+        d === undefined
+          ? typeof old.preset === "string" && old.preset ? old.preset : "alttp"
+          : typeof d === "number"
+            ? (DIFFICULTY_PRESETS[Math.round(d)] ?? "alttp")
+            : textOf(d) || "alttp";
       tk.applyPreset(preset);
       // Only fields PS Maker actually passed: an action saved by an older version keeps
       // its difficulty preset values instead of being reset to these defaults.
@@ -260,7 +219,7 @@ const startToolkit = defineEvent({
         ensureSession(ctx);
         return;
       }
-      scheduleMapFallback(ctx, startSession(ctx, mapId ?? deriveMapId(ctx.scene), reason));
+      startSession(ctx, mapId ?? deriveMapId(ctx.scene), reason);
     } catch (err) {
       tk.logger.error('Action "Zelda: Start Toolkit" failed:', err);
       if (tk.config.debug.rethrowErrors) throw err;
@@ -366,7 +325,7 @@ const changeObject = defineEvent({
   description: "Changes an object by id. Operation: open, close (doors, chests), on, off, toggle (levers, buttons, plates), reveal, hide, reset (forget saved progress), destroy, or state (any state name). / Изменить объект.",
   parameterDefs: {
     id: str("ID", "Object id.", ""),
-    operation: str("Operation", OBJECT_OPERATIONS.join(" | "), "open"),
+    operation: choice("Operation", "What to do with the object. / Действие.", OBJECT_OPERATIONS, "open"),
     state: str("State", 'Only for operation "state": on, off, opened, closed, locked, unlocked, lit, destroyed, revealed, hidden.', ""),
   },
   execute(params, ctx) {
@@ -475,8 +434,9 @@ const createEnemy = defineEvent({
   name: "Zelda: Create Enemy",
   description: "Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre or your own (Define Enemy). / Создаёт врага по шаблону.",
   parameterDefs: {
-    template: str("Template", "slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name.", "slime"),
-    position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. Empty = next to the player. / Точка появления."),
+    template: choice("Template", "Behaviour and stats. / Шаблон врага.", ENEMY_TEMPLATES, "slime"),
+    customTemplate: customTemplate(),
+    position: mapPos("Position", "Where to spawn: pick it on the map. Empty = next to the player. / Точка появления."),
     character: npc("Look (PS Maker character)", "Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker."),
     id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
     group: str("Group", "Optional group name: rules can wait until the whole group is defeated. / Группа врагов.", ""),
@@ -500,7 +460,7 @@ const createEnemy = defineEvent({
         const ch = characterFromParam(story, params.character);
         if (!ch) s.logger.warn(`Create Enemy: could not match the chosen character (${describeParams(params.character)}) with the PS Maker library: ${story.characters.map((c) => c.name).join(", ")}.`);
         else {
-          const plan = characterPlan(story, ch);
+          const plan = characterPlan(story, ch, columnsOf(s, story));
           registerPsSheets(s, tk, story, plan.sheets, "Create Enemy");
           tk.configure({ sprites: { animations: plan.animations } }, "Create Enemy");
           Object.assign(anims, plan.states);
@@ -517,7 +477,7 @@ const createEnemy = defineEvent({
       if (Object.keys(anims).length) overrides.animations = { ...(overrides.animations ?? {}), ...anims } as EnemyConfig["animations"];
       const route = listOf(params.patrol);
       if (route.length > 0) overrides.patrol = { ...(overrides.patrol ?? {}), mode: "path", points: route as unknown as EnemyConfig["patrol"]["points"] } as EnemyConfig["patrol"];
-      spawnEnemy(s, textOf(params.template) || "slime", at.x, at.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides });
+      spawnEnemy(s, templateOf(params, "slime"), at.x, at.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides });
     });
   },
 });
@@ -528,8 +488,9 @@ const enemyFromNpc = defineEvent({
   name: "Zelda: Enemy From NPC",
   description: "Turns an NPC already on this map (placed or spawned earlier) into an enemy that keeps the NPC's sprite. / Превращает NPC на карте во врага.",
   parameterDefs: {
-    npc: npc("NPC", "The NPC to turn into an enemy. / NPC, который станет врагом."),
-    template: str("Template", "Enemy template name (behaviour and stats).", "soldier"),
+    npc: inMapNpc("NPC", "An NPC on this map (placed or spawned earlier) that becomes the enemy. / NPC на карте, который станет врагом."),
+    template: choice("Template", "Behaviour and stats. / Шаблон врага.", ENEMY_TEMPLATES, "soldier"),
+    customTemplate: customTemplate(),
     id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
     group: str("Group", "Optional group name for rules. / Группа врагов.", ""),
     ...STAT_FIELDS,
@@ -542,7 +503,7 @@ const enemyFromNpc = defineEvent({
         return;
       }
       const overrides = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Enemy From NPC") ?? {}), ...enemyStats(params) };
-      spawnEnemy(s, textOf(params.template) || "soldier", adopt.x, adopt.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides, adopt });
+      spawnEnemy(s, templateOf(params, "soldier"), adopt.x, adopt.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides, adopt });
     });
   },
 });
@@ -552,8 +513,8 @@ const createObjectAction = defineEvent({
   description:
     "Creates an interactive object: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, hook_post, sign. / Создаёт интерактивный объект.",
   parameterDefs: {
-    type: str("Type", "Object type (see description).", "bush"),
-    position: pos("Position", "Object center."),
+    type: choice("Type", "Object type. / Тип объекта.", OBJECT_TYPES, "bush"),
+    position: mapPos("Position", "Object center."),
     id: str("ID", "Unique id (needed for saving and for other actions to refer to it).", ""),
     sprite: img("Sprite", "Optional custom image for the object."),
     hidden: bool("Hidden", "Starts invisible; Reveal it later. / Скрыт до открытия.", false),
@@ -596,7 +557,7 @@ const createChest = defineEvent({
   description: "Places a treasure chest with an item inside. Opened chests stay open. / Сундук с наградой.",
   parameterDefs: {
     id: str("ID", "Unique chest id.", "chest_1"),
-    position: pos("Position", "Chest center."),
+    position: mapPos("Position", "Chest center."),
     item: str("Item", "Item or resource id: key, big_key, bombs, arrows, rupees, boomerang, bow, heart_container...", "key"),
     count: num("Count", "How many.", 1),
     requiresBigKey: bool("Needs Big Key", "Big chest that needs the dungeon's Big Key.", false),
@@ -616,13 +577,11 @@ const createChest = defineEvent({
 
 const createDoor = defineEvent({
   name: "Zelda: Create Door",
-  description: "Places a door. With no lock ticked it opens by action; Opened by switch = only rules, switches and Change Object open it. / Дверь.",
+  description: "Places a door. Lock: none (opens by action), small key, Big Key, or switch (only switches, rules and Change Object open it). / Дверь.",
   parameterDefs: {
     id: str("ID", "Unique door id.", "door_1"),
-    position: pos("Position", "Door center."),
-    smallKey: bool("Needs a small key", "Opens with a small key of this dungeon. / Нужен маленький ключ.", true),
-    bigKey: bool("Needs the Big Key", "Boss door. / Нужен большой ключ.", false),
-    bySwitch: bool("Opened by switch", "Opens only from a switch, a rule or Change Object. / Открывается переключателем.", false),
+    position: mapPos("Position", "Door center."),
+    lock: choice("Lock", "What opens it. / Замок.", [["none", "None"], ["small_key", "Small key"], ["big_key", "Big Key"], ["switch", "Switch / rule"]], "small_key"),
     startOpen: bool("Start open", "Shutter doors that close when a fight starts.", false),
     width: num("Width", "Pixels; 0 = normal size (16). / Ширина.", 0),
     height: num("Height", "Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота.", 0),
@@ -631,15 +590,16 @@ const createDoor = defineEvent({
     run("Zelda: Create Door", ctx, params, (s) => {
       const at = where(s, params.position, "Create Door");
       if (!at) return;
-      const old = (params as Record<string, unknown>).lock;
+      const old = params as Record<string, unknown>;
+      // 0.5.0–0.5.3 saved three checkboxes instead of the Lock dropdown.
       const lock =
-        params.smallKey === undefined && typeof old === "string" && ["none", "small_key", "big_key", "switch"].includes(old)
-          ? old
-          : boolOr(params.bySwitch, false)
+        typeof old.lock === "string" && ["none", "small_key", "big_key", "switch"].includes(old.lock)
+          ? old.lock
+          : boolOr(old.bySwitch, false)
             ? "switch"
-            : boolOr(params.bigKey, false)
+            : boolOr(old.bigKey, false)
               ? "big_key"
-              : boolOr(params.smallKey, true)
+              : boolOr(old.smallKey, true)
                 ? "small_key"
                 : "none";
       const overrides: Partial<ObjectConfig> = { lock: lock as ObjectConfig["lock"], startOpen: boolOr(params.startOpen, false) };
@@ -656,7 +616,7 @@ const placeItem = defineEvent({
   parameterDefs: {
     item: str("Item", "Item or resource id.", "key"),
     count: num("Count", "How many.", 1),
-    position: pos("Position", "Where."),
+    position: mapPos("Position", "Where."),
     id: str("ID", "Optional id to make it persistent.", ""),
   },
   execute(params, ctx) {
@@ -673,7 +633,7 @@ const damageTarget = defineEvent({
   parameterDefs: {
     id: str("ID", "Enemy/object id or 'player'.", ""),
     amount: num("Amount", "Damage points.", 1),
-    damageType: str("Damage type", "sword, bomb, arrow, fire, ice, magic, script...", "script"),
+    damageType: choice("Damage type", "Enemies may resist some types. / Тип урона.", DAMAGE_TYPES, "script"),
   },
   execute(params, ctx) {
     run("Zelda: Damage Target", ctx, params, (s) => {
@@ -753,7 +713,7 @@ const placeMarker = defineEvent({
     "Names a map point once (tip: press F9 in playtest and click the map to get X/Y), e.g. for patrol routes (Patrol markers of Create Enemy). / Именованная точка карты, например для маршрута патруля.",
   parameterDefs: {
     id: str("Marker ID", "Name of the point, e.g. boss_spot.", "marker_1"),
-    position: pos("Position", "Point in map pixels. In playtest press F9 and click the map to read/copy X and Y."),
+    position: mapPos("Position", "Point on the map. / Точка на карте."),
   },
   execute(params, ctx) {
     run("Zelda: Place Marker", ctx, params, (s) => {
@@ -848,7 +808,8 @@ const setPlayerSprites = defineEvent({
   name: "Zelda: Set Player Sprites",
   description: "Uses sprite-sheet animations for the player's attacks (body and weapon layers, e.g. Mana Seed character + weapon sheets). Empty = built-in blade. / Анимации атаки игрока.",
   parameterDefs: {
-    usePsMaker: bool("Use the player's PS Maker animations", "Experimental: attack and hurt come from the player's own sheets in PS Maker (names with Attack / Hurt, e.g. Sword Attack, Sword Hurt). The fields below then stay empty. / Анимации игрока из PS Maker.", false),
+    attackAnimation: playerAnim("Attack animation (PS Maker)", "Pick one of the player's animations, e.g. Sword Attack (any direction): all directions of that sheet are used. / Анимация атаки из PS Maker."),
+    hurtAnimation: playerAnim("Hurt animation (PS Maker)", "Optional, e.g. Sword Hurt. / Анимация урона из PS Maker."),
     attack: str("Attack (body)", "Animation id for the sword swing.", ""),
     weaponAttack: str("Attack (weapon)", "Weapon layer for the swing.", ""),
     spin: str("Spin (body)", "Spin attack; empty = attack.", ""),
@@ -868,22 +829,30 @@ const setPlayerSprites = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Set Player Sprites", ctx, params, (s, tk) => {
-      const old = (params as Record<string, unknown>).weaponBehind;
+      const old = params as Record<string, unknown>;
       const behind: Facing[] =
-        params.behindUp === undefined && typeof old === "string"
-          ? listOf(old).filter((x): x is Facing => isFacing(x))
+        params.behindUp === undefined && typeof old.weaponBehind === "string"
+          ? listOf(old.weaponBehind).filter((x): x is Facing => isFacing(x))
           : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
       const anim = (v: unknown) => textOf(v);
       const fromPs: Record<string, string> = {};
-      const story = boolOr(params.usePsMaker, false) ? psStory(s, "Set Player Sprites") : null;
+      const picked = { attack: old.attackAnimation, hurt: old.hurtAnimation };
+      const auto = boolOr(old.usePsMaker, false); // 0.5.2: one checkbox, sheets found by name
+      const story = textOf(picked.attack) || textOf(picked.hurt) || auto ? psStory(s, "Set Player Sprites") : null;
       if (story) {
-        const auto = playerAutoAnims(story);
-        if (!auto.attack) s.logger.warn(`Set Player Sprites: no player sheet with "Attack" in its name. Player sheets: ${sheetNames(story, { type: "player" }).join(", ") || "none"}.`);
-        for (const [slot, found] of Object.entries(auto)) {
-          registerPsSheets(s, tk, story, { [found.sheetKey]: found.sheet }, "Set Player Sprites");
-          s.logger.info(`Set Player Sprites: ${slot} = PS Maker sheet "${found.sheet.name}".`);
+        const cols = columnsOf(s, story);
+        const found: Partial<Record<"attack" | "hurt", ReturnType<typeof playerAnimFromPick>>> = auto
+          ? playerAutoAnims(story, cols)
+          : { attack: playerAnimFromPick(story, picked.attack, cols), hurt: playerAnimFromPick(story, picked.hurt, cols) };
+        for (const [slot, value] of Object.entries(picked)) {
+          if (textOf(value) && !found[slot as "attack"]) s.logger.warn(`Set Player Sprites: PS Maker animation "${textOf(value)}" not found. Player sheets: ${sheetNames(story, { type: "player" }).join(", ") || "none"}.`);
+        }
+        for (const [slot, f] of Object.entries(found)) {
+          if (!f) continue;
+          registerPsSheets(s, tk, story, { [f.sheetKey]: f.sheet }, "Set Player Sprites");
+          s.logger.info(`Set Player Sprites: ${slot} = PS Maker sheet "${f.sheet.name}".`);
           const id = `ps_player_${slot}`;
-          tk.configure({ sprites: { animations: { [id]: found.anim } } }, "Set Player Sprites");
+          tk.configure({ sprites: { animations: { [id]: f.anim } } }, "Set Player Sprites");
           fromPs[slot] = id;
         }
       }
@@ -919,7 +888,7 @@ const setSound = defineEvent({
   name: "Zelda: Set Sound",
   description: `Plays a sound at a toolkit moment: ${SOUND_EVENTS.join(", ")}. Leave Audio empty to remove it. / Звук для момента игры.`,
   parameterDefs: {
-    moment: str("Moment", SOUND_EVENTS.join(" | "), "swordSwing"),
+    moment: choice("Moment", "When the sound plays. / Когда звучит.", SOUND_EVENTS, "swordSwing"),
     sound: audio("Sound", "Audio asset."),
     soundKey: str("Sound key or URL", "Optional: audio key or file URL if the Sound picker does not work.", ""),
     volume: num("Volume", "0..1", 1),
@@ -982,8 +951,9 @@ const addWaveEnemy = defineEvent({
   parameterDefs: {
     roomId: str("Room ID", "Wave room id.", "arena"),
     wave: num("Wave", "Wave number: 1, 2, 3...", 1),
-    template: str("Template", "Enemy template.", "slime"),
-    position: pos("Position", "Spawn point."),
+    template: choice("Template", "Behaviour and stats. / Шаблон врага.", ENEMY_TEMPLATES, "slime"),
+    customTemplate: customTemplate(),
+    position: mapPos("Position", "Spawn point."),
     ...STAT_FIELDS,
   },
   execute(params, ctx) {
@@ -999,7 +969,7 @@ const addWaveEnemy = defineEvent({
       const roomId = textOf(params.roomId) || "arena";
       const marker = `__wave_${roomId}_${s.markers.size}`;
       s.markers.set(marker, p);
-      s.dungeons.addWaveSpawn(roomId, Math.max(1, Math.round(numOr(params.wave, 1))), { template: textOf(params.template) || "slime", at: marker, overrides: Object.keys(overrides).length ? overrides : undefined });
+      s.dungeons.addWaveSpawn(roomId, Math.max(1, Math.round(numOr(params.wave, 1))), { template: templateOf(params, "slime"), at: marker, overrides: Object.keys(overrides).length ? overrides : undefined });
     });
   },
 });
@@ -1095,7 +1065,7 @@ const showMessage = defineEvent({
 const setRespawn = defineEvent({
   name: "Zelda: Set Respawn Point",
   description: "Where the player revives after falling in battle on this map (empty = current position). / Точка возрождения.",
-  parameterDefs: { position: pos("Position", "Respawn point.") },
+  parameterDefs: { position: mapPos("Position", "Respawn point.") },
   execute(params, ctx) {
     run("Zelda: Set Respawn Point", ctx, params, (s) => {
       const p = resolvePosition(params.position, s.config);
@@ -1162,10 +1132,10 @@ const defineItem = defineEvent({
     id: str("Item ID", "Unique id, e.g. ice_rod.", "ice_rod"),
     name: str("Name", "Shown in messages and the inventory. / Название.", "Ice Rod"),
     icon: img("Icon", "Optional icon image. / Иконка."),
-    resource: str("Uses", "What one use costs: magic, arrows, bombs, rupees or empty = free. / Расходует.", "magic"),
+    resource: choice("Uses", "What one use costs. / Что расходует.", [["", "Nothing"], "magic", "arrows", "bombs", "rupees"], "magic"),
     cost: num("Cost", "How much of it per use.", 4),
     damage: num("Damage", "Damage of the shot or burst; 0 = no attack. / Урон.", 3),
-    damageType: str("Damage type", "magic, fire, ice, arrow, bomb... (enemies may resist).", "magic"),
+    damageType: choice("Damage type", "Enemies may resist some types. / Тип урона.", DAMAGE_TYPES, "magic"),
     area: bool("Area attack", "Hit everything around the player instead of shooting. / Удар вокруг игрока.", false),
     stunMs: num("Stun (ms)", "Freeze hit enemies; 1000 = one second.", 0),
     heal: num("Heal", "Half-hearts restored per use (makes it a healing item). / Лечение.", 0),
@@ -1207,7 +1177,7 @@ const defineEnemy = defineEvent({
   description: "Makes a new enemy type from an existing one with other stats; use its name as the Template of Create Enemy. / Новый тип врага на основе существующего.",
   parameterDefs: {
     name: str("Template name", "New template name.", "red_soldier"),
-    basedOn: str("Based on", "slime, soldier, spitter, knight, sentry, ogre or another Define Enemy name.", "soldier"),
+    basedOn: choice("Based on", "Template to start from. / На основе шаблона.", ENEMY_TEMPLATES, "soldier"),
     ...STAT_FIELDS,
     detectRange: num("Sight range", "Pixels at which it notices the player; 0 = template value. / Дальность обзора.", 0),
     boss: bool("Boss", "Defeating it completes the dungeon (with Enter Dungeon). / Босс.", false),
@@ -1233,6 +1203,26 @@ const defineEnemy = defineEvent({
     });
   },
 });
+
+/**
+ * PS Maker's StoryRunner runs the actions of an event one after another and waits
+ * for `ctx.endAction()` before the next one (confirmed in the PS Maker 1.2.1 runtime;
+ * the published 0.0.3 typings do not mention it). Every toolkit action does its work
+ * synchronously, so it ends right after, also when it failed.
+ */
+function endsAction(e: PluginEvent<any>): PluginEvent<any> {
+  const execute = e.execute;
+  return {
+    ...e,
+    execute(params: any, ctx: any) {
+      try {
+        execute.call(e, params, ctx);
+      } finally {
+        (ctx as { endAction?: (result?: object) => void } | undefined)?.endAction?.({});
+      }
+    },
+  };
+}
 
 /** Every action shown in the PS Maker event editor. */
 export const ZELDA_ACTIONS: PluginEvent<any>[] = [
@@ -1278,4 +1268,4 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   setPlayerSprites,
   previewSheet,
   setSound,
-];
+].map(endsAction);

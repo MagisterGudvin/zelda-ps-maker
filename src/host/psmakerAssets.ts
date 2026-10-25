@@ -45,74 +45,10 @@ export interface PsCharacter {
   defaultAnimationSetId?: string;
 }
 
-/** An action saved in a map's event list. Plugin actions carry `pluginName`, `actionName`, `pluginParams`. */
-export interface PsSavedAction {
-  id?: string;
-  type?: string;
-  name?: string;
-  pluginName?: string;
-  actionName?: string;
-  pluginParams?: Record<string, unknown>;
-}
-
-export interface PsMap {
-  id: string;
-  name?: string;
-  setupActions?: PsSavedAction[];
-  initialActions?: PsSavedAction[];
-  enterActions?: PsSavedAction[];
-  leaveActions?: PsSavedAction[];
-}
-
 export interface PsStory {
   characters: PsCharacter[];
   spritesheetAnimations: PsSheet[];
   player?: { animationSets: PsAnimationSet[]; defaultAnimationSetId?: string };
-  maps?: PsMap[];
-}
-
-export const MAP_ACTION_LISTS = ["setupActions", "initialActions", "enterActions", "leaveActions"] as const;
-const TOOLKIT_TYPE_PREFIX = "plugin:zelda-maker-toolkit:";
-
-export function isToolkitAction(a: PsSavedAction | null | undefined): boolean {
-  return !!a && ((typeof a.type === "string" && a.type.startsWith(TOOLKIT_TYPE_PREFIX)) || a.pluginName === "Zelda Maker Toolkit");
-}
-
-const actionLabel = (a: PsSavedAction) => a.actionName ?? a.name ?? a.type ?? "?";
-
-/** The map a scene shows: PS Maker uses the map id as the scene key. */
-export function findMap(story: PsStory, sceneKey: string | undefined): PsMap | null {
-  return (sceneKey && story.maps?.find((m) => m.id === sceneKey)) || null;
-}
-
-/**
- * Toolkit actions saved directly after "Zelda: Start Toolkit" in the same list,
- * stopping at the first other action (a wait, a dialogue...), so only actions
- * PS Maker would have run immediately are returned.
- */
-export function actionsAfterStart(map: PsMap): { list: string; actions: { name: string; params: Record<string, unknown> }[] } | null {
-  for (const list of MAP_ACTION_LISTS) {
-    const arr = map[list] ?? [];
-    const at = arr.findIndex((a) => isToolkitAction(a) && actionLabel(a) === "Zelda: Start Toolkit");
-    if (at < 0) continue;
-    const actions: { name: string; params: Record<string, unknown> }[] = [];
-    for (const a of arr.slice(at + 1)) {
-      if (!isToolkitAction(a) || actionLabel(a) === "Zelda: Start Toolkit") break;
-      actions.push({ name: actionLabel(a), params: { ...(a.pluginParams ?? {}) } });
-    }
-    return { list, actions };
-  }
-  return null;
-}
-
-/** "initialActions: Start Toolkit, Create Enemy" for the diagnostics panel. */
-export function mapActionSummary(map: PsMap): string {
-  const parts: string[] = [];
-  for (const list of MAP_ACTION_LISTS) {
-    const arr = map[list] ?? [];
-    if (arr.length) parts.push(`${list}: ${arr.map((a) => actionLabel(a).replace("Zelda: ", "")).join(", ")}`);
-  }
-  return parts.join("; ") || "no events";
 }
 
 export function isStory(v: unknown): v is PsStory {
@@ -205,8 +141,14 @@ export function sheetColumns(sheet: PsSheet): number {
   return Math.max(1, ...sheet.animations.map((a) => Math.max(a.startCol, a.endCol) + 1));
 }
 
-function framesOf(sheet: PsSheet, range: PsAnimRange): number[] {
-  const cols = sheetColumns(sheet);
+/**
+ * Columns of the loaded texture, when known. PS Maker numbers frames by the image
+ * width (row * floor(width / frameWidth) + col), which can exceed the longest row.
+ */
+export type ColumnsOf = (sheet: PsSheet) => number | null;
+
+function framesOf(sheet: PsSheet, range: PsAnimRange, columnsOf?: ColumnsOf): number[] {
+  const cols = columnsOf?.(sheet) || sheetColumns(sheet);
   const out: number[] = [];
   for (let row = range.startRow; row <= range.endRow; row++) {
     const from = row === range.startRow ? range.startCol : 0;
@@ -238,19 +180,19 @@ export function directionRows(story: PsStory, set: PsAnimationSet | null): Parti
 }
 
 /** Per-direction frames of a sheet using the character's row order. */
-export function directionalFrames(sheet: PsSheet, rows: Partial<Record<Facing, number>>): Partial<Record<Facing, number[]>> {
+export function directionalFrames(sheet: PsSheet, rows: Partial<Record<Facing, number>>, columnsOf?: ColumnsOf): Partial<Record<Facing, number[]>> {
   const out: Partial<Record<Facing, number[]>> = {};
   for (const f of FACINGS) {
     const row = rows[f];
     const range = row === undefined ? undefined : sheet.animations.find((a) => a.startRow === row);
-    if (range) out[f] = framesOf(sheet, range);
+    if (range) out[f] = framesOf(sheet, range, columnsOf);
   }
-  if (Object.keys(out).length === 0 && sheet.animations[0]) out.down = framesOf(sheet, sheet.animations[0]);
+  if (Object.keys(out).length === 0 && sheet.animations[0]) out.down = framesOf(sheet, sheet.animations[0], columnsOf);
   return out;
 }
 
 /** Frames of the animation set's own direction entries (e.g. walk or idleDown...). */
-function setFrames(story: PsStory, set: PsAnimationSet, prefix: "" | "idle"): { sheet: PsSheet; frames: Partial<Record<Facing, number[]>> } | null {
+function setFrames(story: PsStory, set: PsAnimationSet, prefix: "" | "idle", columnsOf?: ColumnsOf): { sheet: PsSheet; frames: Partial<Record<Facing, number[]>> } | null {
   let sheet: PsSheet | null = null;
   const frames: Partial<Record<Facing, number[]>> = {};
   for (const f of FACINGS) {
@@ -261,7 +203,7 @@ function setFrames(story: PsStory, set: PsAnimationSet, prefix: "" | "idle"): { 
       const a = s.animations.find((x) => x.id === id);
       if (a && (!sheet || sheet === s)) {
         sheet = s;
-        frames[f] = framesOf(s, a);
+        frames[f] = framesOf(s, a, columnsOf);
       }
     }
   }
@@ -302,7 +244,7 @@ function sheetId(sheet: PsSheet): string {
 }
 
 /** Everything needed to draw a PS Maker character as a toolkit enemy. */
-export function characterPlan(story: PsStory, character: PsCharacter): PsAnimPlan {
+export function characterPlan(story: PsStory, character: PsCharacter, columnsOf?: ColumnsOf): PsAnimPlan {
   const set = defaultSet(character.animationSets, character.defaultAnimationSetId);
   const rows = directionRows(story, set);
   const sheets = sheetsOf(story, { type: "npc", id: character.id });
@@ -315,14 +257,14 @@ export function characterPlan(story: PsStory, character: PsCharacter): PsAnimPla
   };
   for (const state of ["idle", "walk", "attack", "hurt", "death"] as const) {
     const sheet = sheetForState(sheets, state);
-    if (sheet) add(state, sheet, directionalFrames(sheet, rows), state === "idle" || state === "walk");
+    if (sheet) add(state, sheet, directionalFrames(sheet, rows, columnsOf), state === "idle" || state === "walk");
   }
   if (set && !plan.states.walk) {
-    const own = setFrames(story, set, "");
+    const own = setFrames(story, set, "", columnsOf);
     if (own) add("walk", own.sheet, own.frames, true);
   }
   if (set && !plan.states.idle) {
-    const own = setFrames(story, set, "idle");
+    const own = setFrames(story, set, "idle", columnsOf);
     if (own) add("idle", own.sheet, own.frames, true);
   }
   const box = set?.collision?.enabled !== false ? set?.collision?.box : undefined;
@@ -339,29 +281,39 @@ export function characterPlan(story: PsStory, character: PsCharacter): PsAnimPla
 }
 
 /** A player sheet by name (e.g. "Sword Attack") as a directional animation. */
-export function playerSheetAnim(story: PsStory, name: string, loop = false): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
+export function playerSheetAnim(story: PsStory, name: string, loop = false, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
   const sheet = sheetsOf(story, { type: "player" }).find((s) => norm(s.name) === norm(name));
-  return sheet ? playerAnimOf(story, sheet, loop) : null;
+  return sheet ? playerAnimOf(story, sheet, loop, columnsOf) : null;
 }
 
-function playerAnimOf(story: PsStory, sheet: PsSheet, loop: boolean): { sheetKey: string; sheet: PsSheet; anim: AnimDef } {
+/**
+ * The sheet holding an animation picked in a "player-animation-picker" field (one
+ * row, e.g. Sword Attack facing down) as a directional animation over all its rows.
+ */
+export function playerAnimFromPick(story: PsStory, animationId: unknown, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
+  if (typeof animationId !== "string" || !animationId) return null;
+  const sheet = story.spritesheetAnimations.find((s) => s.animations.some((a) => a.id === animationId));
+  return sheet ? playerAnimOf(story, sheet, false, columnsOf) : null;
+}
+
+function playerAnimOf(story: PsStory, sheet: PsSheet, loop: boolean, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } {
   const set = defaultSet(story.player?.animationSets, story.player?.defaultAnimationSetId);
-  return { sheetKey: sheetId(sheet), sheet, anim: { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set)), loop } };
+  return { sheetKey: sheetId(sheet), sheet, anim: { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set), columnsOf), loop } };
 }
 
 /**
  * The player's attack and hurt sheets found by name ("Sword Attack", "Sword Hurt").
  * The hurt sheet of the same set as the attack wins ("Sword Hurt" over "Unarmed Hurt").
  */
-export function playerAutoAnims(story: PsStory): Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> {
+export function playerAutoAnims(story: PsStory, columnsOf?: ColumnsOf): Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> {
   const sheets = sheetsOf(story, { type: "player" });
   const out: Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> = {};
   const attack = sheetForState(sheets, "attack");
-  if (attack) out.attack = playerAnimOf(story, attack, false);
+  if (attack) out.attack = playerAnimOf(story, attack, false, columnsOf);
   const prefix = attack ? norm(attack.name).split(/\s+/)[0] : "";
   const hurts = sheets.filter((s) => STATE_WORDS.hurt.test(s.name));
   const hurt = hurts.find((s) => prefix && norm(s.name).startsWith(prefix)) ?? sheetForState(sheets, "hurt");
-  if (hurt) out.hurt = playerAnimOf(story, hurt, false);
+  if (hurt) out.hurt = playerAnimOf(story, hurt, false, columnsOf);
   return out;
 }
 
@@ -382,13 +334,15 @@ interface TextureManagerLike {
 }
 
 /**
- * Texture key PS Maker loaded a sheet under, or a URL to load it from. PS Maker's
- * key naming is not documented: the sheet id, its file name (with or without
- * extension), any key containing either, or a texture whose image URL ends with
- * the file name are accepted. As a last resort the URL is built from the folder
+ * Texture key PS Maker loaded a sheet under, or a URL to load it from. PS Maker 1.2.1
+ * uses "<animationId>frames" (StoryAnimations/loadAnimations.ts); the sheet id, its file
+ * name, any key containing either, or a texture whose image URL ends with the file
+ * name are accepted too. As a last resort the URL is built from the folder
  * of another loaded project image.
  */
 export function sheetImage(textures: TextureManagerLike, sheet: PsSheet, story: PsStory): string | null {
+  // PS Maker 1.2.1 loads every animation (one row) as a whole-sheet texture "<animationId>frames".
+  for (const a of sheet.animations) if (textures.exists(`${a.id}frames`)) return `${a.id}frames`;
   const base = sheet.src.replace(/\.[a-z0-9]+$/i, "");
   for (const k of [sheet.id, sheet.src, base]) if (k && textures.exists(k)) return k;
   const keys = textures.getTextureKeys?.() ?? [];

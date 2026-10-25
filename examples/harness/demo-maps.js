@@ -33,7 +33,7 @@ export const MAPS = {
     ],
     npcs: [{ name: "npc_guard", x: 120, y: 184, color: "#d9822b" }],
     onLoad: [
-      ["Zelda: Start Toolkit", { mapId: "field", difficulty: 2, hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { mapId: "field", difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
       ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, id: "sign_intro", text: "Arrows: move  X: sword (hold = spin)  C: item  Q/E: switch item  Z: lift/open  I: items  F9: hitboxes" }],
@@ -74,7 +74,7 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "pit", position: { x: 340, y: 80 }, id: "" }],
       ["Zelda: Create Object", { type: "pit", position: { x: 356, y: 80 }, id: "" }],
       ["Zelda: Create Object", { type: "pit", position: { x: 372, y: 80 }, id: "" }],
-      ["Zelda: Create Door", { id: "gate", position: { x: 392, y: 120 }, smallKey: false, bigKey: false, bySwitch: true, startOpen: false, height: 32 }],
+      ["Zelda: Create Door", { id: "gate", position: { x: 392, y: 120 }, lock: "switch", startOpen: false, height: 32 }],
       ["Zelda: Add Rule", { id: "open_gate", whenActive: "gate_switch", openDoors: "gate", message: "The gate opened!", once: true }],
       ["Zelda: Add Rule", { id: "field_cleared", whenDefeated: "field", giveItem: "rupees", giveCount: 20, message: "Field cleared!", once: true }],
     ],
@@ -100,18 +100,18 @@ export const MAPS = {
     ],
     npcs: [],
     onLoad: [
-      ["Zelda: Start Toolkit", { mapId: "dungeon", difficulty: 2, hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { mapId: "dungeon", difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "d1", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 40, y: 200 } }],
       // 8. Block + pressure plate opens the puzzle shutter.
       ["Zelda: Create Object", { type: "block", position: { x: 88, y: 168 }, id: "block_1" }],
       ["Zelda: Create Object", { type: "pressure_plate", position: { x: 104, y: 168 }, id: "plate_1", staysOn: true }],
-      ["Zelda: Create Door", { id: "puzzle_door", position: { x: 100, y: 112 }, smallKey: false, bigKey: false, bySwitch: true, startOpen: false }],
+      ["Zelda: Create Door", { id: "puzzle_door", position: { x: 100, y: 112 }, lock: "switch", startOpen: false }],
       ["Zelda: Add Rule", { id: "plate_opens_shutter", whenActive: "plate_1", openDoors: "puzzle_door", once: true }],
       // 7. Chest with a small key + locked door.
       ["Zelda: Create Chest", { id: "key_chest", position: { x: 60, y: 48 }, item: "key", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Object", { type: "torch", position: { x: 150, y: 40 }, id: "torch_1", setFlag: "torch_lit" }],
-      ["Zelda: Create Door", { id: "key_door", position: { x: 200, y: 120 }, smallKey: true, bigKey: false, bySwitch: false, startOpen: false }],
+      ["Zelda: Create Door", { id: "key_door", position: { x: 200, y: 120 }, lock: "small_key", startOpen: false }],
       // Arena: two waves, then the mini-boss.
       // Arena: two waves (spawn points picked on the map), then the mini-boss.
       ["Zelda: Place Marker", { id: "boss_spot", position: { x: 300, y: 120 } }],

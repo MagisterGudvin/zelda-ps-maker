@@ -38,7 +38,7 @@ export function resolvePosition(value: unknown, config: ToolkitConfig): Vec2 | n
  * "Spawned NPC" instances; instances are matched by their own id or by the id,
  * name or texture of the asset they were spawned from.
  */
-const ID_KEYS = ["id", "npcId", "instanceId", "uuid", "key", "name", "assetId", "npcAssetId", "characterId", "npcName"];
+const ID_KEYS = ["inGameCharacterId", "id", "npcId", "instanceId", "uuid", "key", "name", "assetId", "npcAssetId", "characterId", "npcName"];
 
 function matches(obj: any, wanted: string): boolean {
   if (!obj) return false;

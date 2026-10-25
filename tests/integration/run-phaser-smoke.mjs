@@ -353,7 +353,8 @@ await check("PS Maker project data: a character's sheets animate a Create Enemy 
       g.fillRect((i % 4) * 32, Math.floor(i / 4) * 32, 32, 32);
     }
     const src = "animation-t-RUN1-asset-z-Blob_Run.png";
-    scene.textures.addCanvas(src, c);
+    // PS Maker 1.2.1 loads each animation row as a whole-sheet texture "<animationId>frames".
+    scene.textures.addCanvas("RUN10frames", c);
     const rowsOf = (id) => [0, 1, 2, 3].map((row) => ({ id: id + row, startCol: 0, startRow: row, endCol: 3, endRow: row }));
     H.game.cache.json.add("story", {
       characters: [{ id: "BLOB", name: "Blob", animationSets: [{ id: "s", animations: { down: "RUN10", left: "RUN11", right: "RUN12", up: "RUN13" }, collision: { enabled: true, box: { x: 10, y: 14, width: 12, height: 12 } } }] }],
@@ -363,7 +364,7 @@ await check("PS Maker project data: a character's sheets animate a Create Enemy 
     H.run("Zelda: Create Enemy", { template: "slime", position: { x: 80, y: 60 }, id: "ps_blob", character: "BLOB" });
     const searchMs = performance.now() - t0;
     await new Promise((ok) => setTimeout(ok, 300));
-    const img = scene.children.list.find((o) => o.type === "Image" && o.texture?.key === src);
+    const img = scene.children.list.find((o) => o.type === "Image" && o.texture?.key === "RUN10frames");
     const e = window.ZeldaMakerToolkit.session.world.get("ps_blob");
     const diag = window.ZeldaMakerToolkit.session.host.describe().find((l) => l.startsWith("PS Maker data"));
     return { frame: img?.frame?.name ?? null, w: e?.cfg.width, diag, searchMs: Math.round(searchMs) };

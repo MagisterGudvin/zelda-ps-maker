@@ -7,7 +7,7 @@ import { KeyboardInput, type GamepadLike } from "./keyboardInput.ts";
 import { resolveTexture } from "./textures.ts";
 import { getHud } from "./phaserHud.ts";
 import { SheetLibrary } from "./sheets.ts";
-import { findMap, findStory, mapActionSummary, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
+import { findStory, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
 
 /**
  * The PS Maker plugin context, typed only as far as the toolkit uses it.
@@ -634,6 +634,24 @@ export class PhaserHost implements HostAdapter, DepthSource {
     return this.story;
   }
 
+  /** True while a PS Maker dialogue is on screen (GameMap.playingDialogue). */
+  isDialogueOpen(): boolean {
+    return this.scene?.playingDialogue === true;
+  }
+
+  /** Columns of a PS Maker sheet's loaded texture (frame numbering follows the image width). */
+  psMakerSheetColumns(sheet: PsSheet, story: PsStory): number | null {
+    const key = this.psMakerSheetImage(sheet, story);
+    const textures = this.scene?.textures;
+    let width: unknown;
+    try {
+      width = key && textures?.exists(key) ? textures.get?.(key)?.source?.[0]?.width : undefined;
+    } catch {
+      width = undefined;
+    }
+    return typeof width === "number" && width > 0 && sheet.frameWidth > 0 ? Math.floor(width / sheet.frameWidth) : null;
+  }
+
   /** Texture key or URL of a PS Maker sheet (see psmakerAssets.sheetImage). */
   psMakerSheetImage(sheet: PsSheet, story: PsStory): string | null {
     return this.scene?.textures ? sheetImage(this.scene.textures, sheet, story) : null;
@@ -648,10 +666,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
       `scene "${s?.sys?.settings?.key ?? "?"}"  camera scroll ${n(cam?.scrollX)},${n(cam?.scrollY)} zoom ${n(cam?.zoom)} view ${n(cam?.width)}x${n(cam?.height)}`,
       `player sprite ${n(p?.x)},${n(p?.y)} depth ${n(p?.depth)} size ${n(p?.displayWidth)}x${n(p?.displayHeight)} body ${p?.body ? `${n(p.body.x)},${n(p.body.y)} ${n(p.body.width)}x${n(p.body.height)}` : "none"}`,
       ((ps) => (ps ? `PS Maker data: ${ps.where} (${ps.story.characters.length} characters, ${ps.story.spritesheetAnimations.length} sheets)` : "PS Maker data: not reachable (Character / PS Maker sheet fields unavailable)"))(this.psMakerStory()),
-      ...((ps) => {
-        const map = ps ? findMap(ps.story, s?.sys?.settings?.key) : null;
-        return map ? [`map events (saved): ${mapActionSummary(map)}`.slice(0, 140)] : [];
-      })(this.psMakerStory()),
       `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers, ${this.npcCount} NPC bodies`,
     ];
     return lines;

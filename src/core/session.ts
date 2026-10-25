@@ -157,6 +157,9 @@ export class Session {
     this.host.input.latch();
     this.world.reindex();
 
+    const dialogue = this.config.combat.pauseDuringDialogue && this.host.isDialogueOpen?.() === true;
+    if (dialogue !== this.isPaused("dialogue")) this.setPaused("dialogue", dialogue);
+
     this.debug?.handleInput();
     this.inventoryUi?.tick(dtMs);
 

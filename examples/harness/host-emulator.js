@@ -95,12 +95,28 @@ class GameMap extends Phaser.Scene {
     if (MAP_ZOOM === 1) this.cameras.main.setBounds(0, 0, map.size.w, map.size.h);
 
     // PS Maker runs the map's On-load events after the map is built.
-    for (const [name, params] of map.onLoad) action(name).execute(params, this.ctx());
+    this.playEvent(map.onLoad);
     window.dispatchEvent(new CustomEvent("demo:map-loaded", { detail: this.mapId }));
   }
 
-  ctx() {
-    return { game: this.game, scene: this, player: this.player };
+  ctx(endAction) {
+    return { game: this.game, scene: this, player: this.player, endAction };
+  }
+
+  /**
+   * Like PS Maker's StoryRunner: the actions of an event run in order and each must call
+   * ctx.endAction() before the next one starts; one that never does leaves the event waiting.
+   * (Toolkit actions end synchronously, so the check is synchronous here.)
+   */
+  playEvent(list) {
+    for (const [name, params] of list) {
+      let ended = false;
+      action(name).execute(params, this.ctx(() => (ended = true)));
+      if (!ended) {
+        console.error(`[harness] "${name}" did not call ctx.endAction(): the rest of the event would never run.`);
+        return;
+      }
+    }
   }
 
   update() {
@@ -131,7 +147,7 @@ class GameMap extends Phaser.Scene {
       const key = JSON.stringify(r);
       if (t.once && this.firedTriggers.has(key)) continue;
       this.firedTriggers.add(key);
-      for (const [name, params] of t.events) action(name).execute(params, this.ctx());
+      this.playEvent(t.events);
     }
   }
 }
@@ -152,9 +168,9 @@ const game = new Phaser.Game({
 window.addEventListener("keydown", (e) => {
   const scene = game.scene.getScene("GameMap");
   if (!scene?.player) return;
-  if (e.code === "F5") action("Zelda: Save Progress").execute({ slot: "default" }, scene.ctx());
-  else if (e.code === "F8") action("Zelda: Load Progress").execute({ slot: "default" }, scene.ctx());
-  else if (e.code === "F6") action("Zelda: Reset Progress").execute({ slot: "default", newGame: true }, scene.ctx());
+  if (e.code === "F5") scene.playEvent([["Zelda: Save Progress", { slot: "default" }]]);
+  else if (e.code === "F8") scene.playEvent([["Zelda: Load Progress", { slot: "default" }]]);
+  else if (e.code === "F6") scene.playEvent([["Zelda: Reset Progress", { slot: "default", newGame: true }]]);
   else return;
   e.preventDefault();
 });
@@ -165,8 +181,7 @@ window.__harness = {
   scene: () => game.scene.getScene("GameMap"),
   player: () => game.scene.getScene("GameMap")?.player,
   run: (name, params) => {
-    const s = game.scene.getScene("GameMap");
-    action(name).execute(params, s.ctx());
+    game.scene.getScene("GameMap").playEvent([[name, params]]);
   },
   api: () => window.ZeldaMakerToolkit,
 };

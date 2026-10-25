@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.5.3) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.6.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **42**. Все имена начинаются с `Zelda: `.
 
@@ -56,7 +56,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `mapId` (Map ID) | string | `""` | Unique map name used to remember chests, doors and switches. / Уникальное имя карты для сохранения прогресса. |
-| `difficulty` (Difficulty) | number | `2` | 1 = easy (longer invulnerability and sword, shield blocks magic, own bombs harmless), 2 = normal, 3 = hard (short invulnerability, fewer drops). / Сложность: 1 лёгкая, 2 обычная, 3 сложная. |
+| `difficulty` (Difficulty) | string-enum | `"alttp"` | Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность. |
 | `hearts` (Hearts) | number | `3` | Starting and maximum hearts. / Сердца в начале игры. |
 | `swordDamage` (Sword damage) | number | `2` | Damage of one sword hit (a slime has 2 HP). / Урон меча. |
 | `hud` (Show HUD) | boolean | `true` | Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit. |
@@ -64,7 +64,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `shieldButton` (Shield on a button) | boolean | `false` | Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке. |
 | `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
 | `autosave` (Autosave) | boolean | `true` | Save after chests, doors, new items and dungeons. / Автосохранение. |
-| `language` (Language) | string | `"auto"` | auto, en or ru. / Язык интерфейса. |
+| `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
 | `diagnostics` (Show diagnostics) | boolean | `false` | On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики. |
@@ -112,8 +112,9 @@ Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre o
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `template` (Template) | string | `"slime"` | slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name. |
-| `position` (Position) | position | — | Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. Empty = next to the player. / Точка появления. |
+| `template` (Template) | string-enum | `"slime"` | Behaviour and stats. / Шаблон врага. |
+| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
+| `position` (Position) | map-position | — | Where to spawn: pick it on the map. Empty = next to the player. / Точка появления. |
 | `character` (Look (PS Maker character)) | npc | — | Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses). |
 | `group` (Group) | string | `""` | Optional group name: rules can wait until the whole group is defeated. / Группа врагов. |
@@ -135,8 +136,9 @@ Turns an NPC already on this map (placed or spawned earlier) into an enemy that 
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `npc` (NPC) | npc | — | The NPC to turn into an enemy. / NPC, который станет врагом. |
-| `template` (Template) | string | `"soldier"` | Enemy template name (behaviour and stats). |
+| `npc` (NPC) | in-map-npc | `""` | An NPC on this map (placed or spawned earlier) that becomes the enemy. / NPC на карте, который станет врагом. |
+| `template` (Template) | string-enum | `"soldier"` | Behaviour and stats. / Шаблон врага. |
+| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses). |
 | `group` (Group) | string | `""` | Optional group name for rules. / Группа врагов. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
@@ -149,8 +151,8 @@ Creates an interactive object: bush, grass, pot, rock, heavy_rock, breakable, bo
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `type` (Type) | string | `"bush"` | Object type (see description). |
-| `position` (Position) | position | — | Object center. |
+| `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. |
+| `position` (Position) | map-position | — | Object center. |
 | `id` (ID) | string | `""` | Unique id (needed for saving and for other actions to refer to it). |
 | `sprite` (Sprite) | image | — | Optional custom image for the object. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; Reveal it later. / Скрыт до открытия. |
@@ -170,7 +172,7 @@ Places a treasure chest with an item inside. Opened chests stay open. / Сунд
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `id` (ID) | string | `"chest_1"` | Unique chest id. |
-| `position` (Position) | position | — | Chest center. |
+| `position` (Position) | map-position | — | Chest center. |
 | `item` (Item) | string | `"key"` | Item or resource id: key, big_key, bombs, arrows, rupees, boomerang, bow, heart_container... |
 | `count` (Count) | number | `1` | How many. |
 | `requiresBigKey` (Needs Big Key) | boolean | `false` | Big chest that needs the dungeon's Big Key. |
@@ -178,15 +180,13 @@ Places a treasure chest with an item inside. Opened chests stay open. / Сунд
 
 ## Zelda: Create Door
 
-Places a door. With no lock ticked it opens by action; Opened by switch = only rules, switches and Change Object open it. / Дверь.
+Places a door. Lock: none (opens by action), small key, Big Key, or switch (only switches, rules and Change Object open it). / Дверь.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `id` (ID) | string | `"door_1"` | Unique door id. |
-| `position` (Position) | position | — | Door center. |
-| `smallKey` (Needs a small key) | boolean | `true` | Opens with a small key of this dungeon. / Нужен маленький ключ. |
-| `bigKey` (Needs the Big Key) | boolean | `false` | Boss door. / Нужен большой ключ. |
-| `bySwitch` (Opened by switch) | boolean | `false` | Opens only from a switch, a rule or Change Object. / Открывается переключателем. |
+| `position` (Position) | map-position | — | Door center. |
+| `lock` (Lock) | string-enum | `"small_key"` | What opens it. / Замок. |
 | `startOpen` (Start open) | boolean | `false` | Shutter doors that close when a fight starts. |
 | `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
 | `height` (Height) | number | `0` | Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота. |
@@ -199,7 +199,7 @@ Puts a collectible on the ground (key, heart, bombs...). With an ID it never res
 |---|---|---|---|
 | `item` (Item) | string | `"key"` | Item or resource id. |
 | `count` (Count) | number | `1` | How many. |
-| `position` (Position) | position | — | Where. |
+| `position` (Position) | map-position | — | Where. |
 | `id` (ID) | string | `""` | Optional id to make it persistent. |
 
 ## Zelda: Place Marker
@@ -209,7 +209,7 @@ Names a map point once (tip: press F9 in playtest and click the map to get X/Y),
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `id` (Marker ID) | string | `"marker_1"` | Name of the point, e.g. boss_spot. |
-| `position` (Position) | position | — | Point in map pixels. In playtest press F9 and click the map to read/copy X and Y. |
+| `position` (Position) | map-position | — | Point on the map. / Точка на карте. |
 
 ## Zelda: Change Object
 
@@ -218,7 +218,7 @@ Changes an object by id. Operation: open, close (doors, chests), on, off, toggle
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `id` (ID) | string | `""` | Object id. |
-| `operation` (Operation) | string | `"open"` | open \| close \| on \| off \| toggle \| reveal \| hide \| reset \| destroy \| state |
+| `operation` (Operation) | string-enum | `"open"` | What to do with the object. / Действие. |
 | `state` (State) | string | `""` | Only for operation "state": on, off, opened, closed, locked, unlocked, lit, destroyed, revealed, hidden. |
 
 ## Zelda: Remove Target
@@ -239,7 +239,7 @@ Deals damage to an enemy or object by id (use 'player' for the player). / Нан
 |---|---|---|---|
 | `id` (ID) | string | `""` | Enemy/object id or 'player'. |
 | `amount` (Amount) | number | `1` | Damage points. |
-| `damageType` (Damage type) | string | `"script"` | sword, bomb, arrow, fire, ice, magic, script... |
+| `damageType` (Damage type) | string-enum | `"script"` | Enemies may resist some types. / Тип урона. |
 
 ## Zelda: Add Rule
 
@@ -328,8 +328,9 @@ Adds one enemy to a wave of a wave room at the given point. / Добавляет
 |---|---|---|---|
 | `roomId` (Room ID) | string | `"arena"` | Wave room id. |
 | `wave` (Wave) | number | `1` | Wave number: 1, 2, 3... |
-| `template` (Template) | string | `"slime"` | Enemy template. |
-| `position` (Position) | position | — | Spawn point. |
+| `template` (Template) | string-enum | `"slime"` | Behaviour and stats. / Шаблон врага. |
+| `customTemplate` (Custom template) | string | `""` | Optional: a name made with Zelda: Define Enemy; used instead of Template. / Свой шаблон. |
+| `position` (Position) | map-position | — | Spawn point. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
@@ -430,7 +431,7 @@ Where the player revives after falling in battle on this map (empty = current po
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `position` (Position) | position | — | Respawn point. |
+| `position` (Position) | map-position | — | Respawn point. |
 
 ## Zelda: Respawn Player
 
@@ -472,10 +473,10 @@ Adds a usable item without code: a shot (Damage > 0), a burst around the player 
 | `id` (Item ID) | string | `"ice_rod"` | Unique id, e.g. ice_rod. |
 | `name` (Name) | string | `"Ice Rod"` | Shown in messages and the inventory. / Название. |
 | `icon` (Icon) | image | — | Optional icon image. / Иконка. |
-| `resource` (Uses) | string | `"magic"` | What one use costs: magic, arrows, bombs, rupees or empty = free. / Расходует. |
+| `resource` (Uses) | string-enum | `"magic"` | What one use costs. / Что расходует. |
 | `cost` (Cost) | number | `4` | How much of it per use. |
 | `damage` (Damage) | number | `3` | Damage of the shot or burst; 0 = no attack. / Урон. |
-| `damageType` (Damage type) | string | `"magic"` | magic, fire, ice, arrow, bomb... (enemies may resist). |
+| `damageType` (Damage type) | string-enum | `"magic"` | Enemies may resist some types. / Тип урона. |
 | `area` (Area attack) | boolean | `false` | Hit everything around the player instead of shooting. / Удар вокруг игрока. |
 | `stunMs` (Stun (ms)) | number | `0` | Freeze hit enemies; 1000 = one second. |
 | `heal` (Heal) | number | `0` | Half-hearts restored per use (makes it a healing item). / Лечение. |
@@ -488,7 +489,7 @@ Makes a new enemy type from an existing one with other stats; use its name as th
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `name` (Template name) | string | `"red_soldier"` | New template name. |
-| `basedOn` (Based on) | string | `"soldier"` | slime, soldier, spitter, knight, sentry, ogre or another Define Enemy name. |
+| `basedOn` (Based on) | string-enum | `"soldier"` | Template to start from. / На основе шаблона. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
@@ -534,7 +535,8 @@ Uses sprite-sheet animations for the player's attacks (body and weapon layers, e
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `usePsMaker` (Use the player's PS Maker animations) | boolean | `false` | Experimental: attack and hurt come from the player's own sheets in PS Maker (names with Attack / Hurt, e.g. Sword Attack, Sword Hurt). The fields below then stay empty. / Анимации игрока из PS Maker. |
+| `attackAnimation` (Attack animation (PS Maker)) | player-animation-picker | `""` | Pick one of the player's animations, e.g. Sword Attack (any direction): all directions of that sheet are used. / Анимация атаки из PS Maker. |
+| `hurtAnimation` (Hurt animation (PS Maker)) | player-animation-picker | `""` | Optional, e.g. Sword Hurt. / Анимация урона из PS Maker. |
 | `attack` (Attack (body)) | string | `""` | Animation id for the sword swing. |
 | `weaponAttack` (Attack (weapon)) | string | `""` | Weapon layer for the swing. |
 | `spin` (Spin (body)) | string | `""` | Spin attack; empty = attack. |
@@ -567,7 +569,7 @@ Plays a sound at a toolkit moment: swordSwing, spinAttack, enemyHurt, enemyDefea
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `moment` (Moment) | string | `"swordSwing"` | swordSwing \| spinAttack \| enemyHurt \| enemyDefeated \| playerHurt \| playerDie \| shieldBlock \| bombExplode \| objectBreak \| pickup \| itemGet \| chestOpen \| doorUnlock \| puzzleSolved |
+| `moment` (Moment) | string-enum | `"swordSwing"` | When the sound plays. / Когда звучит. |
 | `sound` (Sound) | audio | — | Audio asset. |
 | `soundKey` (Sound key or URL) | string | `""` | Optional: audio key or file URL if the Sound picker does not work. |
 | `volume` (Volume) | number | `1` | 0..1 |

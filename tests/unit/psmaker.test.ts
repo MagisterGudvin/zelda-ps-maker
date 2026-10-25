@@ -65,6 +65,13 @@ test("a PS Maker character becomes enemy animations with its row order and colli
   assert.deepEqual(plan.hitbox, { width: 14, height: 15, offsetX: -1, offsetY: 0 });
 });
 
+test("frame numbers follow the texture width when it is known (PS Maker numbering)", () => {
+  const ch = findCharacter(story, "Slime")!;
+  // Run sheet: rows of 8 frames, but the image is 10 frames wide.
+  const plan = characterPlan(story, ch, (sh) => (sh.id === "run" ? 10 : null));
+  assert.deepEqual((plan.animations[plan.states.walk!].frames as Record<string, number[]>).right, [20, 21, 22, 23, 24, 25, 26, 27]);
+});
+
 test("sheet names map to states; plain names win over compound ones", () => {
   const playerSheets = story.spritesheetAnimations.filter((s) => s.ownerRef?.type === "player");
   assert.equal(sheetForState(playerSheets, "attack")?.name, "Sword Attack");
@@ -100,6 +107,7 @@ test("sheet textures are matched by id, file name or image URL", () => {
     getTextureKeys: () => Object.keys(keys),
     get: (k: string) => ({ source: [{ image: { src: keys[k] } }] }),
   });
+  assert.equal(sheetImage(tex({ run2frames: "", [s.src]: "" }), s, story), "run2frames", "PS Maker 1.2.1 key: <animationId>frames");
   assert.equal(sheetImage(tex({ [s.src]: "" }), s, story), s.src);
   assert.equal(sheetImage(tex({ [`sheet:${s.id}`]: "" }), s, story), `sheet:${s.id}`);
   assert.equal(sheetImage(tex({ k1: `https://game/assets/${s.src}` }), s, story), "k1");
@@ -131,7 +139,8 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
   assert.equal(e.cfg.animations.walk, "ps_SLIME_walk");
   assert.equal(tk.config.sprites.sheets.ps_run?.image, story.spritesheetAnimations[1].src);
 
-  run("Zelda: Set Player Sprites", { usePsMaker: true });
+  // Picked in the editor's player-animation picker: one row (Sword Attack facing left) → all directions.
+  run("Zelda: Set Player Sprites", { attackAnimation: "sa1", hurtAnimation: "sh0" });
   assert.equal(tk.config.player.sprites.attack, "ps_player_attack");
   assert.equal(tk.config.sprites.animations.ps_player_attack?.sheet, "ps_sa");
   assert.equal(tk.config.sprites.animations.ps_player_hurt?.sheet, "ps_sh");
@@ -143,64 +152,99 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
   resetToolkitForTests();
 });
 
-// ---- saved map events -------------------------------------------------------------------
+// ---- PS Maker StoryRunner contract ------------------------------------------------------
 
-const startAction = { type: "plugin:zelda-maker-toolkit:zelda-start-toolkit", pluginName: "Zelda Maker Toolkit", actionName: "Zelda: Start Toolkit", pluginParams: { mapId: "start", language: "en" } };
-const enemyAction = { type: "plugin:zelda-maker-toolkit:zelda-create-enemy", pluginName: "Zelda Maker Toolkit", actionName: "Zelda: Create Enemy", pluginParams: { template: "slime", id: "m_slime", position: { x: 140, y: 100 } } };
-const chestAction = { type: "plugin:zelda-maker-toolkit:zelda-create-chest", pluginName: "Zelda Maker Toolkit", actionName: "Zelda: Create Chest", pluginParams: { id: "m_chest", item: "key", count: 1, position: { x: 60, y: 60 } } };
-const waitAction = { type: "waitAction", name: "Wait" };
+type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
 
-test("toolkit actions saved right after Start Toolkit are read from the map, up to the first other action", async () => {
-  const { actionsAfterStart, findMap, mapActionSummary } = await import("../../src/host/psmakerAssets.ts");
-  const withMap: PsStory = { ...story, maps: [{ id: "GameMap", setupActions: [{ type: "movePlayerAction", name: "Move player" }], initialActions: [startAction, enemyAction, waitAction, chestAction] }] };
-  const map = findMap(withMap, "GameMap")!;
-  const block = actionsAfterStart(map)!;
-  assert.equal(block.list, "initialActions");
-  assert.deepEqual(block.actions.map((a) => a.name), ["Zelda: Create Enemy"]);
-  assert.equal(mapActionSummary(map), "setupActions: Move player; initialActions: Start Toolkit, Create Enemy, Wait, Create Chest");
-  assert.equal(findMap(withMap, "other"), null);
-});
-
-async function mapRig(initialActions: unknown[]) {
-  const { default: plugin } = await import("../../src/index.ts");
-  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
-  const { MAP_FALLBACK_MS } = await import("../../src/editor/actions.ts");
-  resetToolkitForTests();
-  const f = createFakeScene();
-  // Where PS Maker 1.2.1 keeps the project data during a playtest (seen in diagnostics).
-  f.scene.sys.settings.data = { story: { ...story, maps: [{ id: "GameMap", initialActions }] } };
-  const ctx = { game: f.game, scene: f.scene, player: f.player };
-  type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
-  const run = (name: string, params: Record<string, unknown>) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!.execute(params, ctx);
-  const wait = () => new Promise((ok) => setTimeout(ok, MAP_FALLBACK_MS + 100));
-  return { run, wait, getToolkit, done: resetToolkitForTests };
+/**
+ * Minimal model of PS Maker 1.2.1's StoryRunner: actions of one event run in order,
+ * each waiting for ctx.endAction(); errors are logged and end the action.
+ */
+async function playEvent(actions: AnyAction[], list: [string, Record<string, unknown>][], base: Record<string, unknown>, timeoutMs = 200): Promise<string[]> {
+  const finished: string[] = [];
+  for (const [name, params] of list) {
+    const def = actions.find((e) => e.name === name)!;
+    const ended = await new Promise<boolean>((resolve) => {
+      const timer = setTimeout(() => resolve(false), timeoutMs);
+      const endAction = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      try {
+        def.execute(params, { ...base, endAction });
+      } catch {
+        endAction();
+      }
+    });
+    if (!ended) break; // the event would wait forever
+    finished.push(name);
+  }
+  return finished;
 }
 
-test("actions PS Maker does not call are run from the map data, once", async () => {
-  const { run, wait, getToolkit, done } = await mapRig([startAction, enemyAction, chestAction]);
-  run("Zelda: Start Toolkit", startAction.pluginParams);
-  const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" } });
-  assert.equal(tk.session!.world.count("enemy"), 0);
-  await wait();
-  assert.ok(tk.session!.world.get("m_slime"), "enemy created from the saved action");
-  assert.ok(tk.session!.world.get("m_chest"), "chest created from the saved action");
-  assert.match(tk.logger.history.filter((l) => l.level === "warn").at(-1)!.text, /PS Maker did not call Create Enemy, Create Chest/);
-  assert.equal(tk.actionCounts.get("Create Enemy (map data)"), 1);
-  // PS Maker calls it after all: skipped, no second enemy.
-  run("Zelda: Create Enemy", enemyAction.pluginParams);
-  assert.equal(tk.session!.world.count("enemy"), 1);
-  done();
+test("every action ends itself (ctx.endAction) exactly once, also on errors", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  resetToolkitForTests();
+  const f = createFakeScene();
+  const base = { game: f.game, scene: f.scene, player: f.player };
+  const actions = plugin.events as unknown as AnyAction[];
+  const counts = new Map<string, number>();
+  for (const a of actions) {
+    a.execute({}, { ...base, endAction: () => counts.set(a.name, (counts.get(a.name) ?? 0) + 1) });
+    if (a.name === "Zelda: Start Toolkit") getToolkit().configure({ debug: { logLevel: "silent" } });
+  }
+  for (const a of actions) assert.equal(counts.get(a.name), 1, `${a.name} called endAction ${counts.get(a.name) ?? 0} times`);
+  // Also when the action body throws.
+  getToolkit().configure({ debug: { rethrowErrors: true } });
+  let ended = 0;
+  const broken = { ...base, endAction: () => ended++ };
+  Object.defineProperty(broken, "player", { get: () => { throw new Error("broken context"); } });
+  getToolkit().stop("test");
+  assert.throws(() => actions.find((e) => e.name === "Zelda: Create Enemy")!.execute({ template: "slime" }, broken), /broken context/);
+  assert.equal(ended, 1);
+  resetToolkitForTests();
 });
 
-test("actions PS Maker does call are not run twice", async () => {
-  const { run, wait, getToolkit, done } = await mapRig([startAction, enemyAction]);
-  run("Zelda: Start Toolkit", startAction.pluginParams);
+test("in a PS Maker event, Create Enemy now runs after Start Toolkit", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  resetToolkitForTests();
+  const f = createFakeScene();
+  const base = { game: f.game, scene: f.scene, player: f.player };
+  const done = await playEvent(plugin.events as unknown as AnyAction[], [
+    ["Zelda: Start Toolkit", { mapId: "start", language: "en" }],
+    ["Zelda: Create Enemy", { template: "slime", id: "e1", position: { x: 140, y: 100 } }],
+    ["Zelda: Create Chest", { id: "c1", item: "key", count: 1, position: { x: 60, y: 60 } }],
+  ], base);
+  assert.deepEqual(done, ["Zelda: Start Toolkit", "Zelda: Create Enemy", "Zelda: Create Chest"]);
+  assert.ok(getToolkit().session!.world.get("e1"));
+  assert.ok(getToolkit().session!.world.get("c1"));
+  resetToolkitForTests();
+});
+
+test("combat pauses while a PS Maker dialogue is open (GameMap.playingDialogue)", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  resetToolkitForTests();
+  const f = createFakeScene();
+  const ctx = { game: f.game, scene: f.scene, player: f.player, endAction: () => {} };
+  const run = (name: string, params: Record<string, unknown>) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!.execute(params, ctx);
+  run("Zelda: Start Toolkit", { mapId: "d", language: "en" });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: Create Enemy", enemyAction.pluginParams);
-  await wait();
-  assert.equal(tk.session!.world.count("enemy"), 1);
-  assert.equal(tk.actionCounts.get("Create Enemy (map data)"), undefined);
-  done();
+  const s = tk.session!;
+  s.update(20);
+  assert.equal(s.isPaused("dialogue"), false);
+  f.scene.playingDialogue = true;
+  s.update(20);
+  assert.equal(s.isPaused("dialogue"), true);
+  f.scene.playingDialogue = false;
+  s.update(20);
+  assert.equal(s.isPaused(), false);
+  tk.configure({ combat: { pauseDuringDialogue: false } });
+  f.scene.playingDialogue = true;
+  s.update(20);
+  assert.equal(s.isPaused(), false, "can be turned off");
+  resetToolkitForTests();
 });

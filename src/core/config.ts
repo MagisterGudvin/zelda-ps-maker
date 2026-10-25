@@ -158,6 +158,8 @@ export interface ToolkitConfig {
     /** Global multipliers per damage type (applied before resistances). */
     damageTable: Partial<Record<DamageType, number>>;
     bombsHurtPlayer: boolean;
+    /** Freeze enemies and projectiles while a PS Maker dialogue is open. */
+    pauseDuringDialogue: boolean;
   };
   items: {
     bomb: { fuseMs: number; radius: number; damage: number; playerDamage: number; maxActive: number; knockback: number };
@@ -340,6 +342,7 @@ export function createDefaultConfig(): ToolkitConfig {
       flashMs: 250,
       damageTable: {},
       bombsHurtPlayer: true,
+      pauseDuringDialogue: true,
     },
     items: {
       bomb: { fuseMs: 2600, radius: 26, damage: 4, playerDamage: 2, maxActive: 2, knockback: 260 },
