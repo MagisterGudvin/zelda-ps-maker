@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { characterPlan, directionRows, findCharacter, findStory, playerSheetAnim, sheetColumns, sheetForState, sheetImage, type PsSheet, type PsStory } from "../../src/host/psmakerAssets.ts";
+import { characterFromParam, characterPlan, directionRows, findCharacter, findStory, playerAutoAnims, playerSheetAnim, sheetColumns, sheetForState, sheetImage, type PsSheet, type PsStory } from "../../src/host/psmakerAssets.ts";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
 
 // Synthetic project data in the format of a PS Maker 1.2.1 story.json
@@ -30,6 +30,8 @@ const story: PsStory = {
     sheet("sa", "Sword Attack", { type: "player" }, [8, 8, 8, 8]),
     sheet("swa", "Sword Walk Attack", { type: "player" }, [6, 6, 6, 6]),
     sheet("si", "Sword Idle", { type: "player" }, [12, 12, 12, 4]),
+    sheet("uh", "Unarmed Hurt", { type: "player" }, [5, 5, 5, 5]),
+    sheet("sh", "Sword Hurt", { type: "player" }, [5, 5, 5, 5]),
   ],
   player: { defaultAnimationSetId: "p", animationSets: [{ id: "p", animations: { movementDirections: 8, down: "pw0", left: "pw1", right: "pw2", up: "pw3" } }] },
 };
@@ -77,6 +79,20 @@ test("a player sheet by name becomes a directional attack animation", () => {
   assert.equal(playerSheetAnim(story, "Kick"), null);
 });
 
+test("the character chosen in an NPC dropdown is matched whatever PS Maker passes", () => {
+  for (const v of ["SLIME", "Slime", "slime", { id: "SLIME" }, { characterId: "SLIME" }, { assetId: "SLIME", name: "x" }, { texture: { key: "slime" } }, { npc: { id: "SLIME" } }]) {
+    assert.equal(characterFromParam(story, v)?.id, "SLIME", JSON.stringify(v));
+  }
+  assert.equal(characterFromParam(story, ""), null);
+  assert.equal(characterFromParam(story, { id: "nobody" }), null);
+});
+
+test("the player's attack and hurt sheets are found by name", () => {
+  const auto = playerAutoAnims(story);
+  assert.equal(auto.attack?.sheet.name, "Sword Attack");
+  assert.equal(auto.hurt?.sheet.name, "Sword Hurt", "same set as the attack");
+});
+
 test("sheet textures are matched by id, file name or image URL", () => {
   const s = story.spritesheetAnimations[1];
   const tex = (keys: Record<string, string>) => ({
@@ -107,7 +123,7 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
   run("Zelda: Start Toolkit", { mapId: "ps", language: "en" });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: Create Enemy", { template: "slime", position: { x: 150, y: 100 }, id: "s1", character: "Slime", hp: 4 });
+  run("Zelda: Create Enemy", { template: "slime", position: { x: 150, y: 100 }, id: "s1", character: { id: "SLIME" }, hp: 4 });
   const e = tk.session!.world.get("s1") as unknown as { hp: number; cfg: { width: number; height: number; spriteOffsetX: number; animations: Record<string, string> } };
   assert.equal(e.hp, 4);
   assert.equal(e.cfg.width, 14);
@@ -115,9 +131,10 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
   assert.equal(e.cfg.animations.walk, "ps_SLIME_walk");
   assert.equal(tk.config.sprites.sheets.ps_run?.image, story.spritesheetAnimations[1].src);
 
-  run("Zelda: Set Player Sprites", { attackSheet: "Sword Attack" });
+  run("Zelda: Set Player Sprites", { usePsMaker: true });
   assert.equal(tk.config.player.sprites.attack, "ps_player_attack");
   assert.equal(tk.config.sprites.animations.ps_player_attack?.sheet, "ps_sa");
+  assert.equal(tk.config.sprites.animations.ps_player_hurt?.sheet, "ps_sh");
 
   // Missing Position (PS Maker does not save an untouched one): next to the player.
   run("Zelda: Create Enemy", { template: "slime", id: "near" });

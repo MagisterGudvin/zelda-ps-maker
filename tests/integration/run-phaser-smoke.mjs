@@ -360,7 +360,7 @@ await check("PS Maker project data: a character's sheets animate a Create Enemy 
       spritesheetAnimations: [{ id: "RUN1", name: "Blob Run", src, frameWidth: 32, frameHeight: 32, frameRate: 8, ownerRef: { type: "npc", id: "BLOB" }, animations: rowsOf("RUN1") }],
     });
     const t0 = performance.now();
-    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 80, y: 60 }, id: "ps_blob", character: "Blob" });
+    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 80, y: 60 }, id: "ps_blob", character: "BLOB" });
     const searchMs = performance.now() - t0;
     await new Promise((ok) => setTimeout(ok, 300));
     const img = scene.children.list.find((o) => o.type === "Image" && o.texture?.key === src);

@@ -2,6 +2,12 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.5.2] — 2026-10-25
+
+### Изменено
+- `Create Enemy`: персонаж PS Maker выбирается **выпадающим списком** (*Look (PS Maker character)*, тип поля `npc`), а не вписывается текстом. Персонаж не обязан стоять на карте.
+- `Set Player Sprites`: вместо полей с названиями листов — одна галочка *Use the player's PS Maker animations*; листы атаки и урона находятся по названиям сами.
+
 ## [0.5.1] — 2026-10-25
 
 По файлу проекта PS Maker 1.2.1 (story.json), см. `docs/ENGINE_AUDIT.md`, раздел 10.

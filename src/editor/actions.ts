@@ -17,7 +17,7 @@ import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
-import { characterPlan, findCharacter, playerSheetAnim, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { characterFromParam, characterPlan, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { audio, bool, boolOr, buildThen, buildWhen, enemyStats, img, listOf, npc, num, numOr, pos, SPRITE_FIELDS, STAT_FIELDS, str, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
@@ -422,7 +422,7 @@ const createEnemy = defineEvent({
   parameterDefs: {
     template: str("Template", "slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name.", "slime"),
     position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. Empty = next to the player. / Точка появления."),
-    character: str("PS Maker character", "Optional (experimental): name of a character from your PS Maker library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used. / Персонаж PS Maker для внешнего вида.", ""),
+    character: npc("Look (PS Maker character)", "Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker."),
     id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
     group: str("Group", "Optional group name: rules can wait until the whole group is defeated. / Группа врагов.", ""),
     ...STAT_FIELDS,
@@ -439,11 +439,11 @@ const createEnemy = defineEvent({
       if (!at) return;
       const overrides: Partial<EnemyConfig> = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Create Enemy") ?? {}) };
       const anims: Record<string, string> = {};
-      const charName = textOf(params.character);
-      const story = charName ? psStory(s, "Create Enemy") : null;
+      const picked = params.character !== undefined && params.character !== null && params.character !== "";
+      const story = picked ? psStory(s, "Create Enemy") : null;
       if (story) {
-        const ch = findCharacter(story, charName);
-        if (!ch) s.logger.warn(`Create Enemy: PS Maker character "${charName}" not found. Characters: ${story.characters.map((c) => c.name).join(", ")}.`);
+        const ch = characterFromParam(story, params.character);
+        if (!ch) s.logger.warn(`Create Enemy: could not match the chosen character (${describeParams(params.character)}) with the PS Maker library: ${story.characters.map((c) => c.name).join(", ")}.`);
         else {
           const plan = characterPlan(story, ch);
           registerPsSheets(s, tk, story, plan.sheets, "Create Enemy");
@@ -793,8 +793,7 @@ const setPlayerSprites = defineEvent({
   name: "Zelda: Set Player Sprites",
   description: "Uses sprite-sheet animations for the player's attacks (body and weapon layers, e.g. Mana Seed character + weapon sheets). Empty = built-in blade. / Анимации атаки игрока.",
   parameterDefs: {
-    attackSheet: str("Attack sheet (PS Maker)", "Optional (experimental): name of one of the player's PS Maker animations, e.g. Sword Attack. Used instead of Attack (body). / Анимация атаки из PS Maker.", ""),
-    hurtSheet: str("Hurt sheet (PS Maker)", "Optional (experimental), e.g. Sword Hurt.", ""),
+    usePsMaker: bool("Use the player's PS Maker animations", "Experimental: attack and hurt come from the player's own sheets in PS Maker (names with Attack / Hurt, e.g. Sword Attack, Sword Hurt). The fields below then stay empty. / Анимации игрока из PS Maker.", false),
     attack: str("Attack (body)", "Animation id for the sword swing.", ""),
     weaponAttack: str("Attack (weapon)", "Weapon layer for the swing.", ""),
     spin: str("Spin (body)", "Spin attack; empty = attack.", ""),
@@ -821,17 +820,13 @@ const setPlayerSprites = defineEvent({
           : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
       const anim = (v: unknown) => textOf(v);
       const fromPs: Record<string, string> = {};
-      const sheetFields = { attack: textOf(params.attackSheet), hurt: textOf(params.hurtSheet) };
-      const story = sheetFields.attack || sheetFields.hurt ? psStory(s, "Set Player Sprites") : null;
+      const story = boolOr(params.usePsMaker, false) ? psStory(s, "Set Player Sprites") : null;
       if (story) {
-        for (const [slot, name] of Object.entries(sheetFields)) {
-          if (!name) continue;
-          const found = playerSheetAnim(story, name);
-          if (!found) {
-            s.logger.warn(`Set Player Sprites: the player has no PS Maker animation "${name}". Available: ${sheetNames(story, { type: "player" }).join(", ")}.`);
-            continue;
-          }
+        const auto = playerAutoAnims(story);
+        if (!auto.attack) s.logger.warn(`Set Player Sprites: no player sheet with "Attack" in its name. Player sheets: ${sheetNames(story, { type: "player" }).join(", ") || "none"}.`);
+        for (const [slot, found] of Object.entries(auto)) {
           registerPsSheets(s, tk, story, { [found.sheetKey]: found.sheet }, "Set Player Sprites");
+          s.logger.info(`Set Player Sprites: ${slot} = PS Maker sheet "${found.sheet.name}".`);
           const id = `ps_player_${slot}`;
           tk.configure({ sprites: { animations: { [id]: found.anim } } }, "Set Player Sprites");
           fromPs[slot] = id;

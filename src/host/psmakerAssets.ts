@@ -105,6 +105,27 @@ export function findCharacter(story: PsStory, name: string): PsCharacter | null 
   return story.characters.find((c) => norm(c.name) === n || norm(c.key ?? "") === n || c.id === name) ?? null;
 }
 
+/**
+ * Character chosen in an `npc` field ("Select NPC" dropdown). The value PS Maker
+ * passes is not documented: an id, a name, an object carrying one of them, or a
+ * spawned game object are accepted.
+ */
+export function characterFromParam(story: PsStory, value: unknown): PsCharacter | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "string" || typeof value === "number") return findCharacter(story, String(value));
+  if (typeof value !== "object") return null;
+  const o = value as Record<string, unknown> & { texture?: { key?: unknown }; getData?: (k: string) => unknown };
+  const candidates: unknown[] = [o.characterId, o.npcId, o.assetId, o.npcAssetId, o.id, o.key, o.name, o.texture?.key];
+  if (typeof o.getData === "function") for (const k of ["characterId", "npcId", "assetId", "id"]) candidates.push(o.getData(k));
+  for (const c of [o.character, o.npc, o.asset, o.value]) if (c && typeof c === "object") candidates.push((c as Record<string, unknown>).id, (c as Record<string, unknown>).name);
+  for (const c of candidates) {
+    if (typeof c !== "string" && typeof c !== "number") continue;
+    const ch = findCharacter(story, String(c));
+    if (ch) return ch;
+  }
+  return null;
+}
+
 function defaultSet(sets: PsAnimationSet[] | undefined, id: string | undefined): PsAnimationSet | null {
   if (!sets || sets.length === 0) return null;
   return sets.find((s) => s.id === id) ?? sets[0];
@@ -255,11 +276,29 @@ export function characterPlan(story: PsStory, character: PsCharacter): PsAnimPla
 
 /** A player sheet by name (e.g. "Sword Attack") as a directional animation. */
 export function playerSheetAnim(story: PsStory, name: string, loop = false): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
-  const sheets = sheetsOf(story, { type: "player" });
-  const sheet = sheets.find((s) => norm(s.name) === norm(name));
-  if (!sheet) return null;
+  const sheet = sheetsOf(story, { type: "player" }).find((s) => norm(s.name) === norm(name));
+  return sheet ? playerAnimOf(story, sheet, loop) : null;
+}
+
+function playerAnimOf(story: PsStory, sheet: PsSheet, loop: boolean): { sheetKey: string; sheet: PsSheet; anim: AnimDef } {
   const set = defaultSet(story.player?.animationSets, story.player?.defaultAnimationSetId);
   return { sheetKey: sheetId(sheet), sheet, anim: { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set)), loop } };
+}
+
+/**
+ * The player's attack and hurt sheets found by name ("Sword Attack", "Sword Hurt").
+ * The hurt sheet of the same set as the attack wins ("Sword Hurt" over "Unarmed Hurt").
+ */
+export function playerAutoAnims(story: PsStory): Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> {
+  const sheets = sheetsOf(story, { type: "player" });
+  const out: Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> = {};
+  const attack = sheetForState(sheets, "attack");
+  if (attack) out.attack = playerAnimOf(story, attack, false);
+  const prefix = attack ? norm(attack.name).split(/\s+/)[0] : "";
+  const hurts = sheets.filter((s) => STATE_WORDS.hurt.test(s.name));
+  const hurt = hurts.find((s) => prefix && norm(s.name).startsWith(prefix)) ?? sheetForState(sheets, "hurt");
+  if (hurt) out.hurt = playerAnimOf(story, hurt, false);
+  return out;
 }
 
 /** Names of sheets a character (or the player) owns, for messages. */
