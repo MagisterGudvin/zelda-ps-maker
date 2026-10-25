@@ -1,6 +1,7 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position (X/Y) **или** Use NPC, ID, Group, Patrol markers, Overrides JSON.
+`Zelda: Create Enemy` — Template, Position (X/Y), ID, Group, Animations, Patrol markers, Overrides JSON.
+`Zelda: Enemy From NPC` — NPC, Template, ID, Group, Overrides JSON (см. ниже).
 
 **Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.
 
@@ -59,4 +60,4 @@
 
 ## NPC из редактора как враг
 
-Параметр **Use NPC**: выберите размещённого NPC — Toolkit возьмёт его позицию и использует его спрайт (с анимациями PS Maker) как визуал врага; собственное физическое тело NPC отключается на время «усыновления». После победы NPC скрывается. Формат значения параметра `npc` в PS Maker не задокументирован; поддерживаются объект Phaser, id и имя (поиск по `name`, `id`, `npcId`, `instanceId`, `uuid`, `key`, данным `getData`). Если NPC не найден, используется Position и в консоль пишется предупреждение.
+Действие **`Zelda: Enemy From NPC`**: выберите размещённого NPC — Toolkit возьмёт его позицию и использует его спрайт (с анимациями PS Maker) как визуал врага; собственное физическое тело NPC отключается на время «усыновления». После победы NPC скрывается. Формат значения параметра `npc` в PS Maker не задокументирован; поддерживаются объект Phaser, id и имя (поиск по `name`, `id`, `npcId`, `instanceId`, `uuid`, `key`, данным `getData`). Если NPC не найден, враг не создаётся и пишется предупреждение. (До 0.4.2 это был параметр *Use NPC* у `Create Enemy`; вынесен, чтобы пустое поле NPC не мешало обычному созданию врага.)

@@ -68,13 +68,10 @@ function json<T>(s: Session, text: string, what: string): T | null {
   return (value ?? null) as T | null;
 }
 
-function where(s: Session, ctx: Ctx, position: unknown, npcValue: unknown, what: string): { x: number; y: number; adopt: unknown } | null {
-  const adopt = resolveNpc(npcValue, ctx.scene);
-  if (adopt) return { x: adopt.x, y: adopt.y, adopt };
-  if (npcValue !== undefined && npcValue !== null && npcValue !== "") s.logger.warn(`${what}: NPC "${String(npcValue)}" was not found in the scene; using the position parameter.`);
+function where(s: Session, position: unknown, what: string): { x: number; y: number } | null {
   const p = resolvePosition(position, s.config);
-  if (p && p.x === 0 && p.y === 0) s.logger.warn(`${what}: Position is X 0, Y 0 (top-left corner) — was it left unset? Tip: F9 in playtest, then click the map to get coordinates.`);
-  if (p) return { x: p.x, y: p.y, adopt: undefined };
+  if (p && p.x === 0 && p.y === 0) s.logger.warn(`${what}: Position is X 0, Y 0 — was it left unset? Tip: F9 in playtest, then click the map to get coordinates.`);
+  if (p) return p;
   s.logger.warn(`${what}: no valid position (got ${JSON.stringify(position)}).`);
   return null;
 }
@@ -331,8 +328,7 @@ const createEnemy = defineEvent({
   description: "Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre or your own). / Создаёт врага по шаблону.",
   parameterDefs: {
     template: str("Template", "Enemy template name.", "slime"),
-    position: pos("Position", "Where to spawn (ignored if an NPC is chosen)."),
-    npc: npc("Use NPC", "Optional: an NPC already spawned on this map (Spawn NPC runs earlier) becomes the enemy and keeps its sprite. / Превратить NPC на карте во врага."),
+    position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. / Точка появления."),
     id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
     group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
     animations: str("Animations", "Optional sprite-sheet animations: walk=slime_walk, attack=slime_attack, hurt=..., death=..., idle=... (ids from Zelda: Define Animation). / Анимации из спрайт-листа.", ""),
@@ -341,14 +337,39 @@ const createEnemy = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Create Enemy", ctx, params, (s) => {
-      const at = where(s, ctx, params.position, params.npc, "Create Enemy");
+      const at = where(s, params.position, "Create Enemy");
       if (!at) return;
       const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Create Enemy overrides") ?? {};
       const anims = parseAnimationMap(params.animations ?? "");
       if (anims) overrides.animations = { ...(overrides.animations ?? {}), ...anims } as EnemyConfig["animations"];
       const route = (params.patrol ?? "").split(",").map((x) => x.trim()).filter(Boolean);
       if (route.length > 0) overrides.patrol = { ...(overrides.patrol ?? {}), mode: "path", points: route as unknown as EnemyConfig["patrol"]["points"] } as EnemyConfig["patrol"];
-      spawnEnemy(s, params.template || "slime", at.x, at.y, { id: params.id || undefined, group: params.group, overrides, adopt: at.adopt });
+      spawnEnemy(s, params.template || "slime", at.x, at.y, { id: params.id || undefined, group: params.group, overrides });
+    });
+  },
+});
+
+// Separate from Create Enemy: an empty NPC field must not be able to stop PS Maker
+// from running the common case (template + position).
+const enemyFromNpc = defineEvent({
+  name: "Zelda: Enemy From NPC",
+  description: "Turns an NPC already on this map (placed or spawned earlier) into an enemy that keeps the NPC's sprite. / Превращает NPC на карте во врага.",
+  parameterDefs: {
+    npc: npc("NPC", "The NPC to turn into an enemy. / NPC, который станет врагом."),
+    template: str("Template", "Enemy template name (behaviour and stats).", "soldier"),
+    id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
+    group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
+    overrides: str("Overrides JSON", 'Change stats, e.g. {"hp":6,"speed":50}', ""),
+  },
+  execute(params, ctx) {
+    run("Zelda: Enemy From NPC", ctx, params, (s) => {
+      const adopt = resolveNpc(params.npc, (s.host as { scene?: unknown }).scene ?? ctx.scene) ?? resolveNpc(params.npc, ctx.scene);
+      if (!adopt) {
+        s.logger.warn(`Enemy From NPC: NPC ${JSON.stringify(params.npc)} was not found on this map.`);
+        return;
+      }
+      const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Enemy From NPC overrides") ?? {};
+      spawnEnemy(s, params.template || "soldier", adopt.x, adopt.y, { id: params.id || undefined, group: params.group, overrides, adopt });
     });
   },
 });
@@ -366,7 +387,7 @@ const createObjectAction = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Create Object", ctx, params, (s) => {
-      const at = where(s, ctx, params.position, undefined, "Create Object");
+      const at = where(s, params.position, "Create Object");
       if (!at) return;
       const overrides = json<Partial<ObjectConfig>>(s, params.config, "Create Object config") ?? {};
       const sprite = resolveImage(params.sprite);
@@ -389,7 +410,7 @@ const createChest = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Create Chest", ctx, params, (s) => {
-      const at = where(s, ctx, params.position, undefined, "Create Chest");
+      const at = where(s, params.position, "Create Chest");
       if (!at) return;
       createObject(s, "chest", at.x, at.y, {
         id: params.id || undefined,
@@ -410,7 +431,7 @@ const createDoor = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Create Door", ctx, params, (s) => {
-      const at = where(s, ctx, params.position, undefined, "Create Door");
+      const at = where(s, params.position, "Create Door");
       if (!at) return;
       const lock = ["none", "small_key", "big_key", "switch"].includes(params.lock) ? params.lock : "small_key";
       createObject(s, "door", at.x, at.y, { id: params.id || undefined, overrides: { lock: lock as ObjectConfig["lock"], startOpen: !!params.startOpen } });
@@ -429,7 +450,7 @@ const placeItem = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Place Item", ctx, params, (s) => {
-      const at = where(s, ctx, params.position, undefined, "Place Item");
+      const at = where(s, params.position, "Place Item");
       if (at) placePickup(s, params.item, Math.max(1, params.count || 1), at.x, at.y, params.id || undefined);
     });
   },
@@ -920,6 +941,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   pauseCombat,
   debugAction,
   createEnemy,
+  enemyFromNpc,
   createObjectAction,
   createChest,
   createDoor,

@@ -48,7 +48,7 @@ export const MAPS = {
       // 6. Ranged enemy to test the shield.
       ["Zelda: Create Enemy", { template: "spitter", position: { x: 350, y: 180 }, id: "spitter_1", group: "field", overrides: "" }],
       // NPC placed in the editor turned into a shielded knight.
-      ["Zelda: Create Enemy", { template: "knight", position: { x: 0, y: 0 }, npc: "npc_guard", id: "knight_1", group: "field", overrides: '{"hp":4}' }],
+      ["Zelda: Enemy From NPC", { npc: "npc_guard", template: "knight", id: "knight_1", group: "field", overrides: '{"hp":4}' }],
       // World objects.
       ["Zelda: Create Object", { type: "bush", position: { x: 152, y: 128 }, id: "", config: "" }],
       ["Zelda: Create Object", { type: "bush", position: { x: 168, y: 128 }, id: "", config: "" }],

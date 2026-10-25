@@ -104,8 +104,9 @@ export function installPublicApi(tk: Toolkit): void {
   const g = globalThis as Record<string, unknown>;
   const existing = g[GLOBAL_KEY] as { version?: string } | undefined;
   if (existing && existing.version !== TOOLKIT_VERSION) {
-    tk.logger.warn(`globalThis.${GLOBAL_KEY} already defined by version ${existing.version}; not overriding.`);
-    return;
+    // The editor keeps plugin code in memory between playtests: an older copy means the
+    // plugin was replaced without restarting PS Maker (or two copies are in /plugins).
+    tk.logger.warn(`Another copy of the plugin (version ${existing.version}) is loaded in this window. Keep one zelda-maker-toolkit file in /plugins and restart PS Maker.`);
   }
   g[GLOBAL_KEY] = createPublicApi(tk);
 }

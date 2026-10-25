@@ -14,10 +14,11 @@
 src/
   index.ts                  definePlugin(...) — точка входа для CLI
   editor/                   интеграция с PS Maker
-    actions.ts              41 действие редактора (defineEvent)
+    actions.ts              42 действия редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     paramResolvers.ts       разбор параметров position / npc / image
     publicApi.ts            globalThis.ZeldaMakerToolkit
+    pageErrors.ts           ошибки страницы и console.error → панель диагностики
     pluginShape.ts          events + actions (совместимость версий API)
   core/                     ядро
     toolkit.ts              Toolkit: config, state, bus, реестры, сохранения

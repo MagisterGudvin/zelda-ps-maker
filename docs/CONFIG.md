@@ -89,7 +89,7 @@
 `enabled true, volume 1, sounds {}` — звуки моментов (`Zelda: Set Sound`): `{"audio":{"sounds":{"swordSwing":{"src":"sfx/swing.ogg","volume":0.8}}}}`. Список моментов — в [PS_MAKER_INTEGRATION.md](PS_MAKER_INTEGRATION.md#звук).
 
 ### `debug`, `language`, `publicApi`
-`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, строка `actions run:` — какие действия `Zelda:` PS Maker фактически выполнил и сколько раз, последние предупреждения и действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
+`debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, строка `actions run:` — какие действия `Zelda:` PS Maker фактически выполнил и сколько раз, последние предупреждения и действия, а также ошибки страницы и `console.error` вне плагина — например, если PS Maker не смог подготовить параметры действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
 
 ## Примеры
 

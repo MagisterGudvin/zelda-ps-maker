@@ -82,6 +82,11 @@ export class Logger {
     if (this.enabled("error")) this.sink.error(this.prefix, ...args);
   }
 
+  /** Stores a line for the diagnostics panel without printing it (used for errors captured from the page). */
+  record(level: LogEntry["level"], text: string): void {
+    this.remember(level, [text]);
+  }
+
   /** Logs a warning only the first time `key` is seen (avoids per-frame spam). */
   warnOnce(key: string, ...args: unknown[]): void {
     if (this.onceKeys.has(key)) return;

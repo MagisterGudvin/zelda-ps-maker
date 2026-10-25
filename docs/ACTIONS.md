@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.4.1) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.4.2) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **41**. Все имена начинаются с `Zelda: `.
+Всего действий: **42**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -12,6 +12,7 @@
 - [Zelda: Pause Combat](#zelda-pause-combat)
 - [Zelda: Debug](#zelda-debug)
 - [Zelda: Create Enemy](#zelda-create-enemy)
+- [Zelda: Enemy From NPC](#zelda-enemy-from-npc)
 - [Zelda: Create Object](#zelda-create-object)
 - [Zelda: Create Chest](#zelda-create-chest)
 - [Zelda: Create Door](#zelda-create-door)
@@ -99,13 +100,24 @@ Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre o
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `template` (Template) | string | `"slime"` | Enemy template name. |
-| `position` (Position) | position | — | Where to spawn (ignored if an NPC is chosen). |
-| `npc` (Use NPC) | npc | — | Optional: an NPC already spawned on this map (Spawn NPC runs earlier) becomes the enemy and keeps its sprite. / Превратить NPC на карте во врага. |
+| `position` (Position) | position | — | Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. / Точка появления. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses and rules). |
 | `group` (Group) | string | `""` | Group for rules like {"enemiesDefeated":"room1"}. |
 | `animations` (Animations) | string | `""` | Optional sprite-sheet animations: walk=slime_walk, attack=slime_attack, hurt=..., death=..., idle=... (ids from Zelda: Define Animation). / Анимации из спрайт-листа. |
 | `patrol` (Patrol markers) | string | `""` | Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1,p2,p3. / Маршрут патруля по маркерам. |
 | `overrides` (Overrides JSON) | string | `""` | Change stats, e.g. {"hp":6,"speed":50,"resistances":{"arrow":0}} |
+
+## Zelda: Enemy From NPC
+
+Turns an NPC already on this map (placed or spawned earlier) into an enemy that keeps the NPC's sprite. / Превращает NPC на карте во врага.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `npc` (NPC) | npc | — | The NPC to turn into an enemy. / NPC, который станет врагом. |
+| `template` (Template) | string | `"soldier"` | Enemy template name (behaviour and stats). |
+| `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses and rules). |
+| `group` (Group) | string | `""` | Group for rules like {"enemiesDefeated":"room1"}. |
+| `overrides` (Overrides JSON) | string | `""` | Change stats, e.g. {"hp":6,"speed":50} |
 
 ## Zelda: Create Object
 

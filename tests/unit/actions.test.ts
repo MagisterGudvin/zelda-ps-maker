@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createFakeScene } from "../helpers/fakePhaser.ts";
+import { chainable, createFakeScene } from "../helpers/fakePhaser.ts";
 
 type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
 
@@ -31,6 +31,17 @@ test("consolidated editor actions work end to end", async () => {
   assert.match(diag, /enemies 0, objects 2/);
   assert.match(diag, /actions run: Start Toolkit, Create Door, Change Object x3, Create Object/);
 
+  // Errors PS Maker reports outside the plugin reach the diagnostics history (console still prints).
+  const realWrite = process.stderr.write;
+  process.stderr.write = (() => true) as typeof process.stderr.write;
+  try {
+    console.error("Event runner failed:", new TypeError("Cannot read properties of undefined (reading 'id')"));
+  } finally {
+    process.stderr.write = realWrite;
+  }
+  assert.match(tk.logger.history.at(-1)!.text, /^console\.error: Event runner failed: TypeError: Cannot read properties/);
+  assert.equal(tk.logger.history.at(-1)!.level, "error");
+
   run("Zelda: Run Actions", { when: '{"hasItem":"bow"}', then: '[{"setFlag":"yes"}]', else: '[{"setFlag":"no"}]' });
   assert.equal(tk.state.flags.no, true);
   run("Zelda: Run Actions", { when: "", then: '[{"giveItem":{"item":"bow","silent":true}}]', else: "" });
@@ -48,8 +59,20 @@ test("consolidated editor actions work end to end", async () => {
   run("Zelda: Change Player Stats", { stat: "magic", mode: "set", amount: 5 });
   assert.equal(tk.state.player.magic, 5);
 
-  run("Zelda: Create Enemy", { template: "slime", position: { x: 200, y: 200 }, npc: "", id: "", group: "g", animations: "", patrol: "", overrides: '{"detectRange":0}' });
-  run("Zelda: Create Enemy", { template: "slime", position: { x: 220, y: 200 }, npc: "", id: "", group: "g", animations: "", patrol: "", overrides: '{"detectRange":0}' });
+  // An NPC placed by PS Maker becomes an enemy (separate action, so an empty NPC field never blocks Create Enemy).
+  const guard = chainable({ name: "guard", x: 300, y: 320, body: { enable: true } });
+  f.scene.children.list.push(guard);
+  run("Zelda: Enemy From NPC", { npc: "guard", template: "soldier", id: "npc_enemy", group: "", overrides: '{"detectRange":0}' });
+  const adopted = s.world.get("npc_enemy") as unknown as { x: number; y: number };
+  assert.ok(adopted, "NPC adopted as enemy");
+  assert.deepEqual([adopted.x, adopted.y], [300, 320]);
+  assert.equal(guard.body.enable, false, "NPC body handed over to the toolkit");
+  run("Zelda: Enemy From NPC", { npc: "nobody", template: "", id: "", group: "", overrides: "" });
+  assert.match(tk.logger.history.at(-1)!.text, /NPC "nobody" was not found/);
+  run("Zelda: Remove Target", { id: "npc_enemy", group: "", defeat: false });
+
+  run("Zelda: Create Enemy", { template: "slime", position: { x: 200, y: 200 }, id: "", group: "g", animations: "", patrol: "", overrides: '{"detectRange":0}' });
+  run("Zelda: Create Enemy", { template: "slime", position: { x: 220, y: 200 }, id: "", group: "g", animations: "", patrol: "", overrides: '{"detectRange":0}' });
   let defeated = 0;
   tk.bus.on("zelda:enemy:defeated", () => defeated++);
   run("Zelda: Remove Target", { id: "", group: "g", defeat: true });

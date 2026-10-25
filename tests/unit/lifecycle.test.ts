@@ -47,7 +47,7 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   assert.ok(f.events.count("postupdate") === 1, "one frame listener");
   assert.ok(f.keyboard.count() === 2, "keydown + keyup");
 
-  action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, npc: undefined, id: "e1", group: "g", overrides: "" }, ctx);
+  action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, id: "e1", group: "g", overrides: "" }, ctx);
   action("Zelda: Create Chest").execute({ id: "c1", position: { x: 100, y: 80 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }, ctx);
   action("Zelda: Add Rule").execute({ id: "r", when: '{"enemiesDefeated":"g"}', then: '[{"setFlag":"won"}]', else: "", once: true }, ctx);
   action("Zelda: Give Item").execute({ item: "bow", count: 1, silent: true }, ctx);

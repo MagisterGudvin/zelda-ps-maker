@@ -124,7 +124,7 @@ export class Toolkit {
     const s = this.session;
     if (!s) return;
     this.session = null;
-    this.logger.info(`Stopped on map "${s.mapId}" (${reason}).`);
+    this.logger.info(`Stopped on map "${s.mapId}" after ${(s.tick / this.config.world.fixedStepHz).toFixed(1)} s (${reason}).`);
     s.dispose();
     try {
       s.host.dispose();

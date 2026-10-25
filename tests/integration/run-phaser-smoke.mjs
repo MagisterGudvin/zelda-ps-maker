@@ -310,7 +310,7 @@ await check("sprite sheets: data-URL and texture-key sheets, attack overlay, ene
     H.run("Zelda: Define Animation", { id: "slash", sheet: "hero", frames: '{"down":[0,1,2,3],"right":[4,5,6,7]}', fps: 0, loop: false });
     H.run("Zelda: Define Animation", { id: "blob_walk", sheet: "url_sheet", frames: "1,2", fps: 6, loop: true });
     H.run("Zelda: Set Player Sprites", { attack: "slash", weaponAttack: "", spin: "", weaponSpin: "", charge: "", weaponCharge: "", hurt: "", weaponBehind: "up", hidePlayer: true, offsetX: 0, offsetY: 0 });
-    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 60, y: 200 }, npc: "", id: "anim_slime", group: "", animations: "walk=blob_walk, idle=blob_walk", patrol: "", overrides: '{"detectRange":0}' });
+    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 60, y: 200 }, id: "anim_slime", group: "", animations: "walk=blob_walk, idle=blob_walk", patrol: "", overrides: '{"detectRange":0}' });
     await new Promise((ok) => setTimeout(ok, 400));
     const p = H.player();
     const before = p.alpha;

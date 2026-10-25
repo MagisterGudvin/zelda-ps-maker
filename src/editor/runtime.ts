@@ -2,6 +2,7 @@ import { Toolkit } from "../core/toolkit.ts";
 import type { Session } from "../core/session.ts";
 import { mapSceneOf, PhaserHost, type PluginContextLike } from "../host/phaserHost.ts";
 import { installPublicApi } from "./publicApi.ts";
+import { capturePageErrors } from "./pageErrors.ts";
 
 /**
  * Process-wide toolkit instance and its binding to PS Maker scenes. PS Maker
@@ -13,6 +14,7 @@ let instance: Toolkit | null = null;
 export function getToolkit(): Toolkit {
   if (!instance) {
     instance = new Toolkit();
+    capturePageErrors(instance.logger);
     if (instance.config.publicApi) installPublicApi(instance);
   }
   return instance;
