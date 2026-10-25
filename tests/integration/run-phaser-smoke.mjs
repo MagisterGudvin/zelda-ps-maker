@@ -248,7 +248,8 @@ await check("dungeon: key from the chest opens the locked door", async () => {
   await teleport(60, 74);
   await tapKey("ArrowUp", 40);
   await tapKey("z");
-  await sleep(200);
+  // Poll instead of a fixed delay: under load the chest can open a few frames later.
+  await page.waitForFunction(() => window.ZeldaMakerToolkit.toolkit.inventory.count("key") > 0, null, { timeout: 1500 }).catch(() => {});
   const keys = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.count("key"));
   await teleport(180, 120);
   await page.keyboard.down("ArrowRight");
@@ -335,6 +336,42 @@ await check("sprite sheets: data-URL and texture-key sheets, attack overlay, ene
   assert(r.enemyFrame === "zmt_16x16_1" || r.enemyFrame === "zmt_16x16_2", `enemy frame ${r.enemyFrame}`);
   assert(r.labels === 8, `preview labels ${r.labels}`);
   return `overlay ${r.overlayFrame}, enemy ${r.enemyFrame}, preview ${r.labels} frames`;
+});
+
+await check("PS Maker project data: a character's sheets animate a Create Enemy (real Phaser scene search)", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    // Story data in the PS Maker 1.2.1 format, kept in the Phaser JSON cache (one plausible place;
+    // the real location is unconfirmed). The sheet texture is loaded under its file name.
+    const c = document.createElement("canvas");
+    c.width = 128;
+    c.height = 128;
+    const g = c.getContext("2d");
+    for (let i = 0; i < 16; i++) {
+      g.fillStyle = `hsl(${i * 22},70%,50%)`;
+      g.fillRect((i % 4) * 32, Math.floor(i / 4) * 32, 32, 32);
+    }
+    const src = "animation-t-RUN1-asset-z-Blob_Run.png";
+    scene.textures.addCanvas(src, c);
+    const rowsOf = (id) => [0, 1, 2, 3].map((row) => ({ id: id + row, startCol: 0, startRow: row, endCol: 3, endRow: row }));
+    H.game.cache.json.add("story", {
+      characters: [{ id: "BLOB", name: "Blob", animationSets: [{ id: "s", animations: { down: "RUN10", left: "RUN11", right: "RUN12", up: "RUN13" }, collision: { enabled: true, box: { x: 10, y: 14, width: 12, height: 12 } } }] }],
+      spritesheetAnimations: [{ id: "RUN1", name: "Blob Run", src, frameWidth: 32, frameHeight: 32, frameRate: 8, ownerRef: { type: "npc", id: "BLOB" }, animations: rowsOf("RUN1") }],
+    });
+    const t0 = performance.now();
+    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 80, y: 60 }, id: "ps_blob", character: "Blob" });
+    const searchMs = performance.now() - t0;
+    await new Promise((ok) => setTimeout(ok, 300));
+    const img = scene.children.list.find((o) => o.type === "Image" && o.texture?.key === src);
+    const e = window.ZeldaMakerToolkit.session.world.get("ps_blob");
+    const diag = window.ZeldaMakerToolkit.session.host.describe().find((l) => l.startsWith("PS Maker data"));
+    return { frame: img?.frame?.name ?? null, w: e?.cfg.width, diag, searchMs: Math.round(searchMs) };
+  });
+  assert(r.frame && r.frame.startsWith("zmt_32x32_"), `enemy frame ${r.frame}`);
+  assert(r.w === 12, `hitbox width ${r.w}`);
+  assert(/cache\.json/.test(r.diag), r.diag);
+  return `${r.frame}, ${r.diag}, search ${r.searchMs} ms`;
 });
 
 await check("PS Maker NPC bodies block enemies; sounds load from a URL and play", async () => {

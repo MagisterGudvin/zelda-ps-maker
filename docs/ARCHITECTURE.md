@@ -19,7 +19,7 @@ src/
     paramResolvers.ts       разбор параметров position / npc / image
     fields.ts               поля форм: чтение со значениями по умолчанию, группы When/Then, характеристики врагов
     publicApi.ts            globalThis.ZeldaMakerToolkit
-    pageErrors.ts           ошибки страницы и console.error → панель диагностики
+    pageErrors.ts           ошибки страницы, console.error/warn → панель диагностики
     pluginShape.ts          events + actions (совместимость версий API)
   core/                     ядро
     toolkit.ts              Toolkit: config, state, bus, реестры, сохранения
@@ -36,6 +36,7 @@ src/
     phaserHud.ts            HUD-сцена (одна на игру)
     textures.ts             оригинальные процедурные спрайты, пиксельные цифры/иконки HUD
     sheets.ts               нарезка спрайт-листов авторов (по ключу текстуры или URL)
+    psmakerAssets.ts        данные проекта PS Maker: персонажи и их листы → анимации Toolkit (экспериментально)
   player/                   PlayerSystem (направление, урон, щит, смерть, оверлей анимаций), health.ts, overlay.ts
   combat/                   AttackInstance, resolveHit, scaleDamage; SwordSystem
   items/                    реестр предметов, ItemSystem, бомба, бумеранг, крюк, снаряды, подбираемое

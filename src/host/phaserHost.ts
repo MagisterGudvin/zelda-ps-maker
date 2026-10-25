@@ -7,6 +7,7 @@ import { KeyboardInput, type GamepadLike } from "./keyboardInput.ts";
 import { resolveTexture } from "./textures.ts";
 import { getHud } from "./phaserHud.ts";
 import { SheetLibrary } from "./sheets.ts";
+import { findStory, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
 
 /**
  * The PS Maker plugin context, typed only as far as the toolkit uses it.
@@ -302,6 +303,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
   /** Moving NPC bodies, refreshed every tick (they move). */
   private readonly npcBoxes: AABB[] = [];
   private npcCount = 0;
+  private story: { story: PsStory; where: string } | null | undefined;
   private frameListener: ((time: number, delta: number) => void) | null = null;
   private shutdownListener: (() => void) | null = null;
   private disposed = false;
@@ -610,6 +612,30 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
   }
 
+  /**
+   * PS Maker project data (characters and their sprite-sheet animations), if the
+   * game keeps it somewhere reachable. Searched once per map; null when absent.
+   */
+  psMakerStory(): { story: PsStory; where: string } | null {
+    if (this.story !== undefined) return this.story;
+    const g = this.game;
+    const s = this.scene;
+    this.story = findStory([
+      { label: "cache.json", value: g?.cache?.json?.entries?.entries ?? g?.cache?.json?.entries },
+      { label: "registry", value: g?.registry?.list },
+      { label: "scene.data", value: s?.sys?.settings?.data },
+      { label: "scene", value: s },
+      { label: "game", value: g },
+    ]);
+    if (this.story) this.logger.info(`PS Maker project data found at ${this.story.where}.`);
+    return this.story;
+  }
+
+  /** Texture key or URL of a PS Maker sheet (see psmakerAssets.sheetImage). */
+  psMakerSheetImage(sheet: PsSheet, story: PsStory): string | null {
+    return this.scene?.textures ? sheetImage(this.scene.textures, sheet, story) : null;
+  }
+
   describe(): string[] {
     const s = this.scene;
     const p = this.player;
@@ -618,6 +644,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     const lines = [
       `scene "${s?.sys?.settings?.key ?? "?"}"  camera scroll ${n(cam?.scrollX)},${n(cam?.scrollY)} zoom ${n(cam?.zoom)} view ${n(cam?.width)}x${n(cam?.height)}`,
       `player sprite ${n(p?.x)},${n(p?.y)} depth ${n(p?.depth)} size ${n(p?.displayWidth)}x${n(p?.displayHeight)} body ${p?.body ? `${n(p.body.x)},${n(p.body.y)} ${n(p.body.width)}x${n(p.body.height)}` : "none"}`,
+      ((ps) => (ps ? `PS Maker data: ${ps.where} (${ps.story.characters.length} characters, ${ps.story.spritesheetAnimations.length} sheets)` : "PS Maker data: not reachable (Character / PS Maker sheet fields unavailable)"))(this.psMakerStory()),
       `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers, ${this.npcCount} NPC bodies`,
     ];
     return lines;

@@ -2,7 +2,7 @@ import { formatLogArgs, type Logger } from "../core/logger.ts";
 
 /**
  * Mirrors errors raised outside the toolkit (uncaught errors, unhandled
- * promise rejections, console.error) into the diagnostics history. If PS Maker
+ * promise rejections, console.error and console.warn) into the diagnostics history. If PS Maker
  * fails while preparing an action's parameters, the action never reaches the
  * plugin; this is the only way to see why when the browser console is not
  * reachable from the editor's playtest. Pass-through only: nothing is
@@ -11,11 +11,11 @@ import { formatLogArgs, type Logger } from "../core/logger.ts";
 let target: Logger | null = null;
 let installed = false;
 
-function note(what: string, args: unknown[]): void {
+function note(what: string, args: unknown[], level: "warn" | "error" = "error"): void {
   if (!target) return;
   const text = formatLogArgs(args);
   if (text.includes("[ZeldaMakerToolkit]")) return; // our own logger output
-  target.record("error", `${what}: ${text}`);
+  target.record(level, `${what}: ${text}`);
 }
 
 export function capturePageErrors(logger: Logger): void {
@@ -28,11 +28,12 @@ export function capturePageErrors(logger: Logger): void {
     g.addEventListener("unhandledrejection", (e: any) => note("Unhandled rejection", [e?.reason ?? "unknown"]));
   }
   const c = g.console;
-  if (c && typeof c.error === "function") {
-    const original = c.error;
-    c.error = function (this: unknown, ...args: unknown[]) {
+  for (const level of ["error", "warn"] as const) {
+    if (!c || typeof c[level] !== "function") continue;
+    const original = c[level];
+    c[level] = function (this: unknown, ...args: unknown[]) {
       try {
-        note("console.error", args);
+        note(`console.${level}`, args, level);
       } catch {
         // never let diagnostics break logging
       }

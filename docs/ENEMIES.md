@@ -1,6 +1,6 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position (X/Y), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
+`Zelda: Create Enemy` — Template, Position (X/Y; пусто — рядом с игроком), PS Maker character (экспериментально: внешний вид и коллизия персонажа из библиотеки PS Maker, см. [SPRITES.md](SPRITES.md)), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
 `Zelda: Enemy From NPC` — NPC, Template, ID, Group, Health, Damage, Speed (см. ниже).
 `Zelda: Define Enemy` — новый тип на основе существующего: Template name, Based on, Health, Damage, Speed, Sight range, Boss, Immune to (`arrow, fire`). Дальше его имя пишется в *Template* у `Create Enemy`.
 

@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.5.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.5.1) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **42**. Все имена начинаются с `Zelda: `.
 
@@ -113,7 +113,8 @@ Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre o
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `template` (Template) | string | `"slime"` | slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name. |
-| `position` (Position) | position | — | Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. / Точка появления. |
+| `position` (Position) | position | — | Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. Empty = next to the player. / Точка появления. |
+| `character` (PS Maker character) | string | `""` | Optional (experimental): name of a character from your PS Maker library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used. / Персонаж PS Maker для внешнего вида. |
 | `id` (ID) | string | `""` | Optional unique id (needed for persistent bosses). |
 | `group` (Group) | string | `""` | Optional group name: rules can wait until the whole group is defeated. / Группа врагов. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
@@ -533,6 +534,8 @@ Uses sprite-sheet animations for the player's attacks (body and weapon layers, e
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
+| `attackSheet` (Attack sheet (PS Maker)) | string | `""` | Optional (experimental): name of one of the player's PS Maker animations, e.g. Sword Attack. Used instead of Attack (body). / Анимация атаки из PS Maker. |
+| `hurtSheet` (Hurt sheet (PS Maker)) | string | `""` | Optional (experimental), e.g. Sword Hurt. |
 | `attack` (Attack (body)) | string | `""` | Animation id for the sword swing. |
 | `weaponAttack` (Attack (weapon)) | string | `""` | Weapon layer for the swing. |
 | `spin` (Spin (body)) | string | `""` | Spin attack; empty = attack. |

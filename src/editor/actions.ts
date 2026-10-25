@@ -17,6 +17,7 @@ import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
+import { characterPlan, findCharacter, playerSheetAnim, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { audio, bool, boolOr, buildThen, buildWhen, enemyStats, img, listOf, npc, num, numOr, pos, SPRITE_FIELDS, STAT_FIELDS, str, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
@@ -73,7 +74,37 @@ function asList<T>(v: T | T[] | null): T[] {
   return v === null ? [] : Array.isArray(v) ? v : [v];
 }
 
+type PsHost = { psMakerStory?(): { story: PsStory; where: string } | null; psMakerSheetImage?(sheet: PsSheet, story: PsStory): string | null };
+
+/** PS Maker project data via the host, warning once when it is not reachable. */
+function psStory(s: Session, what: string): PsStory | null {
+  const found = (s.host as PsHost).psMakerStory?.() ?? null;
+  if (!found) s.logger.warnOnce("ps-story", `${what}: PS Maker project data is not reachable from the plugin, so PS Maker animations cannot be used here. Use Zelda: Define Sprite Sheet / Define Animation instead.`);
+  return found?.story ?? null;
+}
+
+/** Registers PS Maker sheets as toolkit sheets (by texture key or URL). */
+function registerPsSheets(s: Session, tk: Toolkit, story: PsStory, sheets: Record<string, PsSheet>, what: string): void {
+  for (const [id, sheet] of Object.entries(sheets)) {
+    const image = (s.host as PsHost).psMakerSheetImage?.(sheet, story) ?? null;
+    if (!image) {
+      s.logger.warn(`${what}: the image of PS Maker sheet "${sheet.name}" (${sheet.src}) was not found among loaded textures.`);
+      continue;
+    }
+    tk.configure({ sprites: { sheets: { [id]: toSheetDef(sheet, image) } } }, what);
+  }
+}
+
 function where(s: Session, position: unknown, what: string): { x: number; y: number } | null {
+  if (position === undefined || position === null || position === "") {
+    // PS Maker does not save a Position the author never touched.
+    if (!s.player.present) {
+      s.logger.warn(`${what}: Position is not set and the player was not found.`);
+      return null;
+    }
+    s.logger.warn(`${what}: Position is not set — placed next to the player. Set X/Y in the action (F9 + click the map shows coordinates).`);
+    return { x: s.player.box.x + 32, y: s.player.box.y };
+  }
   const p = resolvePosition(position, s.config);
   if (p && p.x === 0 && p.y === 0) s.logger.warn(`${what}: Position is X 0, Y 0 — was it left unset? Tip: F9 in playtest, then click the map to get coordinates.`);
   if (p) return p;
@@ -390,7 +421,8 @@ const createEnemy = defineEvent({
   description: "Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre or your own (Define Enemy). / Создаёт врага по шаблону.",
   parameterDefs: {
     template: str("Template", "slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name.", "slime"),
-    position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. / Точка появления."),
+    position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. Empty = next to the player. / Точка появления."),
+    character: str("PS Maker character", "Optional (experimental): name of a character from your PS Maker library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used. / Персонаж PS Maker для внешнего вида.", ""),
     id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
     group: str("Group", "Optional group name: rules can wait until the whole group is defeated. / Группа врагов.", ""),
     ...STAT_FIELDS,
@@ -402,11 +434,27 @@ const createEnemy = defineEvent({
     patrol: str("Patrol markers", "Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1, p2, p3. / Маршрут патруля по маркерам.", ""),
   },
   execute(params, ctx) {
-    run("Zelda: Create Enemy", ctx, params, (s) => {
+    run("Zelda: Create Enemy", ctx, params, (s, tk) => {
       const at = where(s, params.position, "Create Enemy");
       if (!at) return;
-      const overrides: Partial<EnemyConfig> = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Create Enemy") ?? {}), ...enemyStats(params) };
-      const anims: Record<string, string> = parseAnimationMap(textOf((params as Record<string, unknown>).animations)) ?? {};
+      const overrides: Partial<EnemyConfig> = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Create Enemy") ?? {}) };
+      const anims: Record<string, string> = {};
+      const charName = textOf(params.character);
+      const story = charName ? psStory(s, "Create Enemy") : null;
+      if (story) {
+        const ch = findCharacter(story, charName);
+        if (!ch) s.logger.warn(`Create Enemy: PS Maker character "${charName}" not found. Characters: ${story.characters.map((c) => c.name).join(", ")}.`);
+        else {
+          const plan = characterPlan(story, ch);
+          registerPsSheets(s, tk, story, plan.sheets, "Create Enemy");
+          tk.configure({ sprites: { animations: plan.animations } }, "Create Enemy");
+          Object.assign(anims, plan.states);
+          if (plan.hitbox) Object.assign(overrides, { width: plan.hitbox.width, height: plan.hitbox.height, spriteOffsetX: plan.hitbox.offsetX, spriteOffsetY: plan.hitbox.offsetY });
+          if (Object.keys(plan.states).length === 0) s.logger.warn(`Create Enemy: character "${ch.name}" has no usable sheets (${sheetNames(story, { type: "npc", id: ch.id }).join(", ") || "none"}).`);
+        }
+      }
+      Object.assign(overrides, enemyStats(params));
+      Object.assign(anims, parseAnimationMap(textOf((params as Record<string, unknown>).animations)) ?? {});
       if (textOf(params.walkAnimation)) anims.walk = textOf(params.walkAnimation);
       if (textOf(params.attackAnimation)) anims.attack = textOf(params.attackAnimation);
       if (textOf(params.hurtAnimation)) anims.hurt = textOf(params.hurtAnimation);
@@ -745,6 +793,8 @@ const setPlayerSprites = defineEvent({
   name: "Zelda: Set Player Sprites",
   description: "Uses sprite-sheet animations for the player's attacks (body and weapon layers, e.g. Mana Seed character + weapon sheets). Empty = built-in blade. / Анимации атаки игрока.",
   parameterDefs: {
+    attackSheet: str("Attack sheet (PS Maker)", "Optional (experimental): name of one of the player's PS Maker animations, e.g. Sword Attack. Used instead of Attack (body). / Анимация атаки из PS Maker.", ""),
+    hurtSheet: str("Hurt sheet (PS Maker)", "Optional (experimental), e.g. Sword Hurt.", ""),
     attack: str("Attack (body)", "Animation id for the sword swing.", ""),
     weaponAttack: str("Attack (weapon)", "Weapon layer for the swing.", ""),
     spin: str("Spin (body)", "Spin attack; empty = attack.", ""),
@@ -770,17 +820,34 @@ const setPlayerSprites = defineEvent({
           ? listOf(old).filter((x): x is Facing => isFacing(x))
           : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
       const anim = (v: unknown) => textOf(v);
+      const fromPs: Record<string, string> = {};
+      const sheetFields = { attack: textOf(params.attackSheet), hurt: textOf(params.hurtSheet) };
+      const story = sheetFields.attack || sheetFields.hurt ? psStory(s, "Set Player Sprites") : null;
+      if (story) {
+        for (const [slot, name] of Object.entries(sheetFields)) {
+          if (!name) continue;
+          const found = playerSheetAnim(story, name);
+          if (!found) {
+            s.logger.warn(`Set Player Sprites: the player has no PS Maker animation "${name}". Available: ${sheetNames(story, { type: "player" }).join(", ")}.`);
+            continue;
+          }
+          registerPsSheets(s, tk, story, { [found.sheetKey]: found.sheet }, "Set Player Sprites");
+          const id = `ps_player_${slot}`;
+          tk.configure({ sprites: { animations: { [id]: found.anim } } }, "Set Player Sprites");
+          fromPs[slot] = id;
+        }
+      }
       tk.configure(
         {
           player: {
             sprites: {
-              attack: anim(params.attack),
+              attack: anim(params.attack) || fromPs.attack || "",
               weaponAttack: anim(params.weaponAttack),
               spin: anim(params.spin),
               weaponSpin: anim(params.weaponSpin),
               charge: anim(params.charge),
               weaponCharge: anim(params.weaponCharge),
-              hurt: anim(params.hurt),
+              hurt: anim(params.hurt) || fromPs.hurt || "",
               weaponBehind: behind,
               hidePlayer: boolOr(params.hidePlayer, true),
               offsetX: numOr(params.offsetX, 0),

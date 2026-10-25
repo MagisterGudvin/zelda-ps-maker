@@ -34,6 +34,14 @@ test("no editor field asks for JSON", async () => {
   }
 });
 
+test("action names stay stable (PS Maker saves actions under a key derived from the name)", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const names = new Set((plugin.events as unknown as AnyAction[]).map((e) => e.name));
+  // As saved in a PS Maker 1.2.1 project: "plugin:zelda-maker-toolkit:zelda-create-enemy".
+  const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Place Marker", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Start Waves", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Set Flag", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Save Progress", "Load Progress", "Reset Progress", "Define Item", "Define Enemy", "Define Sprite Sheet", "Define Animation", "Set Player Sprites", "Preview Sprite Sheet", "Set Sound"];
+  for (const n of saved) assert.ok(names.has(`Zelda: ${n}`), `"Zelda: ${n}" was renamed or removed — saved projects would lose it`);
+});
+
 test("Start Toolkit: game settings from numbers and checkboxes", async () => {
   const { tk, done } = await setup({ difficulty: 3, hearts: 5, swordDamage: 3, magicBar: false, shieldButton: true, hudBottom: true, autosave: false });
   assert.equal(tk.config.player.invulnerableMs, 600, "difficulty 3 = hard");
