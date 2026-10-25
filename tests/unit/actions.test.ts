@@ -27,6 +27,10 @@ test("consolidated editor actions work end to end", async () => {
   run("Zelda: Change Object", { id: "lv", operation: "toggle", state: "" });
   assert.equal((s.world.get("lv") as unknown as { objState: string }).objState, "on");
 
+  const diag = s.debug!.diagnosticsLines().join("\n");
+  assert.match(diag, /enemies 0, objects 2/);
+  assert.match(diag, /actions run: Start Toolkit, Create Door, Change Object x3, Create Object/);
+
   run("Zelda: Run Actions", { when: '{"hasItem":"bow"}', then: '[{"setFlag":"yes"}]', else: '[{"setFlag":"no"}]' });
   assert.equal(tk.state.flags.no, true);
   run("Zelda: Run Actions", { when: "", then: '[{"giveItem":{"item":"bow","silent":true}}]', else: "" });

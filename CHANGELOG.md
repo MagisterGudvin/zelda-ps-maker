@@ -2,6 +2,18 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.4.1] — 2026-10-25
+
+По скриншоту playtest 0.4.0 в PS Maker: `Start Toolkit` выполнился дважды, `Create Enemy` — ни разу.
+
+### Исправлено
+- Повторный `Zelda: Start Toolkit` с тем же Map ID больше не пересоздаёт сессию, если PS Maker передал другой `ctx.scene` для того же игрока: враги и объекты, созданные между вызовами, не пропадают.
+- Диагностика: «enemys» → «enemies».
+
+### Добавлено
+- Строка `actions run:` в панели диагностики — какие действия `Zelda:` фактически выполнены и сколько раз (если `Create Enemy` там нет, PS Maker его не запускал).
+- В журнал пишутся причина перезапуска (`Restarting: map id changed / scene changed`), `Already running…` и остановка сессии (`Stopped on map … (scene shutdown)`); в панели видно 6 последних сообщений вместо 4.
+
 ## [0.4.0] — 2026-10-24
 
 Сверено с PS Maker 1.0–1.2 (см. `docs/ENGINE_AUDIT.md`, раздел 9).

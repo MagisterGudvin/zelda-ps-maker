@@ -48,8 +48,12 @@ export class DebugSystem {
     const r = (v: number) => Math.round(v);
     const lines = [`Zelda Maker Toolkit ${TOOLKIT_VERSION} — map "${s.mapId}" tick ${s.tick}${s.isPaused() ? " (paused)" : ""}  [F10 hides]`, ...s.host.describe()];
     lines.push(p.present ? `player body ${r(p.box.x)},${r(p.box.y)} ${r(p.box.hw * 2)}x${r(p.box.hh * 2)} facing ${p.facing} hp ${s.state.player.hp}/${s.state.player.maxHp}${p.isDead ? " DEAD" : ""}` : "player: NOT FOUND (ctx.player missing?)");
-    const counts = (["enemy", "object", "projectile", "pickup"] as const).map((k) => `${k}s ${s.world.count(k)}`).join(", ");
+    const plural = { enemy: "enemies", object: "objects", projectile: "projectiles", pickup: "pickups" } as const;
+    const counts = (["enemy", "object", "projectile", "pickup"] as const).map((k) => `${plural[k]} ${s.world.count(k)}`).join(", ");
     lines.push(`entities: ${counts}`);
+    // Which Zelda actions PS Maker actually executed: an action missing here never ran.
+    const actions = [...s.toolkit.actionCounts].map(([n, c]) => (c > 1 ? `${n} x${c}` : n)).join(", ");
+    lines.push(`actions run: ${actions || "none"}`);
     const near = [...s.world.list("enemy"), ...s.world.list("object")]
       .filter((e) => !e.removed)
       .sort((a, b) => Math.abs(a.x - p.box.x) + Math.abs(a.y - p.box.y) - (Math.abs(b.x - p.box.x) + Math.abs(b.y - p.box.y)))
@@ -60,7 +64,7 @@ export class DebugSystem {
     }
     // Warnings and errors first: they explain why something did not appear.
     const problems = s.logger.history.filter((l) => l.level !== "info").slice(-4);
-    const recent = s.logger.history.filter((l) => l.level === "info").slice(-4);
+    const recent = s.logger.history.filter((l) => l.level === "info").slice(-6);
     const clip = (t: string) => (t.length > 110 ? `${t.slice(0, 107)}...` : t);
     if (problems.length) lines.push("problems:");
     for (const l of problems) lines.push(`  ${l.level.toUpperCase()} ${clip(l.text)}`);

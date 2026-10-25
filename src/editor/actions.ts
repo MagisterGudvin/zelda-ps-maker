@@ -14,8 +14,7 @@ import { createDataItem, type DataItemSpec } from "../items/builtinItems.ts";
 import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/health.ts";
 import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
-import { deriveMapId, ensureSession, getToolkit, startSession } from "./runtime.ts";
-import { mapSceneOf } from "../host/phaserHost.ts";
+import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
@@ -50,6 +49,7 @@ function describeParams(params: unknown): string {
 
 function run(name: string, ctx: Ctx, params: unknown, body: (s: Session, tk: Toolkit) => void): void {
   const tk = getToolkit();
+  tk.noteAction(name.replace("Zelda: ", ""));
   tk.logger.info(`${name.replace("Zelda: ", "")} ${describeParams(params)}`);
   try {
     body(ensureSession(ctx), tk);
@@ -121,6 +121,7 @@ const startToolkit = defineEvent({
   },
   execute(params, ctx) {
     const tk = getToolkit();
+    tk.noteAction("Start Toolkit");
     tk.logger.info(`Start Toolkit ${describeParams(params)}`);
     try {
       if (params.preset) tk.applyPreset(params.preset);
@@ -129,10 +130,14 @@ const startToolkit = defineEvent({
       if (value) tk.configure(value, "Start Toolkit");
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
       tk.configure({ debug: { hitboxes: !!params.debugHitboxes, diagnostics: !!params.diagnostics } }, "Start Toolkit");
-      const current = tk.session;
       const mapId = params.mapId || undefined;
-      if (current && !current.isDisposed && (current.host as { scene?: unknown }).scene === mapSceneOf(ctx) && (!mapId || mapId === current.mapId)) return;
-      startSession(ctx, mapId ?? deriveMapId(ctx.scene));
+      const reason = sessionMismatch(tk.session, ctx, mapId);
+      if (!reason) {
+        tk.logger.info(`Already running on map "${tk.session!.mapId}"; kept existing objects.`);
+        ensureSession(ctx);
+        return;
+      }
+      startSession(ctx, mapId ?? deriveMapId(ctx.scene), reason);
     } catch (err) {
       tk.logger.error('Action "Zelda: Start Toolkit" failed:', err);
       if (tk.config.debug.rethrowErrors) throw err;

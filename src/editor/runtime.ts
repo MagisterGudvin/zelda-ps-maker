@@ -35,9 +35,27 @@ function hostOf(session: Session): PhaserHost | null {
   return session.host instanceof PhaserHost ? session.host : null;
 }
 
+/**
+ * Why the current session can NOT be reused for this context, or null when it
+ * can. The same player sprite means the same running map even if PS Maker
+ * hands over a different `ctx.scene`, so a repeated Start Toolkit (or an
+ * On-load list that runs twice) does not wipe enemies created in between.
+ */
+export function sessionMismatch(session: Session | null, ctx: PluginContextLike, mapId?: string): string | null {
+  if (!session || session.isDisposed) return "not running";
+  if (mapId && mapId !== session.mapId) return `map id changed ("${session.mapId}" -> "${mapId}")`;
+  const host = hostOf(session);
+  if (!host) return null;
+  if (host.scene === mapSceneOf(ctx)) return null;
+  if (ctx.player && ctx.player === host.player) return null;
+  const key = (sc: any) => sc?.sys?.settings?.key ?? "?";
+  return `scene changed ("${key(host.scene)}" -> "${key(mapSceneOf(ctx))}")`;
+}
+
 /** Starts (or restarts) the toolkit on the context's scene. */
-export function startSession(ctx: PluginContextLike, mapId: string): Session {
+export function startSession(ctx: PluginContextLike, mapId: string, reason?: string): Session {
   const tk = getToolkit();
+  if (reason && tk.session) tk.logger.info(`Restarting: ${reason}.`);
   const host = new PhaserHost(ctx, tk.config, tk.logger);
   const session = tk.start(host, mapId);
   host.attach(
@@ -57,14 +75,10 @@ export function startSession(ctx: PluginContextLike, mapId: string): Session {
 export function ensureSession(ctx: PluginContextLike, mapId?: string): Session {
   const tk = getToolkit();
   const current = tk.session;
-  if (current && !current.isDisposed) {
-    const host = hostOf(current);
-    const sameScene = host ? host.scene === mapSceneOf(ctx) : true;
-    const sameMap = mapId === undefined || mapId === "" || mapId === current.mapId;
-    if (sameScene && sameMap) {
-      host?.updatePlayer(ctx.player);
-      return current;
-    }
+  const reason = sessionMismatch(current, ctx, mapId);
+  if (current && !reason) {
+    hostOf(current)?.updatePlayer(ctx.player);
+    return current;
   }
-  return startSession(ctx, mapId || deriveMapId(ctx.scene));
+  return startSession(ctx, mapId || deriveMapId(ctx.scene), reason ?? undefined);
 }

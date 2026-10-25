@@ -34,6 +34,8 @@ export class Toolkit {
 
   state: GameState;
   session: Session | null = null;
+  /** Executed editor actions by name (shown by the diagnostics panel). */
+  readonly actionCounts = new Map<string, number>();
   /** True once a game has been started or loaded (start items granted). */
   private gameInitialized = false;
 
@@ -114,10 +116,15 @@ export class Toolkit {
     return session;
   }
 
+  noteAction(name: string): void {
+    this.actionCounts.set(name, (this.actionCounts.get(name) ?? 0) + 1);
+  }
+
   stop(reason: string): void {
     const s = this.session;
     if (!s) return;
     this.session = null;
+    this.logger.info(`Stopped on map "${s.mapId}" (${reason}).`);
     s.dispose();
     try {
       s.host.dispose();

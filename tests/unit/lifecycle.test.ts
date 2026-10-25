@@ -58,6 +58,13 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "", config: "", language: "", debugHitboxes: false }, ctx);
   assert.equal(tk.session, first);
   assert.equal(f.events.count("postupdate"), 1);
+  // ...even when PS Maker passes another ctx.scene for the same player (the player's scene wins).
+  const other = createFakeScene();
+  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "", config: "", language: "", debugHitboxes: false }, { game: f.game, scene: other.scene, player: f.player });
+  assert.equal(tk.session, first);
+  assert.equal(tk.session!.world.count("enemy"), 1, "enemies created in between survive");
+  assert.equal(tk.actionCounts.get("Start Toolkit"), 3);
+  assert.equal(tk.actionCounts.get("Create Enemy"), 1);
 
   // Simulate frames: PS Maker's scene emits postupdate with (time, delta).
   for (let i = 0; i < 120; i++) f.events.emit("postupdate", i * 16, 16.6667);
