@@ -39,28 +39,29 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   const action = (name: string) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!;
   const baselineScene = f.events.count();
 
-  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "alttp", config: '{"debug":{"logLevel":"silent"}}', language: "ru", debugHitboxes: true }, ctx);
+  action("Zelda: Start Toolkit").execute({ mapId: "field", difficulty: 2, hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "ru", debugHitboxes: true, diagnostics: false }, ctx);
   const tk = getToolkit();
+  tk.configure({ debug: { logLevel: "silent" } });
   assert.equal(tk.session?.mapId, "field");
   assert.equal(tk.i18n.language, "ru");
   assert.ok((globalThis as Record<string, unknown>).ZeldaMakerToolkit, "public API installed on first use");
   assert.ok(f.events.count("postupdate") === 1, "one frame listener");
   assert.ok(f.keyboard.count() === 2, "keydown + keyup");
 
-  action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, id: "e1", group: "g", overrides: "" }, ctx);
+  action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, id: "e1", group: "g" }, ctx);
   action("Zelda: Create Chest").execute({ id: "c1", position: { x: 100, y: 80 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }, ctx);
-  action("Zelda: Add Rule").execute({ id: "r", when: '{"enemiesDefeated":"g"}', then: '[{"setFlag":"won"}]', else: "", once: true }, ctx);
+  action("Zelda: Add Rule").execute({ id: "r", whenDefeated: "g", setFlag: "won", once: true }, ctx);
   action("Zelda: Give Item").execute({ item: "bow", count: 1, silent: true }, ctx);
   assert.equal(tk.session!.world.count("enemy"), 1);
 
   // Calling Start Toolkit again on the same map must not create a second session.
   const first = tk.session;
-  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "", config: "", language: "", debugHitboxes: false }, ctx);
+  action("Zelda: Start Toolkit").execute({ mapId: "field", language: "", debugHitboxes: false }, ctx);
   assert.equal(tk.session, first);
   assert.equal(f.events.count("postupdate"), 1);
   // ...even when PS Maker passes another ctx.scene for the same player (the player's scene wins).
   const other = createFakeScene();
-  action("Zelda: Start Toolkit").execute({ mapId: "field", preset: "", config: "", language: "", debugHitboxes: false }, { game: f.game, scene: other.scene, player: f.player });
+  action("Zelda: Start Toolkit").execute({ mapId: "field", language: "", debugHitboxes: false }, { game: f.game, scene: other.scene, player: f.player });
   assert.equal(tk.session, first);
   assert.equal(tk.session!.world.count("enemy"), 1, "enemies created in between survive");
   assert.equal(tk.actionCounts.get("Start Toolkit"), 3);

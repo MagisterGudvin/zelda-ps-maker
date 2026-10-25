@@ -8,6 +8,7 @@ import { spawnEnemy, type SpawnEnemyOptions } from "../enemies/spawn.ts";
 import { createObject, type CreateObjectOptions } from "../interactions/spawnObject.ts";
 import { changeHealth } from "../player/health.ts";
 import { TOOLKIT_VERSION } from "../core/version.ts";
+import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 
 export const GLOBAL_KEY = "ZeldaMakerToolkit";
 
@@ -88,6 +89,13 @@ export function createPublicApi(tk: Toolkit) {
     },
     createObject(type: string, x: number, y: number, opts?: CreateObjectOptions) {
       return tk.session ? createObject(tk.session, type, x, y, opts) : null;
+    },
+    /** Full rule vocabulary (docs/RULES.md) for logic the editor fields do not cover. */
+    addRule(spec: RuleSpec) {
+      tk.session?.rules?.addRule(spec);
+    },
+    runActions(actions: RuleAction[]) {
+      tk.session?.rules?.execute(actions, "api");
     },
     save(slot?: string) {
       return tk.saves.save(slot);

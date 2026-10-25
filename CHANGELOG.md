@@ -2,6 +2,31 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.5.0] — 2026-10-25
+
+### Изменено: формы без JSON
+Все поля, где нужно было писать JSON, заменены обычными полями: галочками, числами, короткими списками через запятую. Выпадающих списков и кнопок API плагинов PS Maker (0.0.3) не даёт — выбор из вариантов сделан галочками и числами.
+
+| Действие | Было | Стало |
+|---|---|---|
+| `Start Toolkit` | Preset (текст), Config JSON | Difficulty (1–3), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Positions in tiles |
+| `Configure` | Config JSON | заменено на `Zelda: Set Controls` — клавиши по полям (`X`, `Space`, `Shift`, `Tab`, `Up`…) |
+| `Create Enemy`, `Enemy From NPC`, `Add Wave Enemy` | Overrides JSON, Animations `walk=…` | Health, Damage, Speed (0 = как в шаблоне), Walk/Attack/Hurt/Death animation, Sprite offset X/Y, Sprite scale |
+| `Create Object` | Config JSON | Hidden, Stays on, Width, Height, Text, Reacts to, On use: set flag / open doors / reveal |
+| `Create Door` | Lock (текст) | галочки Needs a small key, Needs the Big Key, Opened by switch; Width, Height |
+| `Add Rule`, `Run Actions` | When/Then/Else JSON | When group defeated, When objects active, When flag set, When player has, When boss defeated → Open doors, Reveal, Set flag, Give item + count, Message, Spawn enemy + marker |
+| `Create Switch Sequence`, `Create Wave Room` | On solved / On cleared / Advanced JSON | те же поля действий; у комнаты — Pause between waves (ms) |
+| `Change Player Stats` | Stat, Mode (текст) | Health, Max health, Magic + галочка Set instead of add |
+| `Define Item` | Item JSON | Item ID, Name, Icon, Uses, Cost, Damage, Damage type, Area attack, Stun, Heal |
+| `Define Enemy` | Template JSON | Based on, Health, Damage, Speed, Sight range, Boss, Immune to, Sprite offset/scale |
+| `Define Animation` | Frames JSON по направлениям | Frames (facing down), Frames facing up / left / right |
+| `Set Player Sprites` | Weapon behind in (текст) | четыре галочки направлений; Swing center X/Y |
+
+**Совместимость.** Действия, сохранённые старыми версиями, продолжают работать: старые JSON-поля применяются с предупреждением «re-open the action», а новые поля, которых у старого действия нет, ничего не сбрасывают. Полный словарь правил и все настройки остаются в JS API (`ZeldaMakerToolkit.addRule`, `runActions` — новые, `configure`, `registerEnemyTemplate`, `defineItem`).
+
+### Добавлено
+- Названия клавиш без учёта регистра: `shift`, `tab`, `esc`, `up`/`down`/`left`/`right`.
+
 ## [0.4.2] — 2026-10-25
 
 По скриншоту playtest 0.4.1: `Start Toolkit x3`, `Create Enemy` ни разу.

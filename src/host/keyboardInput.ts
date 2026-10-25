@@ -22,10 +22,27 @@ export function normalizeKey(code: string): string {
   if (/^[0-9]$/.test(c)) return `Digit${c}`;
   const m = /^(Shift|Control|Alt|Meta)(Left|Right)$/.exec(c);
   if (m) return m[1];
-  if (c.toLowerCase() === "space") return "Space";
-  if (c.toLowerCase() === "enter") return "Enter";
-  return c;
+  return KEY_NAMES[c.toLowerCase()] ?? c;
 }
+
+/** Friendly names typed in editor fields (case-insensitive). */
+const KEY_NAMES: Record<string, string> = {
+  space: "Space",
+  enter: "Enter",
+  return: "Enter",
+  tab: "Tab",
+  shift: "Shift",
+  ctrl: "Control",
+  control: "Control",
+  alt: "Alt",
+  esc: "Escape",
+  escape: "Escape",
+  backspace: "Backspace",
+  up: "ArrowUp",
+  down: "ArrowDown",
+  left: "ArrowLeft",
+  right: "ArrowRight",
+};
 
 /**
  * Listens to raw key events instead of creating Phaser Key objects, so the

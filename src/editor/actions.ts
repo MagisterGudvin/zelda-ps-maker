@@ -19,18 +19,7 @@ import { parseFlagValue, parseJsonValue, pickAudioSource, pickImageSource, resol
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { type AnimDef, validateAnim } from "../core/animation.ts";
 import { type Facing, isFacing } from "../core/math.ts";
-
-// ---- parameter helpers ------------------------------------------------------------------
-// `label` is used by the official CLI templates but missing from the 0.0.3
-// typings; it is passed through untyped and is harmless if ignored.
-
-const str = (label: string, description: string, defaultValue = "") => ({ type: "string" as const, label, description, defaultValue });
-const num = (label: string, description: string, defaultValue = 0) => ({ type: "number" as const, label, description, defaultValue });
-const bool = (label: string, description: string, defaultValue = false) => ({ type: "boolean" as const, label, description, defaultValue });
-const pos = (label: string, description: string) => ({ type: "position" as const, label, description });
-const npc = (label: string, description: string) => ({ type: "npc" as const, label, description });
-const img = (label: string, description: string) => ({ type: "image" as const, label, description });
-const audio = (label: string, description: string) => ({ type: "audio" as const, label, description });
+import { audio, bool, boolOr, buildThen, buildWhen, enemyStats, img, listOf, npc, num, numOr, pos, SPRITE_FIELDS, STAT_FIELDS, str, textOf, THEN_FIELDS, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -66,6 +55,22 @@ function json<T>(s: Session, text: string, what: string): T | null {
     return null;
   }
   return (value ?? null) as T | null;
+}
+
+/**
+ * Actions saved before 0.5.0 may still carry a JSON field that the form no longer
+ * shows. It keeps working (so old projects do not silently change) and asks the
+ * author to re-open the action.
+ */
+function legacy<T>(s: Session, params: unknown, key: string, what: string): T | null {
+  const text = (params as Record<string, unknown>)[key];
+  if (typeof text !== "string" || !text.trim() || text.trim() === "[]") return null;
+  s.logger.warnOnce(`legacy-${what}-${key}`, `${what}: uses the old JSON field "${key}" — re-open the action in the editor and use the new fields.`);
+  return json<T>(s, text, `${what} ${key}`);
+}
+
+function asList<T>(v: T | T[] | null): T[] {
+  return v === null ? [] : Array.isArray(v) ? v : [v];
 }
 
 function where(s: Session, position: unknown, what: string): { x: number; y: number } | null {
@@ -105,14 +110,23 @@ function objectById(s: Session, id: string, what: string): Interactable | null {
 
 // ---- lifecycle & configuration -------------------------------------------------------------
 
+const DIFFICULTY_PRESETS = ["casual", "casual", "alttp", "hardcore"];
+
 const startToolkit = defineEvent({
   name: "Zelda: Start Toolkit",
-  description: "Starts Zelda Maker Toolkit on this map. Put it first in the map's On-load events. / Запускает Toolkit на карте (первым в On-load событиях).",
+  description: "Starts Zelda Maker Toolkit on this map with the main game settings. Put it first in the map's start events (same settings on every map). / Запускает Toolkit на карте (первым в событиях начала карты).",
   parameterDefs: {
     mapId: str("Map ID", "Unique map name used to remember chests, doors and switches. / Уникальное имя карты для сохранения прогресса.", ""),
-    preset: str("Preset", "Balance preset: alttp, casual, hardcore. / Пресет баланса.", "alttp"),
-    config: str("Config JSON", 'Optional JSON overrides, e.g. {"sword":{"damage":3}}. / JSON-настройки.', ""),
+    difficulty: num("Difficulty", "1 = easy (longer invulnerability and sword, shield blocks magic, own bombs harmless), 2 = normal, 3 = hard (short invulnerability, fewer drops). / Сложность: 1 лёгкая, 2 обычная, 3 сложная.", 2),
+    hearts: num("Hearts", "Starting and maximum hearts. / Сердца в начале игры.", 3),
+    swordDamage: num("Sword damage", "Damage of one sword hit (a slime has 2 HP). / Урон меча.", 2),
+    hud: bool("Show HUD", "Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit.", true),
+    magicBar: bool("Magic bar", "Show the magic meter (needed for magic items). / Шкала магии.", true),
+    shieldButton: bool("Shield on a button", "Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке.", false),
+    hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
+    autosave: bool("Autosave", "Save after chests, doors, new items and dungeons. / Автосохранение.", true),
     language: str("Language", "auto, en or ru. / Язык интерфейса.", "auto"),
+    tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
     debugHitboxes: bool("Show hitboxes", "Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы.", false),
     diagnostics: bool("Show diagnostics", "On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики.", false),
   },
@@ -121,12 +135,38 @@ const startToolkit = defineEvent({
     tk.noteAction("Start Toolkit");
     tk.logger.info(`Start Toolkit ${describeParams(params)}`);
     try {
-      if (params.preset) tk.applyPreset(params.preset);
-      const { value, error } = parseJsonObject(params.config, "Start Toolkit config");
-      if (error) tk.logger.warn(error);
-      if (value) tk.configure(value, "Start Toolkit");
+      const old = params as Record<string, unknown>;
+      // Before 0.5.0: a "preset" text field instead of the Difficulty number.
+      const preset = params.difficulty === undefined && typeof old.preset === "string" && old.preset ? old.preset : DIFFICULTY_PRESETS[Math.round(numOr(params.difficulty, 2))] ?? "alttp";
+      tk.applyPreset(preset);
+      // Only fields PS Maker actually passed: an action saved by an older version keeps
+      // its difficulty preset values instead of being reset to these defaults.
+      const has = (k: string) => old[k] !== undefined;
+      const hearts = Math.round(numOr(params.hearts, 0));
+      const health = hearts * tk.config.player.heartValue;
+      tk.configure(
+        {
+          player: hearts > 0 ? { maxHealth: health, startHealth: health, respawnHealth: health } : {},
+          sword: numOr(params.swordDamage, 0) > 0 ? { damage: numOr(params.swordDamage, 0) } : {},
+          shield: has("shieldButton") ? { mode: boolOr(params.shieldButton, false) ? "hold" : "passive" } : {},
+          ui: {
+            ...(has("hud") ? { enabled: boolOr(params.hud, true) } : {}),
+            ...(has("magicBar") ? { showMagic: boolOr(params.magicBar, true) } : {}),
+            ...(has("hudBottom") ? { position: boolOr(params.hudBottom, false) ? "bottom" : "top" } : {}),
+          },
+          save: has("autosave") ? { autoSave: boolOr(params.autosave, true) } : {},
+          world: has("tileUnits") ? { positionUnits: boolOr(params.tileUnits, false) ? "tiles" : "pixels" } : {},
+          debug: { hitboxes: boolOr(params.debugHitboxes, false), diagnostics: boolOr(params.diagnostics, false) },
+        },
+        "Start Toolkit",
+      );
+      if (typeof old.config === "string" && old.config.trim()) {
+        tk.logger.warn('Start Toolkit: uses the old JSON field "config" — re-open the action in the editor and use the new fields.');
+        const { value, error } = parseJsonObject(old.config, "Start Toolkit config");
+        if (error) tk.logger.warn(error);
+        if (value) tk.configure(value, "Start Toolkit");
+      }
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
-      tk.configure({ debug: { hitboxes: !!params.debugHitboxes, diagnostics: !!params.diagnostics } }, "Start Toolkit");
       const mapId = params.mapId || undefined;
       const reason = sessionMismatch(tk.session, ctx, mapId);
       if (!reason) {
@@ -142,15 +182,25 @@ const startToolkit = defineEvent({
   },
 });
 
-const configure = defineEvent({
-  name: "Zelda: Configure",
-  description: "Changes toolkit settings with JSON at any time (controls, balance, UI). / Меняет настройки JSON-ом.",
-  parameterDefs: { config: str("Config JSON", 'e.g. {"controls":{"sword":["Space"]},"ui":{"position":"top-right"}}', "") },
+const CONTROL_ACTIONS = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory"] as const;
+
+const setControls = defineEvent({
+  name: "Zelda: Set Controls",
+  description: "Changes the keys. Key names: X, Z, C, Space, Enter, Shift, Tab, Up, 1... Several keys: X, Space. Empty = keep. / Клавиши управления (пусто — не менять).",
+  parameterDefs: {
+    sword: str("Sword", "Default: X.", ""),
+    useItem: str("Use item", "Default: C.", ""),
+    shield: str("Shield", "Only with Shield on a button. Default: V.", ""),
+    action: str("Action", "Open, lift, read. Default: Z.", ""),
+    nextItem: str("Next item", "Default: E.", ""),
+    prevItem: str("Previous item", "Default: Q.", ""),
+    inventory: str("Inventory", "Default: I.", ""),
+  },
   execute(params, ctx) {
-    run("Zelda: Configure", ctx, params, (s, tk) => {
-      const { value, error } = parseJsonObject(params.config, "Configure");
-      if (error) s.logger.warn(error);
-      if (value) tk.configure(value, "Configure");
+    run("Zelda: Set Controls", ctx, params, (s, tk) => {
+      const controls: Record<string, string[]> = {};
+      for (const a of CONTROL_ACTIONS) if (listOf(params[a]).length) controls[a] = listOf(params[a]);
+      tk.configure({ controls }, "Set Controls");
       (s.host.input as { rebind?: () => void }).rebind?.();
     });
   },
@@ -191,23 +241,19 @@ const debugAction = defineEvent({
 
 const runActions = defineEvent({
   name: "Zelda: Run Actions",
-  description:
-    'Runs toolkit actions, optionally only when a toolkit condition holds (item, flag, enemy state...). PS Maker conditionals cannot read toolkit state, so check it here. E.g. When {"hasItem":"bow"}, Then [{"openDoor":"d1"}]. / Действия Toolkit с условием.',
-  parameterDefs: {
-    when: str("When (JSON, optional)", 'Condition, e.g. {"flag":"talked_to_sage"}. Empty = always.', ""),
-    then: str("Then (JSON)", 'Actions, e.g. [{"giveItem":{"item":"bombs","count":5}}]', "[]"),
-    else: str("Else (JSON)", "Actions when the condition is false.", ""),
-  },
+  description: "Does several things at once, optionally only when a toolkit condition holds (PS Maker conditions cannot read toolkit state). Empty When fields = always. / Несколько действий сразу, можно с условием.",
+  parameterDefs: { ...WHEN_FIELDS, ...THEN_FIELDS },
   execute(params, ctx) {
     run("Zelda: Run Actions", ctx, params, (s) => {
       if (!s.rules) {
         s.logger.warn('Run Actions: the "puzzles" feature is disabled.');
         return;
       }
-      const when = params.when.trim() ? json<Record<string, unknown>>(s, params.when, "Run Actions when") : {};
-      if (when === null) return;
-      const branch = json<RuleAction[]>(s, s.rules.evaluate(when) ? params.then : params.else, "Run Actions");
-      if (branch) s.rules.execute(Array.isArray(branch) ? branch : [branch], "Run Actions");
+      const when = legacy<Record<string, unknown>>(s, params, "when", "Run Actions") ?? buildWhen(params);
+      const ok = s.rules.evaluate(when);
+      const actions = ok ? [...asList(legacy<RuleAction[]>(s, params, "then", "Run Actions")), ...buildThen(params)] : asList(legacy<RuleAction[]>(s, params, "else", "Run Actions"));
+      if (ok && actions.length === 0) s.logger.warn("Run Actions: nothing to do — fill at least one action field (Open doors, Reveal, Set flag, Give item, Message, Spawn enemy).");
+      if (actions.length) s.rules.execute(actions, "Run Actions");
     });
   },
 });
@@ -301,22 +347,38 @@ const removeTarget = defineEvent({
 
 const changePlayerStats = defineEvent({
   name: "Zelda: Change Player Stats",
-  description: "Stat: health, max health (also refills) or magic. Mode: add (+/-) or set. 1 heart = 2 health points by default. / Здоровье и магия игрока.",
+  description: "Adds to (or, with Set, replaces) the player's health, maximum health and magic. Health is in half-hearts: 2 = one heart. 0 = no change. / Здоровье и магия игрока.",
   parameterDefs: {
-    stat: str("Stat", "health | max health | magic", "health"),
-    mode: str("Mode", "add | set", "add"),
-    amount: num("Amount", "Points.", 2),
+    health: num("Health", "Half-hearts to add (negative = damage). / Здоровье в половинках сердца.", 0),
+    maxHealth: num("Max health", "Half-hearts added to the maximum (also refills). / Максимум здоровья.", 0),
+    magic: num("Magic", "Magic points to add. / Магия.", 0),
+    set: bool("Set instead of add", "Use the numbers as new values (fields left at 0 are not changed). / Установить вместо прибавления.", false),
   },
   execute(params, ctx) {
     run("Zelda: Change Player Stats", ctx, params, (s, tk) => {
-      const stat = params.stat.trim().toLowerCase().replace(/[\s_-]/g, "");
-      const set = params.mode.trim().toLowerCase() === "set";
-      if (stat === "maxhealth") setMaxHealth(tk, set ? params.amount : tk.state.player.maxHp + params.amount, true);
-      else if (stat === "magic") changeMagic(tk, set ? params.amount - tk.state.player.magic : params.amount);
-      else if (stat === "health") {
-        if (set) setHealth(tk, params.amount);
-        else changeHealth(tk, params.amount);
-      } else s.logger.warn(`Change Player Stats: unknown stat "${params.stat}" (health, max health, magic).`);
+      const old = params as Record<string, unknown>;
+      if (params.health === undefined && typeof old.stat === "string") {
+        // Before 0.5.0: Stat / Mode / Amount.
+        const stat = old.stat.trim().toLowerCase().replace(/[\s_-]/g, "");
+        const set = String(old.mode ?? "").trim().toLowerCase() === "set";
+        const amount = numOr(old.amount, 0);
+        if (stat === "maxhealth") setMaxHealth(tk, set ? amount : tk.state.player.maxHp + amount, true);
+        else if (stat === "magic") changeMagic(tk, set ? amount - tk.state.player.magic : amount);
+        else if (set) setHealth(tk, amount);
+        else changeHealth(tk, amount);
+        return;
+      }
+      const set = boolOr(params.set, false);
+      const maxHealth = numOr(params.maxHealth, 0);
+      const health = numOr(params.health, 0);
+      const magic = numOr(params.magic, 0);
+      if (maxHealth) setMaxHealth(tk, set ? maxHealth : tk.state.player.maxHp + maxHealth, true);
+      if (health) {
+        if (set) setHealth(tk, health);
+        else changeHealth(tk, health);
+      }
+      if (magic) changeMagic(tk, set ? magic - tk.state.player.magic : magic);
+      if (!maxHealth && !health && !magic) s.logger.warn("Change Player Stats: all fields are 0 — nothing changed.");
     });
   },
 });
@@ -325,26 +387,34 @@ const changePlayerStats = defineEvent({
 
 const createEnemy = defineEvent({
   name: "Zelda: Create Enemy",
-  description: "Spawns an enemy from a template (slime, soldier, spitter, knight, sentry, ogre or your own). / Создаёт врага по шаблону.",
+  description: "Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre or your own (Define Enemy). / Создаёт врага по шаблону.",
   parameterDefs: {
-    template: str("Template", "Enemy template name.", "slime"),
+    template: str("Template", "slime, soldier, spitter, knight, sentry, ogre or a Define Enemy name.", "slime"),
     position: pos("Position", "Where to spawn, in map pixels. In playtest press F9 and click the map to read X and Y. / Точка появления."),
-    id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
-    group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
-    animations: str("Animations", "Optional sprite-sheet animations: walk=slime_walk, attack=slime_attack, hurt=..., death=..., idle=... (ids from Zelda: Define Animation). / Анимации из спрайт-листа.", ""),
-    patrol: str("Patrol markers", "Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1,p2,p3. / Маршрут патруля по маркерам.", ""),
-    overrides: str("Overrides JSON", 'Change stats, e.g. {"hp":6,"speed":50,"resistances":{"arrow":0}}', ""),
+    id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
+    group: str("Group", "Optional group name: rules can wait until the whole group is defeated. / Группа врагов.", ""),
+    ...STAT_FIELDS,
+    walkAnimation: str("Walk animation", "Optional animation id (Zelda: Define Animation); also used when standing. / Анимация ходьбы.", ""),
+    attackAnimation: str("Attack animation", "Optional animation id. / Анимация атаки.", ""),
+    hurtAnimation: str("Hurt animation", "Optional animation id. / Анимация урона.", ""),
+    deathAnimation: str("Death animation", "Optional animation id. / Анимация смерти.", ""),
+    ...SPRITE_FIELDS,
+    patrol: str("Patrol markers", "Optional: marker IDs placed with Zelda: Place Marker, walked in order, e.g. p1, p2, p3. / Маршрут патруля по маркерам.", ""),
   },
   execute(params, ctx) {
     run("Zelda: Create Enemy", ctx, params, (s) => {
       const at = where(s, params.position, "Create Enemy");
       if (!at) return;
-      const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Create Enemy overrides") ?? {};
-      const anims = parseAnimationMap(params.animations ?? "");
-      if (anims) overrides.animations = { ...(overrides.animations ?? {}), ...anims } as EnemyConfig["animations"];
-      const route = (params.patrol ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      const overrides: Partial<EnemyConfig> = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Create Enemy") ?? {}), ...enemyStats(params) };
+      const anims: Record<string, string> = parseAnimationMap(textOf((params as Record<string, unknown>).animations)) ?? {};
+      if (textOf(params.walkAnimation)) anims.walk = textOf(params.walkAnimation);
+      if (textOf(params.attackAnimation)) anims.attack = textOf(params.attackAnimation);
+      if (textOf(params.hurtAnimation)) anims.hurt = textOf(params.hurtAnimation);
+      if (textOf(params.deathAnimation)) anims.death = textOf(params.deathAnimation);
+      if (Object.keys(anims).length) overrides.animations = { ...(overrides.animations ?? {}), ...anims } as EnemyConfig["animations"];
+      const route = listOf(params.patrol);
       if (route.length > 0) overrides.patrol = { ...(overrides.patrol ?? {}), mode: "path", points: route as unknown as EnemyConfig["patrol"]["points"] } as EnemyConfig["patrol"];
-      spawnEnemy(s, params.template || "slime", at.x, at.y, { id: params.id || undefined, group: params.group, overrides });
+      spawnEnemy(s, textOf(params.template) || "slime", at.x, at.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides });
     });
   },
 });
@@ -357,9 +427,9 @@ const enemyFromNpc = defineEvent({
   parameterDefs: {
     npc: npc("NPC", "The NPC to turn into an enemy. / NPC, который станет врагом."),
     template: str("Template", "Enemy template name (behaviour and stats).", "soldier"),
-    id: str("ID", "Optional unique id (needed for persistent bosses and rules).", ""),
-    group: str("Group", 'Group for rules like {"enemiesDefeated":"room1"}.', ""),
-    overrides: str("Overrides JSON", 'Change stats, e.g. {"hp":6,"speed":50}', ""),
+    id: str("ID", "Optional unique id (needed for persistent bosses).", ""),
+    group: str("Group", "Optional group name for rules. / Группа врагов.", ""),
+    ...STAT_FIELDS,
   },
   execute(params, ctx) {
     run("Zelda: Enemy From NPC", ctx, params, (s) => {
@@ -368,8 +438,8 @@ const enemyFromNpc = defineEvent({
         s.logger.warn(`Enemy From NPC: NPC ${JSON.stringify(params.npc)} was not found on this map.`);
         return;
       }
-      const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Enemy From NPC overrides") ?? {};
-      spawnEnemy(s, params.template || "soldier", adopt.x, adopt.y, { id: params.id || undefined, group: params.group, overrides, adopt });
+      const overrides = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Enemy From NPC") ?? {}), ...enemyStats(params) };
+      spawnEnemy(s, textOf(params.template) || "soldier", adopt.x, adopt.y, { id: textOf(params.id) || undefined, group: textOf(params.group), overrides, adopt });
     });
   },
 });
@@ -381,18 +451,39 @@ const createObjectAction = defineEvent({
   parameterDefs: {
     type: str("Type", "Object type (see description).", "bush"),
     position: pos("Position", "Object center."),
-    id: str("ID", "Unique id (required for persistence and rules).", ""),
-    config: str("Config JSON", 'Overrides, e.g. {"tools":["arrow"],"setFlag":"eye_hit","onActivate":[{"openDoor":"d1"}]}', ""),
+    id: str("ID", "Unique id (needed for saving and for other actions to refer to it).", ""),
     sprite: img("Sprite", "Optional custom image for the object."),
+    hidden: bool("Hidden", "Starts invisible; Reveal it later. / Скрыт до открытия.", false),
+    staysOn: bool("Stays on", "Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым.", false),
+    width: num("Width", "Pixels; 0 = normal size (16). / Ширина.", 0),
+    height: num("Height", "Pixels; 0 = normal size (16). / Высота.", 0),
+    text: str("Text", "Sign text, or a message shown when the object is used. / Текст таблички или сообщение.", ""),
+    reactsTo: str("Reacts to", "For reactive objects (eye switches, crystals): sword, arrow, bomb, boomerang, fire... comma-separated. / Реагирует на.", ""),
+    setFlag: str("On use: set flag", "Flag set when the object is activated (opened, switched on, lit, destroyed). / Флаг при активации.", ""),
+    openDoors: str("On use: open doors", "Door ids opened when the object is activated. / Открыть двери при активации.", ""),
+    reveal: str("On use: reveal", "Hidden object ids revealed when the object is activated. / Показать объекты при активации.", ""),
   },
   execute(params, ctx) {
     run("Zelda: Create Object", ctx, params, (s) => {
       const at = where(s, params.position, "Create Object");
       if (!at) return;
-      const overrides = json<Partial<ObjectConfig>>(s, params.config, "Create Object config") ?? {};
+      const overrides: Partial<ObjectConfig> = legacy<Partial<ObjectConfig>>(s, params, "config", "Create Object") ?? {};
       const sprite = resolveImage(params.sprite);
       if (sprite) overrides.sprite = overrides.sprite ?? sprite;
-      createObject(s, params.type || "bush", at.x, at.y, { id: params.id || undefined, overrides });
+      if (boolOr(params.hidden, false)) overrides.hidden = true;
+      if (boolOr(params.staysOn, false)) {
+        overrides.plateMode = "latch";
+        overrides.toggle = false;
+      }
+      if (numOr(params.width, 0) > 0) overrides.width = numOr(params.width, 0);
+      if (numOr(params.height, 0) > 0) overrides.height = numOr(params.height, 0);
+      if (textOf(params.text)) overrides.message = textOf(params.text);
+      const tools = listOf(params.reactsTo).map(damageType);
+      if (tools.length) overrides.tools = tools;
+      if (textOf(params.setFlag)) overrides.setFlag = textOf(params.setFlag);
+      const onUse = buildThen({ openDoors: params.openDoors, reveal: params.reveal });
+      if (onUse.length) overrides.onActivate = [...(overrides.onActivate ?? []), ...onUse];
+      createObject(s, textOf(params.type) || "bush", at.x, at.y, { id: textOf(params.id) || undefined, overrides });
     });
   },
 });
@@ -422,19 +513,36 @@ const createChest = defineEvent({
 
 const createDoor = defineEvent({
   name: "Zelda: Create Door",
-  description: "Places a door. Lock: none, small_key, big_key or switch (opened by rules). / Дверь: замок small_key, big_key или switch.",
+  description: "Places a door. With no lock ticked it opens by action; Opened by switch = only rules, switches and Change Object open it. / Дверь.",
   parameterDefs: {
     id: str("ID", "Unique door id.", "door_1"),
     position: pos("Position", "Door center."),
-    lock: str("Lock", "none | small_key | big_key | switch", "small_key"),
+    smallKey: bool("Needs a small key", "Opens with a small key of this dungeon. / Нужен маленький ключ.", true),
+    bigKey: bool("Needs the Big Key", "Boss door. / Нужен большой ключ.", false),
+    bySwitch: bool("Opened by switch", "Opens only from a switch, a rule or Change Object. / Открывается переключателем.", false),
     startOpen: bool("Start open", "Shutter doors that close when a fight starts.", false),
+    width: num("Width", "Pixels; 0 = normal size (16). / Ширина.", 0),
+    height: num("Height", "Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота.", 0),
   },
   execute(params, ctx) {
     run("Zelda: Create Door", ctx, params, (s) => {
       const at = where(s, params.position, "Create Door");
       if (!at) return;
-      const lock = ["none", "small_key", "big_key", "switch"].includes(params.lock) ? params.lock : "small_key";
-      createObject(s, "door", at.x, at.y, { id: params.id || undefined, overrides: { lock: lock as ObjectConfig["lock"], startOpen: !!params.startOpen } });
+      const old = (params as Record<string, unknown>).lock;
+      const lock =
+        params.smallKey === undefined && typeof old === "string" && ["none", "small_key", "big_key", "switch"].includes(old)
+          ? old
+          : boolOr(params.bySwitch, false)
+            ? "switch"
+            : boolOr(params.bigKey, false)
+              ? "big_key"
+              : boolOr(params.smallKey, true)
+                ? "small_key"
+                : "none";
+      const overrides: Partial<ObjectConfig> = { lock: lock as ObjectConfig["lock"], startOpen: boolOr(params.startOpen, false) };
+      if (numOr(params.width, 0) > 0) overrides.width = numOr(params.width, 0);
+      if (numOr(params.height, 0) > 0) overrides.height = numOr(params.height, 0);
+      createObject(s, "door", at.x, at.y, { id: textOf(params.id) || undefined, overrides });
     });
   },
 });
@@ -485,12 +593,11 @@ const damageTarget = defineEvent({
 
 const addRule = defineEvent({
   name: "Zelda: Add Rule",
-  description: 'When a condition becomes true, run actions. E.g. when {"switchOn":["plate_1"]} then [{"openDoor":"door_2"}]. / Правило «условие → действия».',
+  description: "When the conditions become true (every filled When field), do the filled actions. E.g. When objects active: plate_1 → Open doors: door_2. / Правило «условие → действия».",
   parameterDefs: {
     id: str("Rule ID", "Unique rule id.", "rule_1"),
-    when: str("When (JSON)", 'Condition, e.g. {"enemiesDefeated":"room1"}', ""),
-    then: str("Then (JSON)", 'Actions, e.g. [{"reveal":"chest_2"},{"message":"A chest appeared!"}]', "[]"),
-    else: str("Else (JSON)", "Optional actions when the condition turns false again (needs Once = false).", ""),
+    ...WHEN_FIELDS,
+    ...THEN_FIELDS,
     once: bool("Once", "Fire only the first time (remembered in saves).", true),
   },
   execute(params, ctx) {
@@ -499,12 +606,17 @@ const addRule = defineEvent({
         s.logger.warn('Add Rule: the "puzzles" feature is disabled.');
         return;
       }
-      const when = json<Record<string, unknown>>(s, params.when, `Rule ${params.id} when`);
-      const then = json<RuleAction[]>(s, params.then, `Rule ${params.id} then`);
-      const otherwise = json<RuleAction[]>(s, params.else, `Rule ${params.id} else`);
-      if (!when || !then) return;
-      const spec: RuleSpec = { id: params.id, when, then: Array.isArray(then) ? then : [then], once: params.once };
-      if (otherwise) spec.else = Array.isArray(otherwise) ? otherwise : [otherwise];
+      const id = textOf(params.id) || "rule";
+      const when = legacy<Record<string, unknown>>(s, params, "when", `Rule ${id}`) ?? buildWhen(params);
+      const then = [...asList(legacy<RuleAction[]>(s, params, "then", `Rule ${id}`)), ...buildThen(params)];
+      if (Object.keys(when).length === 0) {
+        s.logger.warn(`Add Rule ${id}: no condition — fill at least one When field.`);
+        return;
+      }
+      if (then.length === 0) s.logger.warn(`Add Rule ${id}: no actions — fill at least one action field (Open doors, Reveal, Set flag, Give item, Message, Spawn enemy).`);
+      const spec: RuleSpec = { id, when, then, once: boolOr(params.once, true) };
+      const otherwise = legacy<RuleAction[]>(s, params, "else", `Rule ${id}`);
+      if (otherwise) spec.else = asList(otherwise);
       s.rules.addRule(spec);
     });
   },
@@ -512,22 +624,21 @@ const addRule = defineEvent({
 
 const switchSequence = defineEvent({
   name: "Zelda: Create Switch Sequence",
-  description: "Switches must be activated in this order; a wrong one resets them. / Переключатели в заданном порядке.",
+  description: "Switches must be activated in this order; a wrong one resets them. When solved, the filled actions run. / Переключатели в заданном порядке.",
   parameterDefs: {
     id: str("Puzzle ID", "Unique id; solved state is saved as flag puzzle:<id>.", "sequence_1"),
     switches: str("Switch IDs", "Comma-separated ids in the correct order.", "switch_a,switch_b,switch_c"),
     resetOnWrong: bool("Reset on wrong", "Turn all switches off after a wrong one.", true),
-    onSolved: str("On solved (JSON)", 'Actions, e.g. [{"openDoor":"door_3"}]', "[]"),
+    ...THEN_FIELDS,
   },
   execute(params, ctx) {
     run("Zelda: Create Switch Sequence", ctx, params, (s) => {
       if (!s.rules) return;
-      const onSolved = json<RuleAction[]>(s, params.onSolved, "Switch sequence onSolved") ?? [];
       s.rules.addSequence({
-        id: params.id,
-        switches: params.switches.split(",").map((x) => x.trim()).filter(Boolean),
-        resetOnWrong: params.resetOnWrong,
-        onSolved: Array.isArray(onSolved) ? onSolved : [onSolved],
+        id: textOf(params.id) || "sequence",
+        switches: listOf(params.switches),
+        resetOnWrong: boolOr(params.resetOnWrong, true),
+        onSolved: [...asList(legacy<RuleAction[]>(s, params, "onSolved", "Switch Sequence")), ...buildThen(params)],
       });
     });
   },
@@ -536,7 +647,7 @@ const switchSequence = defineEvent({
 const placeMarker = defineEvent({
   name: "Zelda: Place Marker",
   description:
-    'Names a map point once (tip: press F9 in playtest and click the map to get X/Y). Use the name instead of coordinates: patrol routes, Add Wave Enemy, and rule actions like {"spawnEnemy":{"template":"ogre","at":"boss_spot"}}. / Именованная точка карты вместо ввода координат.',
+    "Names a map point once (tip: press F9 in playtest and click the map to get X/Y), e.g. for patrol routes (Patrol markers of Create Enemy). / Именованная точка карты, например для маршрута патруля.",
   parameterDefs: {
     id: str("Marker ID", "Name of the point, e.g. boss_spot.", "marker_1"),
     position: pos("Position", "Point in map pixels. In playtest press F9 and click the map to read/copy X and Y."),
@@ -592,26 +703,40 @@ const defineSheet = defineEvent({
 const defineAnimation = defineEvent({
   name: "Zelda: Define Animation",
   description:
-    'Names frames of a sprite sheet. Frames: "8,9,10,11" for all directions or JSON per direction {"down":[0,1,2],"up":[8,9,10],"right":[16,17,18]} (left mirrors right if omitted). FPS 0 = stretch over the action. / Анимация из кадров.',
+    "Names frames of a sprite sheet (numbers from Preview Sprite Sheet). Fill only Frames for one animation in every direction, or the four direction fields; Left mirrors Right when empty. FPS 0 = stretch over the action. / Анимация из кадров.",
   parameterDefs: {
     id: str("Animation ID", "e.g. hero_slash.", "hero_slash"),
     sheet: str("Sheet ID", "From Zelda: Define Sprite Sheet.", "hero"),
-    frames: str("Frames", "Frame numbers (see Preview Sprite Sheet).", ""),
+    frames: str("Frames (facing down)", "Frame numbers, e.g. 0, 1, 2, 3. Used for every direction that has no own frames. / Кадры (вниз или для всех).", ""),
+    framesUp: str("Frames facing up", "Optional, e.g. 8, 9, 10.", ""),
+    framesLeft: str("Frames facing left", "Optional; empty = mirrored Right.", ""),
+    framesRight: str("Frames facing right", "Optional, e.g. 16, 17, 18.", ""),
     fps: num("FPS", "Frames per second; 0 = fit the action duration (attacks).", 0),
     loop: bool("Loop", "Repeat (walk/idle).", false),
   },
   execute(params, ctx) {
     run("Zelda: Define Animation", ctx, params, (s, tk) => {
-      const t = (params.frames ?? "").trim();
-      const frames = t.startsWith("{") || t.startsWith("[") ? json<AnimDef["frames"]>(s, t, `Define Animation ${params.id}`) : t.split(/[\s,;]+/).filter(Boolean).map(Number);
-      const def: AnimDef = { sheet: params.sheet, frames: frames ?? [], loop: params.loop };
-      if (params.fps > 0) def.fps = params.fps;
+      const id = textOf(params.id);
+      const t = textOf(params.frames);
+      const nums = (v: unknown) => textOf(v).split(/[\s,;]+/).filter(Boolean).map(Number);
+      let frames: AnimDef["frames"] | null;
+      if (t.startsWith("{") || t.startsWith("[")) frames = json<AnimDef["frames"]>(s, t, `Define Animation ${id}`); // before 0.5.0
+      else if (textOf(params.framesUp) || textOf(params.framesLeft) || textOf(params.framesRight)) {
+        const dirs: Partial<Record<Facing, number[]>> = {};
+        if (t) dirs.down = nums(t);
+        if (textOf(params.framesUp)) dirs.up = nums(params.framesUp);
+        if (textOf(params.framesLeft)) dirs.left = nums(params.framesLeft);
+        if (textOf(params.framesRight)) dirs.right = nums(params.framesRight);
+        frames = dirs;
+      } else frames = nums(t);
+      const def: AnimDef = { sheet: textOf(params.sheet), frames: frames ?? [], loop: boolOr(params.loop, false) };
+      if (numOr(params.fps, 0) > 0) def.fps = numOr(params.fps, 0);
       // A missing sheet is only a warning: it may be defined later in the same event list.
       const problems = validateAnim(def, tk.config.sprites.sheets);
       const blocking = problems.filter((p) => !p.startsWith("sheet "));
-      if (problems.length > 0) s.logger.warn(`Define Animation "${params.id}": ${problems.join("; ")}.`);
-      if (blocking.length > 0 || !params.id) return;
-      tk.configure({ sprites: { animations: { [params.id]: def } } }, "Define Animation");
+      if (problems.length > 0) s.logger.warn(`Define Animation "${id}": ${problems.join("; ")}.`);
+      if (blocking.length > 0 || !id) return;
+      tk.configure({ sprites: { animations: { [id]: def } } }, "Define Animation");
     });
   },
 });
@@ -627,35 +752,46 @@ const setPlayerSprites = defineEvent({
     charge: str("Charge (body)", "While charging; empty = last attack frame.", ""),
     weaponCharge: str("Charge (weapon)", "", ""),
     hurt: str("Hurt (body)", "While knocked back.", ""),
-    weaponBehind: str("Weapon behind in", "Directions where the weapon is drawn behind the body: up, left...", "up"),
+    behindUp: bool("Weapon behind when facing up", "Draw the weapon layer behind the body. / Оружие за телом (вверх).", true),
+    behindDown: bool("Weapon behind when facing down", "", false),
+    behindLeft: bool("Weapon behind when facing left", "", false),
+    behindRight: bool("Weapon behind when facing right", "", false),
     hidePlayer: bool("Hide PS Maker sprite", "Hide the normal sprite while an animation plays.", true),
     offsetX: num("Offset X", "Pixels.", 0),
     offsetY: num("Offset Y", "Pixels.", 0),
+    pivotX: num("Swing center X", "Move the point the sword swings around, pixels. / Центр взмаха по X.", 0),
+    pivotY: num("Swing center Y", "e.g. 4 to swing from lower on the body. / Центр взмаха по Y.", 0),
   },
   execute(params, ctx) {
     run("Zelda: Set Player Sprites", ctx, params, (s, tk) => {
-      const behind = params.weaponBehind.split(",").map((x) => x.trim()).filter((x): x is Facing => isFacing(x));
+      const old = (params as Record<string, unknown>).weaponBehind;
+      const behind: Facing[] =
+        params.behindUp === undefined && typeof old === "string"
+          ? listOf(old).filter((x): x is Facing => isFacing(x))
+          : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
+      const anim = (v: unknown) => textOf(v);
       tk.configure(
         {
           player: {
             sprites: {
-              attack: params.attack,
-              weaponAttack: params.weaponAttack,
-              spin: params.spin,
-              weaponSpin: params.weaponSpin,
-              charge: params.charge,
-              weaponCharge: params.weaponCharge,
-              hurt: params.hurt,
+              attack: anim(params.attack),
+              weaponAttack: anim(params.weaponAttack),
+              spin: anim(params.spin),
+              weaponSpin: anim(params.weaponSpin),
+              charge: anim(params.charge),
+              weaponCharge: anim(params.weaponCharge),
+              hurt: anim(params.hurt),
               weaponBehind: behind,
-              hidePlayer: params.hidePlayer,
-              offsetX: params.offsetX || 0,
-              offsetY: params.offsetY || 0,
+              hidePlayer: boolOr(params.hidePlayer, true),
+              offsetX: numOr(params.offsetX, 0),
+              offsetY: numOr(params.offsetY, 0),
             },
           },
+          sword: { pivotOffsetX: numOr(params.pivotX, 0), pivotOffsetY: numOr(params.pivotY, 0) },
         },
         "Set Player Sprites",
       );
-      for (const id of [params.attack, params.weaponAttack, params.spin, params.weaponSpin, params.charge, params.weaponCharge, params.hurt]) {
+      for (const id of [params.attack, params.weaponAttack, params.spin, params.weaponSpin, params.charge, params.weaponCharge, params.hurt].map(anim)) {
         if (id && !tk.config.sprites.animations[id]) s.logger.warn(`Set Player Sprites: animation "${id}" is not defined yet (Zelda: Define Animation).`);
       }
     });
@@ -698,25 +834,26 @@ const previewSheet = defineEvent({
 
 const waveRoom = defineEvent({
   name: "Zelda: Create Wave Room",
-  description: "Room with enemy waves: doors stay shut until every wave is beaten. Add enemies with Zelda: Add Wave Enemy. / Комната с волнами врагов.",
+  description: "Room with enemy waves: doors stay shut until every wave is beaten, then the filled actions run. Add enemies with Zelda: Add Wave Enemy. / Комната с волнами врагов.",
   parameterDefs: {
     id: str("Room ID", "Unique room id (cleared state is saved).", "arena"),
     lockDoors: str("Doors to lock", "Comma-separated door ids closed during the fight.", ""),
     autoStart: bool("Start at once", "Start when the map loads; otherwise use Zelda: Start Waves (e.g. from a trigger area).", false),
-    onCleared: str("On cleared (JSON)", 'Actions after the last wave, e.g. [{"reveal":"arena_chest"}]', "[]"),
-    advanced: str("Advanced JSON", 'Optional: extra fields, e.g. {"delayMs":1000} or whole waves [[{"template":"slime","at":"m1"}]].', ""),
+    delayMs: num("Pause between waves (ms)", "1000 = one second.", 800),
+    ...THEN_FIELDS,
   },
   execute(params, ctx) {
     run("Zelda: Create Wave Room", ctx, params, (s) => {
       if (!s.dungeons) return;
-      const extra = json<Partial<WaveRoomSpec>>(s, params.advanced, "Wave room advanced") ?? {};
-      const onCleared = json<RuleAction[]>(s, params.onCleared, "Wave room onCleared");
+      const extra = legacy<Partial<WaveRoomSpec>>(s, params, "advanced", "Create Wave Room") ?? {};
+      const onCleared = [...asList(legacy<RuleAction[]>(s, params, "onCleared", "Create Wave Room")), ...buildThen(params)];
       s.dungeons.addWaveRoom({
         ...extra,
-        id: params.id || extra.id || "arena",
-        autoStart: params.autoStart,
-        lockDoors: params.lockDoors ? params.lockDoors.split(",").map((x) => x.trim()).filter(Boolean) : (extra.lockDoors ?? []),
-        onCleared: onCleared ? (Array.isArray(onCleared) ? onCleared : [onCleared]) : extra.onCleared,
+        id: textOf(params.id) || extra.id || "arena",
+        autoStart: boolOr(params.autoStart, false),
+        delayMs: params.delayMs === undefined ? extra.delayMs : Math.max(0, numOr(params.delayMs, 800)),
+        lockDoors: listOf(params.lockDoors).length ? listOf(params.lockDoors) : (extra.lockDoors ?? []),
+        onCleared: onCleared.length ? onCleared : extra.onCleared,
       });
     });
   },
@@ -730,7 +867,7 @@ const addWaveEnemy = defineEvent({
     wave: num("Wave", "Wave number: 1, 2, 3...", 1),
     template: str("Template", "Enemy template.", "slime"),
     position: pos("Position", "Spawn point."),
-    overrides: str("Overrides JSON", 'Optional stat changes, e.g. {"hp":4}.', ""),
+    ...STAT_FIELDS,
   },
   execute(params, ctx) {
     run("Zelda: Add Wave Enemy", ctx, params, (s) => {
@@ -740,11 +877,12 @@ const addWaveEnemy = defineEvent({
         s.logger.warn(`Add Wave Enemy: no valid position (got ${JSON.stringify(params.position)}).`);
         return;
       }
-      const overrides = json<Partial<EnemyConfig>>(s, params.overrides, "Add Wave Enemy overrides") ?? undefined;
+      const overrides = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Add Wave Enemy") ?? {}), ...enemyStats(params) };
       // Store as a marker: resolvePosition already converted to pixels.
-      const marker = `__wave_${params.roomId}_${s.markers.size}`;
+      const roomId = textOf(params.roomId) || "arena";
+      const marker = `__wave_${roomId}_${s.markers.size}`;
       s.markers.set(marker, p);
-      s.dungeons.addWaveSpawn(params.roomId, params.wave || 1, { template: params.template || "slime", at: marker, overrides });
+      s.dungeons.addWaveSpawn(roomId, Math.max(1, Math.round(numOr(params.wave, 1))), { template: textOf(params.template) || "slime", at: marker, overrides: Object.keys(overrides).length ? overrides : undefined });
     });
   },
 });
@@ -902,33 +1040,79 @@ const resetProgress = defineEvent({
 
 const defineItem = defineEvent({
   name: "Zelda: Define Item",
-  description:
-    'Adds a custom item without code. JSON: {"id":"ice_rod","name":{"en":"Ice Rod","ru":"Ледяной жезл"},"resource":"magic","cost":4,"effect":"projectile","projectile":{"damageType":"ice","damage":3,"stunMs":1000}}',
+  description: "Adds a usable item without code: a shot (Damage > 0), a burst around the player (Area attack) or a healing item (Heal > 0). With none of these it is a quest item. / Свой предмет без кода.",
   parameterDefs: {
-    json: str("Item JSON", "Item definition (see description and docs/ITEMS.md).", ""),
+    id: str("Item ID", "Unique id, e.g. ice_rod.", "ice_rod"),
+    name: str("Name", "Shown in messages and the inventory. / Название.", "Ice Rod"),
+    icon: img("Icon", "Optional icon image. / Иконка."),
+    resource: str("Uses", "What one use costs: magic, arrows, bombs, rupees or empty = free. / Расходует.", "magic"),
+    cost: num("Cost", "How much of it per use.", 4),
+    damage: num("Damage", "Damage of the shot or burst; 0 = no attack. / Урон.", 3),
+    damageType: str("Damage type", "magic, fire, ice, arrow, bomb... (enemies may resist).", "magic"),
+    area: bool("Area attack", "Hit everything around the player instead of shooting. / Удар вокруг игрока.", false),
+    stunMs: num("Stun (ms)", "Freeze hit enemies; 1000 = one second.", 0),
+    heal: num("Heal", "Half-hearts restored per use (makes it a healing item). / Лечение.", 0),
     give: bool("Give now", "Also give the item to the player.", false),
   },
   execute(params, ctx) {
     run("Zelda: Define Item", ctx, params, (s, tk) => {
-      const spec = json<DataItemSpec>(s, params.json, "Define Item");
-      if (!spec) return;
+      let spec = legacy<DataItemSpec>(s, params, "json", "Define Item");
+      if (!spec) {
+        const id = textOf(params.id);
+        if (!id) {
+          s.logger.warn("Define Item: Item ID is empty.");
+          return;
+        }
+        const damage = numOr(params.damage, 0);
+        const heal = numOr(params.heal, 0);
+        const type = damageType(textOf(params.damageType) || "magic");
+        const stunMs = Math.max(0, numOr(params.stunMs, 0));
+        spec = {
+          id,
+          name: textOf(params.name) || id,
+          icon: resolveImage(params.icon) || undefined,
+          resource: textOf(params.resource) || undefined,
+          cost: Math.max(0, numOr(params.cost, 1)),
+          effect: heal > 0 ? "heal" : damage > 0 ? (boolOr(params.area, false) ? "area" : "projectile") : "none",
+          amount: heal,
+          projectile: { damage, damageType: type, stunMs },
+          area: { damage, damageType: type, stunMs },
+        };
+      }
       tk.items.register(createDataItem(spec));
-      if (params.give) tk.inventory.give(spec.id, 1, { silent: true });
+      if (boolOr(params.give, false)) tk.inventory.give(spec.id, 1, { silent: true });
     });
   },
 });
 
 const defineEnemy = defineEvent({
   name: "Zelda: Define Enemy",
-  description: 'Adds an enemy template. JSON: {"extends":"soldier","hp":8,"tint":16729156,"resistances":{"fire":0}}',
+  description: "Makes a new enemy type from an existing one with other stats; use its name as the Template of Create Enemy. / Новый тип врага на основе существующего.",
   parameterDefs: {
     name: str("Template name", "New template name.", "red_soldier"),
-    json: str("Template JSON", "Fields of the enemy config (see docs/ENEMIES.md).", ""),
+    basedOn: str("Based on", "slime, soldier, spitter, knight, sentry, ogre or another Define Enemy name.", "soldier"),
+    ...STAT_FIELDS,
+    detectRange: num("Sight range", "Pixels at which it notices the player; 0 = template value. / Дальность обзора.", 0),
+    boss: bool("Boss", "Defeating it completes the dungeon (with Enter Dungeon). / Босс.", false),
+    immuneTo: str("Immune to", "Damage types that do nothing, comma-separated: arrow, fire, bomb... / Неуязвим к.", ""),
+    ...SPRITE_FIELDS,
   },
   execute(params, ctx) {
     run("Zelda: Define Enemy", ctx, params, (s, tk) => {
-      const t = json<Partial<EnemyConfig> & { extends?: string }>(s, params.json, "Define Enemy");
-      if (t) tk.enemyTemplates.define(params.name, t);
+      const name = textOf(params.name);
+      if (!name) {
+        s.logger.warn("Define Enemy: Template name is empty.");
+        return;
+      }
+      const old = legacy<Partial<EnemyConfig> & { extends?: string }>(s, params, "json", "Define Enemy");
+      const t: Partial<EnemyConfig> & { extends?: string } = old ?? { extends: textOf(params.basedOn) || "soldier" };
+      Object.assign(t, enemyStats(params));
+      const range = numOr(params.detectRange, 0);
+      if (range > 0) t.detectRange = range;
+      if (boolOr(params.boss, false)) t.boss = true;
+      const immune = listOf(params.immuneTo).map(damageType);
+      if (immune.length) t.resistances = { ...(t.resistances ?? {}), ...Object.fromEntries(immune.map((d) => [d, 0])) };
+      tk.enemyTemplates.define(name, t);
     });
   },
 });
@@ -936,7 +1120,7 @@ const defineEnemy = defineEvent({
 /** Every action shown in the PS Maker event editor. */
 export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   startToolkit,
-  configure,
+  setControls,
   stopToolkit,
   pauseCombat,
   debugAction,

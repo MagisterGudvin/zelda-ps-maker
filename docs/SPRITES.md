@@ -28,13 +28,13 @@ Toolkit умеет рисовать атаки игрока и врагов ка
 
 | Действие | Параметры |
 |---|---|
-| `Zelda: Define Animation` | ID `hero_slash`, Sheet `hero`, Frames `{"down":[A,B,C,D],"up":[E,F,G,H],"right":[I,J,K,L]}`, FPS 0 |
+| `Zelda: Define Animation` | ID `hero_slash`, Sheet `hero`, Frames (facing down) `A, B, C, D`, Frames facing up `E, F, G, H`, Frames facing right `I, J, K, L`, FPS 0 |
 | `Zelda: Define Animation` | ID `sword_slash`, Sheet `sword`, те же номера кадров, FPS 0 |
 
    Если левое направление не указано, используется правое с отражением. Для наборов, где оружие нарисовано кадр-в-кадр поверх тела, номера у тела и оружия совпадают.
-5. `Zelda: Set Player Sprites`: Attack (body) `hero_slash`, Attack (weapon) `sword_slash`, Weapon behind in `up` (в каких направлениях оружие за телом), Hide PS Maker sprite = true. При необходимости — Spin/Charge/Hurt и смещение Offset X/Y.
+5. `Zelda: Set Player Sprites`: Attack (body) `hero_slash`, Attack (weapon) `sword_slash`, галочки *Weapon behind when facing …* (в каких направлениях оружие за телом; по умолчанию — вверх), Hide PS Maker sprite = true. При необходимости — Spin/Charge/Hurt и смещение Offset X/Y.
 
-Встроенный клинок автоматически скрывается, когда задана анимация атаки (`sword.showBlade`: `auto` | `always` | `never`). Точку вращения удара можно сдвинуть: `{"sword":{"pivotOffsetY":4}}`.
+Встроенный клинок автоматически скрывается, когда задана анимация атаки (`sword.showBlade`: `auto` | `always` | `never`). Точку вращения удара сдвигают поля *Swing center X/Y* у `Set Player Sprites`.
 
 ## Враги из спрайт-листа
 
@@ -42,11 +42,11 @@ Toolkit умеет рисовать атаки игрока и врагов ка
 Zelda: Define Sprite Sheet   id=slime_sheet  image=...  64x64
 Zelda: Define Animation      id=slime_walk   sheet=slime_sheet  frames="0,1,2,3"  fps=8  loop=true
 Zelda: Define Animation      id=slime_hit    sheet=slime_sheet  frames="8"
-Zelda: Create Enemy          template=slime  Animations="walk=slime_walk, idle=slime_walk, hurt=slime_hit"
-                             Overrides={"spriteOffsetY":-16}
+Zelda: Create Enemy          Template: slime  Walk animation: slime_walk  Hurt animation: slime_hit
+                             Sprite offset Y: -16
 ```
 
-Состояния: `idle`, `walk`, `windup`, `attack`, `hurt` (также при оглушении), `death`. Отсутствующие состояния заменяются соседними (`windup` → `attack`, `idle` ↔ `walk`). Хитбокс врага задаётся `width`/`height`, а картинка двигается отдельно: `spriteOffsetX`, `spriteOffsetY`, `spriteScale`.
+Состояния: `idle`, `walk`, `windup`, `attack`, `hurt` (также при оглушении), `death`. Отсутствующие состояния заменяются соседними (`windup` → `attack`, `idle` ↔ `walk`). Хитбокс врага остаётся от шаблона, а картинка двигается отдельно полями *Sprite offset X/Y* и *Sprite scale* (у `Create Enemy` и `Define Enemy`).
 
 ## Проверка
 

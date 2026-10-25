@@ -1,23 +1,32 @@
 # Конфигурация
 
-Все параметры имеют безопасные значения по умолчанию (полный список — [examples/configs/default-config.json](../examples/configs/default-config.json)). Автор меняет любую часть JSON-ом:
+Все параметры имеют безопасные значения по умолчанию (полный список — [examples/configs/default-config.json](../examples/configs/default-config.json)).
 
-- в `Zelda: Start Toolkit` → параметр **Config JSON** (применяется при загрузке карты);
-- в любой момент — `Zelda: Configure`;
-- из кода — `ZeldaMakerToolkit.configure({...})`.
+**В редакторе** (без JSON) настраивается главное:
+
+| Где | Поля |
+|---|---|
+| `Zelda: Start Toolkit` | Difficulty (1 лёгкая, 2 обычная, 3 сложная), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря (`X`, `Space`, `Shift`, `Tab`, `Up`…; несколько — через запятую) |
+| `Zelda: Set Player Sprites` | анимации атаки, слой оружия, центр взмаха |
+| `Zelda: Set Sound` | звуки моментов |
+
+Поля *Hearts* и *Sword damage* применяются поверх сложности. Если действие `Start Toolkit` сохранено старой версией плагина и новых полей у него нет, они не применяются — ничего не сбрасывается.
+
+**Из кода** доступна любая настройка ниже: `ZeldaMakerToolkit.configure({...})` (расширение-плагин или событие PS Maker с JavaScript, если оно есть в вашей версии). Действия, сохранённые до 0.5.0 с полем *Config JSON*, продолжают его применять, но показывают предупреждение — откройте их в редакторе и заполните новые поля.
 
 Неизвестные ключи и значения неверного типа **игнорируются** с предупреждением в консоли (`[ZeldaMakerToolkit] Configure: sword.dammage: unknown option (ignored)`), поэтому опечатка не ломает остальные настройки. Время — в миллисекундах, расстояния — в пикселях, скорости — пиксели/с.
 
 ## Пресеты
 
-Параметр `Preset` в `Zelda: Start Toolkit`: `alttp` (по умолчанию, ничего не меняет), `casual` (больше здоровья, длиннее неуязвимость, щит блокирует магию, бомбы не ранят игрока), `hardcore` (4 HP, слабый меч, меньше дропа). Пресет применяется до JSON из параметра Config.
+Поле *Difficulty* в `Zelda: Start Toolkit`: 2 — `alttp` (по умолчанию, ничего не меняет), 1 — `casual` (длиннее неуязвимость и меч, щит блокирует магию, бомбы не ранят игрока), 3 — `hardcore` (короткая неуязвимость, меньше дропа). Здоровье и урон меча берутся из полей *Hearts* и *Sword damage*.
 
 ## Разделы
 
 ### `features` — включение подсистем
 `combat, items, inventory, enemies, interactions, puzzles, dungeons, ui, save, debugTools` — `true/false`. Отключение подсистемы не ломает остальные (проверено тестом для каждой): например, при `enemies: false` действие `Create Enemy` пишет предупреждение и ничего не создаёт.
 
-### `controls` — привязка кнопок
+### `controls` — привязка кнопок (в редакторе — `Zelda: Set Controls`)
 `controls.move` — клавиши движения PS Maker (по умолчанию стрелки и WASD): Toolkit их не обрабатывает, а только использует как подсказку направления, чтобы игрок мог «повернуться» к стене/сундуку, не сдвигаясь (`player.facingFromInput`).
 
 Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory`. Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory}` — индексы кнопок стандартной раскладки; работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
@@ -91,7 +100,7 @@
 ### `debug`, `language`, `publicApi`
 `debug: { hitboxes false, toggleKey "F9", logLevel "warn", rethrowErrors false, diagnostics false, diagnosticsKey "F10" }` — `diagnostics` включает экранную панель (позиции игрока и камеры, режим глубины, ближайшие объекты Toolkit, строка `actions run:` — какие действия `Zelda:` PS Maker фактически выполнил и сколько раз, последние предупреждения и действия, а также ошибки страницы и `console.error` вне плагина — например, если PS Maker не смог подготовить параметры действия); полезно, когда консоль браузера недоступна; `language: "auto" | "en" | "ru"`; `publicApi: true`.
 
-## Примеры
+## Примеры (из кода)
 
 Динамичный бой, щит в руке:
 ```json

@@ -17,6 +17,7 @@ src/
     actions.ts              42 действия редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     paramResolvers.ts       разбор параметров position / npc / image
+    fields.ts               поля форм: чтение со значениями по умолчанию, группы When/Then, характеристики врагов
     publicApi.ts            globalThis.ZeldaMakerToolkit
     pageErrors.ts           ошибки страницы и console.error → панель диагностики
     pluginShape.ts          events + actions (совместимость версий API)
@@ -93,8 +94,8 @@ sync views → hud.tick (только при изменениях) → debug.tic
 
 | Что | Как |
 |---|---|
-| Предмет | JSON через `Zelda: Define Item` или `ZeldaMakerToolkit.registerItem(def)` (интерфейс `ItemDefinition`). |
-| Враг | JSON через `Zelda: Define Enemy` (`extends` встроенного шаблона) или `registerEnemyTemplate`. |
+| Предмет | Поля `Zelda: Define Item` или `ZeldaMakerToolkit.registerItem(def)` (интерфейс `ItemDefinition`). |
+| Враг | Поля `Zelda: Define Enemy` (на основе встроенного шаблона) или `registerEnemyTemplate`. |
 | Условие / действие правил | `registerCondition(name, fn)`, `registerAction(name, fn)`. |
 | Объект | Комбинация полей `ObjectConfig` (инструменты, флаги, действия) без кода. |
 | Строки | `extendStrings({ ru: {...}, en: {...} })`. |

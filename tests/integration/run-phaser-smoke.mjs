@@ -307,10 +307,11 @@ await check("sprite sheets: data-URL and texture-key sheets, attack overlay, ene
     scene.textures.addCanvas("test_sheet_tex", c);
     H.run("Zelda: Define Sprite Sheet", { id: "hero", image: "test_sheet_tex", imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
     H.run("Zelda: Define Sprite Sheet", { id: "url_sheet", image: { url: c.toDataURL() }, imageKey: "", frameWidth: 16, frameHeight: 16, margin: 0, spacing: 0 });
-    H.run("Zelda: Define Animation", { id: "slash", sheet: "hero", frames: '{"down":[0,1,2,3],"right":[4,5,6,7]}', fps: 0, loop: false });
+    H.run("Zelda: Define Animation", { id: "slash", sheet: "hero", frames: "0, 1, 2, 3", framesUp: "", framesLeft: "", framesRight: "4, 5, 6, 7", fps: 0, loop: false });
     H.run("Zelda: Define Animation", { id: "blob_walk", sheet: "url_sheet", frames: "1,2", fps: 6, loop: true });
-    H.run("Zelda: Set Player Sprites", { attack: "slash", weaponAttack: "", spin: "", weaponSpin: "", charge: "", weaponCharge: "", hurt: "", weaponBehind: "up", hidePlayer: true, offsetX: 0, offsetY: 0 });
-    H.run("Zelda: Create Enemy", { template: "slime", position: { x: 60, y: 200 }, id: "anim_slime", group: "", animations: "walk=blob_walk, idle=blob_walk", patrol: "", overrides: '{"detectRange":0}' });
+    H.run("Zelda: Set Player Sprites", { attack: "slash", weaponAttack: "", spin: "", weaponSpin: "", charge: "", weaponCharge: "", hurt: "", behindUp: true, behindDown: false, behindLeft: false, behindRight: false, hidePlayer: true, offsetX: 0, offsetY: 0 });
+    H.run("Zelda: Define Enemy", { name: "blind_slime", basedOn: "slime", hp: 0, damage: 0, speed: 0, detectRange: 1, boss: false, immuneTo: "" });
+    H.run("Zelda: Create Enemy", { template: "blind_slime", position: { x: 60, y: 200 }, id: "anim_slime", group: "", hp: 0, damage: 0, speed: 0, walkAnimation: "blob_walk", attackAnimation: "", hurtAnimation: "", deathAnimation: "", patrol: "" });
     await new Promise((ok) => setTimeout(ok, 400));
     const p = H.player();
     const before = p.alpha;

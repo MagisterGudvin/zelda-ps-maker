@@ -42,7 +42,7 @@ npm run harness
 6. Враги арены добавлены действиями `Zelda: Add Wave Enemy` с выбором точки на карте. Триггер на входе в арену (x ≈ 216–232): группа событий с действием `Zelda: Start Waves` (Room ID `arena`).
 7. Для проверки сохранений повесьте `Zelda: Save Progress` и `Zelda: Load Progress` на выбор в диалоге NPC или на триггеры.
 
-> Если координаты параметра *Position* в вашей версии PS Maker приходят в тайлах, добавьте в Config JSON `{"world":{"positionUnits":"tiles"}}` (см. [ENGINE_AUDIT.md](ENGINE_AUDIT.md), U-2).
+> Если координаты параметра *Position* в вашей версии PS Maker приходят в тайлах, поставьте галочку *Positions in tiles* у `Zelda: Start Toolkit` (см. [ENGINE_AUDIT.md](ENGINE_AUDIT.md), U-2).
 
 ## Прохождение
 

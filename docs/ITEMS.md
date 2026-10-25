@@ -31,37 +31,25 @@
 
 ## Свой предмет без кода
 
-`Zelda: Define Item`, JSON:
+`Zelda: Define Item` — поля формы:
 
-```json
-{
-  "id": "ice_rod",
-  "name": {"en": "Ice Rod", "ru": "Ледяной жезл"},
-  "description": {"en": "Freezes enemies.", "ru": "Замораживает врагов."},
-  "icon": "icon_fire_rod",
-  "resource": "magic",
-  "cost": 4,
-  "cooldownMs": 400,
-  "effect": "projectile",
-  "projectile": {"damageType": "ice", "damage": 3, "stunMs": 1200, "speed": 180, "range": 150, "tint": 8965375}
-}
-```
-
-Эффекты:
-
-| `effect` | Параметры |
+| Поле | Смысл |
 |---|---|
-| `projectile` | `projectile: { damage, damageType, speed, range, sprite, stunMs, knockback, pierce, tint, size }` |
-| `area` | `area: { radius, damage, damageType, knockback, stunMs, sprite }` — удар по площади вокруг игрока |
-| `heal` | `amount` |
-| `restoreMagic` | `amount` |
-| `setFlag` | `flag`, `value` |
-| `emit` | `event` → `zelda:custom:<event>` |
-| `none` | предмет-ключ для сюжета/условий (`hasItem`) |
+| Item ID, Name, Icon | имя предмета, название в сообщениях, иконка (картинка PS Maker) |
+| Uses, Cost | что тратит одно использование: `magic`, `arrows`, `bombs`, `rupees` или пусто (бесплатно) и сколько |
+| Damage, Damage type | урон выстрела; тип урона (`magic`, `fire`, `ice`…) — враги могут быть к нему устойчивы |
+| Area attack | бить всё вокруг игрока вместо выстрела |
+| Stun (ms) | оглушить врагов при попадании |
+| Heal | восстановить половинок сердца (предмет становится лечебным) |
+| Give now | сразу выдать игроку |
 
-Общие поля: `id`, `name`, `description`, `icon`, `resource`, `cost`, `cooldownMs`, `maxActive`, `useMs`, `stackable`, `quickUse`.
+Что получится: *Heal* > 0 — лечебный предмет; иначе *Damage* > 0 — выстрел (или удар вокруг с *Area attack*); иначе — сюжетный предмет для условий *When player has*.
 
-Свой ресурс (например, «семена»): добавьте ёмкость `{"inventory":{"capacities":{"seeds":50}}}` и укажите `"resource":"seeds"` у предмета. Названия ресурсов для сообщений — через строки `item.seeds.name` (`ZeldaMakerToolkit.extendStrings`) или поле `name` у предмета с `"stackable": true`.
+Пример «Ледяной жезл»: Item ID `ice_rod`, Name `Ледяной жезл`, Uses `magic`, Cost `4`, Damage `3`, Damage type `ice`, Stun `1200`.
+
+Из кода доступны все поля (скорость и дальность выстрела, пробивание, эффекты `restoreMagic`, `setFlag`, `emit`, перевод названия): `ZeldaMakerToolkit.defineItem({ id, name: { en, ru }, effect: "projectile", projectile: { speed, range, pierce } })`.
+
+Свой ресурс (например, «семена») пока объявляется из кода: `ZeldaMakerToolkit.configure({ inventory: { capacities: { seeds: 50 } } })`; затем *Uses* = `seeds`, пополнение — `Give Item`. Названия ресурсов для сообщений — через строки `item.seeds.name` (`ZeldaMakerToolkit.extendStrings`) или поле `name` у предмета с `"stackable": true`.
 
 ## Предмет из кода
 

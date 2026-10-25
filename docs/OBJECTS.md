@@ -1,6 +1,26 @@
 # Интерактивные объекты
 
-Создаются действием `Zelda: Create Object` (Type, Position, ID, Config JSON, Sprite) или специализированными `Zelda: Create Chest`, `Zelda: Create Door`. Все типы — один класс `Interactable` с конфигурацией `ObjectConfig`; тип задаёт значения по умолчанию, любое поле переопределяется JSON-ом. Поэтому «факел, за который можно зацепиться крюком» или «кнопка, реагирующая только на стрелы» не требуют кода.
+Создаются действием `Zelda: Create Object` или специализированными `Zelda: Create Chest`, `Zelda: Create Door`. Все поля — обычные поля формы, JSON не нужен.
+
+## Поля `Zelda: Create Object`
+
+| Поле | Смысл |
+|---|---|
+| Type | тип объекта (таблица ниже) |
+| Position, ID | точка и имя (ID нужен для сохранения состояния и ссылок из других действий) |
+| Sprite | своя картинка вместо встроенной |
+| Hidden | создать скрытым (показать — *Reveal* в правиле или `Change Object` → reveal) |
+| Stays on | плита остаётся нажатой, рычаг/кнопка не выключаются обратно |
+| Width, Height | размер в пикселях; 0 = 16 |
+| Text | текст таблички или сообщение при использовании |
+| Reacts to | чем можно воздействовать: `sword, arrow, bomb, boomerang, fire…` (для `reactive`, кнопок, разрушаемых) |
+| On use: set flag | флаг при активации |
+| On use: open doors | двери, которые открываются при активации |
+| On use: reveal | скрытые объекты, которые появляются при активации |
+
+`Zelda: Create Door`: галочки *Needs a small key*, *Needs the Big Key*, *Opened by switch* (только переключатель, правило или `Change Object`); без галочек дверь открывается клавишей действия. *Width*/*Height* — для широких ворот (например, высота 32).
+
+Внутри все типы — один класс `Interactable` с конфигурацией `ObjectConfig` (таблица полей ниже); поля, которых нет в форме, доступны из кода (`ZeldaMakerToolkit.createObject(type, x, y, { overrides })`).
 
 ## Типы
 
@@ -59,26 +79,20 @@
 
 `idle, destroyed, on, off, opened, closed, locked, unlocked, lit, revealed, hidden, carried`. Активные (для условий `switchOn` и др.): `on, opened, unlocked, lit, destroyed, revealed`. Изменить вручную — `Zelda: Change Object` (операции open, close, on, off, toggle, reveal, hide, destroy, state); сбросить в исходное и забыть сохранённое — та же операция `reset`.
 
-## Примеры JSON
+## Примеры
 
 Глаз-мишень, реагирующий только на стрелы и открывающий дверь:
-```json
-{"tools":["arrow"],"toggle":false,"onActivate":[{"openDoor":"eye_door"}],"message":{"en":"Click!","ru":"Щёлк!"}}
 ```
-(тип `button`)
-
-Камень, который взрывается только огнём и прячет ключ:
-```json
-{"tools":["fire"],"drops":{"chance":1,"entries":[{"item":"key","weight":1}]}}
-```
-(тип `breakable`)
-
-Блок, который можно толкнуть только вверх и один раз:
-```json
-{"pushDirections":["up"],"pushLimit":1}
+Zelda: Create Object  Type: reactive  ID: eye  Reacts to: arrow  [x] Stays on  On use: open doors: eye_door  Text: Щёлк!
 ```
 
-Плита, на которую должен встать враг:
-```json
-{"activators":["enemy"],"plateMode":"hold"}
+Плита, которая остаётся нажатой, и ворота высотой в два тайла:
+```
+Zelda: Create Object  Type: pressure_plate  ID: plate_1  [x] Stays on  On use: open doors: gate
+Zelda: Create Door    ID: gate  [x] Opened by switch  Height: 32
+```
+
+Из кода — поля, которых нет в форме (блок толкается только вверх и один раз):
+```js
+ZeldaMakerToolkit.createObject("block", 120, 80, { id: "b1", overrides: { pushDirections: ["up"], pushLimit: 1 } });
 ```

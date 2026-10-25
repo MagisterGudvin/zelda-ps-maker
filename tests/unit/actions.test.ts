@@ -4,7 +4,7 @@ import { chainable, createFakeScene } from "../helpers/fakePhaser.ts";
 
 type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
 
-test("consolidated editor actions work end to end", async () => {
+test("consolidated editor actions work end to end (incl. actions saved with pre-0.5 JSON fields)", async () => {
   const { default: plugin } = await import("../../src/index.ts");
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   const f = createFakeScene();

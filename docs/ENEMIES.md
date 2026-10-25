@@ -1,7 +1,8 @@
 # Противники
 
-`Zelda: Create Enemy` — Template, Position (X/Y), ID, Group, Animations, Patrol markers, Overrides JSON.
-`Zelda: Enemy From NPC` — NPC, Template, ID, Group, Overrides JSON (см. ниже).
+`Zelda: Create Enemy` — Template, Position (X/Y), ID, Group, Health, Damage, Speed (0 = как в шаблоне), анимации Walk/Attack/Hurt/Death, Patrol markers.
+`Zelda: Enemy From NPC` — NPC, Template, ID, Group, Health, Damage, Speed (см. ниже).
+`Zelda: Define Enemy` — новый тип на основе существующего: Template name, Based on, Health, Damage, Speed, Sight range, Boss, Immune to (`arrow, fire`). Дальше его имя пишется в *Template* у `Create Enemy`.
 
 **Маршрут патруля без координат:** поставьте точки `Zelda: Place Marker` (`p1`, `p2`, `p3`, каждая выбирается на карте) и впишите в *Patrol markers* `p1,p2,p3` — враг будет обходить их по порядку.
 
@@ -22,7 +23,9 @@
 
 `idle → patrol → alert → chase → windup → attack → recover`, а также `hurt` (отбрасывание), `stunned` (бумеранг/крюк), `dead`. Общие состояния обрабатывает класс `Enemy`, поэтому мёртвый враг сразу перестаёт двигаться, атаковать и наносить контактный урон (тест `a dead enemy never attacks…`). Решения (обнаружение, линия видимости, выбор атаки) принимаются раз в `enemies.thinkEveryTicks` тиков со сдвигом, движение — каждый тик.
 
-## Поля конфигурации (Overrides / Define Enemy)
+## Поля конфигурации врага
+
+В формах доступны самые нужные (Health, Damage, Speed, Sight range, Boss, Immune to, Sprite offset/scale, анимации, патруль). Полный список — для кода (`ZeldaMakerToolkit.registerEnemyTemplate(name, { extends, ... })`):
 
 | Поле | Смысл |
 |---|---|
@@ -48,14 +51,14 @@
 
 ## Свой шаблон
 
-`Zelda: Define Enemy`, Template name `fire_soldier`:
-```json
-{"extends":"soldier","hp":6,"tint":16737860,"resistances":{"fire":0,"ice":2},"drops":{"chance":1,"entries":[{"item":"magic","count":8,"weight":1}]}}
+```
+Zelda: Define Enemy   Template name: fire_soldier  Based on: soldier  Health: 6  Immune to: fire
+Zelda: Create Enemy   Template: fire_soldier  Position: …
 ```
 
-Стрелок с веером из трёх снарядов:
-```json
-{"extends":"spitter","projectile":{"count":3,"speed":110}}
+Из кода — поля, которых нет в форме (стрелок с веером из трёх снарядов):
+```js
+ZeldaMakerToolkit.registerEnemyTemplate("fan_spitter", { extends: "spitter", projectile: { count: 3, speed: 110 } });
 ```
 
 ## NPC из редактора как враг
