@@ -93,14 +93,53 @@ test("holding the sword charges a spin attack with multiplied damage", () => {
 test("contact damage is applied once, then the player is invulnerable for invulnerableMs", () => {
   const rig = createRig({ player: { knockbackSpeed: 0 } });
   const p = rig.host.player!;
-  spawnEnemy(rig.session, "slime", p.x, p.y, { overrides: { speed: 0, chaseSpeed: 0, detectRange: 0, damage: 1 } });
+  const e = spawnEnemy(rig.session, "slime", p.x, p.y, { overrides: { speed: 0, chaseSpeed: 0, detectRange: 0, damage: 1 } })!;
   let hits = 0;
   rig.tk.bus.on("zelda:player:takeDamage", () => hits++);
-  rig.run(500); // overlapping the whole time
-  assert.equal(hits, 1, "no per-frame damage while overlapping");
+  rig.run(500);
+  assert.equal(hits, 1, "no per-frame damage while touching");
   assert.equal(rig.tk.state.player.hp, rig.tk.config.player.maxHealth - 1);
-  rig.run(700); // invulnerability (970 ms) has expired
+  // Back on the player while it still blinks: pushed out, no damage.
+  e.x = p.x;
+  e.y = p.y;
+  rig.run(100);
+  assert.equal(hits, 1);
+  rig.run(500); // invulnerability (970 ms) has expired
+  e.x = p.x;
+  e.y = p.y;
+  rig.run(50);
   assert.equal(hits, 2);
+});
+
+test("a lunging enemy bumps the player instead of passing through; knockback points away from it", () => {
+  const rig = createRig();
+  const p = rig.host.player!;
+  const startPX = p.x;
+  // Slime 30 px to the left, close enough to lunge right away.
+  const e = spawnEnemy(rig.session, "slime", p.x - 30, p.y, { overrides: { detectRange: 200, attackRange: 40, windupMs: 50 } })!;
+  let maxX = -Infinity;
+  let hitAt = -1;
+  rig.tk.bus.on("zelda:player:takeDamage", () => (hitAt = e.x));
+  for (let t = 0; t < 60; t++) {
+    rig.run(17);
+    maxX = Math.max(maxX, e.x);
+  }
+  assert.ok(hitAt > -Infinity && hitAt !== -1, "the lunge reached the player");
+  assert.ok(maxX < p.x, `the enemy never got past the player (max x ${maxX.toFixed(1)}, player ${p.x.toFixed(1)})`);
+  assert.ok(p.x > startPX + 5, "the player was knocked away from the enemy (to the right)");
+  assert.ok(e.x < hitAt, "the enemy bounced back after the bump");
+});
+
+test("while the player blinks, an enemy walking into it is pushed out", () => {
+  const rig = createRig();
+  const p = rig.host.player!;
+  rig.session.player.applyDamage(1, { type: "script", sourceId: "t", originX: p.x, originY: p.y, knockback: 0 });
+  const e = spawnEnemy(rig.session, "soldier", p.x + 3, p.y, { overrides: { attackRange: 0 } })!;
+  rig.run(34);
+  const box = rig.session.player.hurtbox;
+  const overlapX = e.hw + box.hw - Math.abs(e.x - box.x);
+  const overlapY = e.hh + box.hh - Math.abs(e.y - box.y);
+  assert.ok(overlapX <= 0.01 || overlapY <= 0.01, "no overlap with the blinking player");
 });
 
 test("shield blocks a frontal projectile but not one from behind", () => {

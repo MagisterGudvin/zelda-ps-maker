@@ -1,5 +1,5 @@
 import { Entity } from "../core/entity.ts";
-import { type Facing, facingFromVector, isInFront, makeBox, normalize, overlaps, type Vec2 } from "../core/math.ts";
+import { type Facing, FACING_VECTORS, facingFromVector, isInFront, makeBox, normalize, overlaps, type Vec2 } from "../core/math.ts";
 import type { Session } from "../core/session.ts";
 import type { Damageable, DamageInfo, HitResult } from "../core/types.ts";
 import { objectKey } from "../core/state.ts";
@@ -134,11 +134,39 @@ export class Enemy extends Entity implements Damageable {
     if (!this.cfg.contactDamage || this.state === "stunned" || this.state === "hurt") return;
     const player = s.player;
     if (!player.present || !overlaps(this, player.hurtbox)) return;
-    resolveHit(
+    const result = resolveHit(
       player,
       makeDamage({ amount: this.cfg.damage, type: "contact", team: "enemy", sourceId: this.id, originX: this.x, originY: this.y, blockable: true }),
       null,
     );
+    // Touching the player is a bump, as in ALttP: the enemy breaks off its lunge and
+    // recoils; while the player blinks it is pushed out. It never walks through.
+    if (result === "damaged" || result === "blocked" || result === "killed") this.recoilFrom(s, player.box.x, player.box.y);
+    else this.separateFrom(s, player.hurtbox);
+  }
+
+  /** Bounces away from a point (contact with the player) and pauses before attacking again. */
+  recoilFrom(s: Session, x: number, y: number): void {
+    normalize(this.tmp, this.x - x, this.y - y);
+    if (this.tmp.x === 0 && this.tmp.y === 0) {
+      const fv = FACING_VECTORS[this.facing];
+      this.tmp.x = -fv.x;
+      this.tmp.y = -fv.y;
+    }
+    const speed = s.config.enemies.contactRecoil * (1 - this.cfg.knockbackResist);
+    this.vx = this.tmp.x * speed;
+    this.vy = this.tmp.y * speed;
+    this.attackCooldownMs = Math.max(this.attackCooldownMs, this.cfg.attackCooldownMs);
+    this.setState("recover");
+  }
+
+  /** Pushes the enemy out of a box along the shallower axis (walls still block it). */
+  private separateFrom(s: Session, box: { x: number; y: number; hw: number; hh: number }): void {
+    const ox = this.hw + box.hw - Math.abs(this.x - box.x);
+    const oy = this.hh + box.hh - Math.abs(this.y - box.y);
+    if (ox <= 0 || oy <= 0) return;
+    if (ox < oy) s.world.move(this, this.x < box.x ? -ox : ox, 0);
+    else s.world.move(this, 0, this.y < box.y ? -oy : oy);
   }
 
   receiveHit(info: DamageInfo): HitResult {

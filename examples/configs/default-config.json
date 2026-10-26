@@ -242,6 +242,7 @@
     "alertMs": 300,
     "maxActive": 64,
     "dropLifetimeMs": 8000,
+    "contactRecoil": 140,
     "defaultDrops": {
       "chance": 0.4,
       "entries": [

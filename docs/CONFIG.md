@@ -80,7 +80,7 @@
 `capacities { bombs 10, arrows 30, rupees 999 }` (можно добавить свои ресурсы), `order` — порядок быстрых предметов, `autoEquipFirst true`.
 
 ### `enemies` / `interactions`
-`enemies: { thinkEveryTicks 4, deathFadeMs 300, alertMs 300, maxActive 64, dropLifetimeMs 8000, defaultDrops }`
+`enemies: { thinkEveryTicks 4, deathFadeMs 300, alertMs 300, maxActive 64, dropLifetimeMs 8000, contactRecoil 140, defaultDrops }` — `contactRecoil`: скорость (пикс./с), с которой враг отскакивает, коснувшись игрока
 `interactions: { pushMs 400, liftMs 200, reachDistance 10, chestOpenFrom "any" | "below", defaultDrops }`
 Таблица дропа: `{ "chance": 0.4, "entries": [ { "item": "heart", "weight": 5 }, { "item": "rupees", "count": 5, "weight": 1 } ] }`.
 

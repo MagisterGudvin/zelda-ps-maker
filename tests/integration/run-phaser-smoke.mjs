@@ -246,7 +246,9 @@ await check("dungeon: push the block onto the plate, the shutter opens", async (
 
 await check("dungeon: key from the chest opens the locked door", async () => {
   await teleport(60, 74);
-  await tapKey("ArrowUp", 40);
+  // Walk up into the chest (it is solid) so the player faces it and stands within reach;
+  // a short tap could fall between two simulation ticks under load.
+  await tapKey("ArrowUp", 250);
   await tapKey("z");
   // Poll instead of a fixed delay: under load the chest can open a few frames later.
   await page.waitForFunction(() => window.ZeldaMakerToolkit.toolkit.inventory.count("key") > 0, null, { timeout: 1500 }).catch(() => {});

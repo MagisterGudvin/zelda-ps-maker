@@ -184,6 +184,8 @@ export interface ToolkitConfig {
     maxActive: number;
     dropLifetimeMs: number;
     defaultDrops: DropTable;
+    /** Speed (px/s) an enemy bounces back with after touching the player. */
+    contactRecoil: number;
   };
   interactions: {
     pushMs: number;
@@ -364,6 +366,7 @@ export function createDefaultConfig(): ToolkitConfig {
       alertMs: 300,
       maxActive: 64,
       dropLifetimeMs: 8000,
+      contactRecoil: 140,
       defaultDrops: {
         chance: 0.4,
         entries: [

@@ -102,6 +102,8 @@ function actCommon(e: Enemy, s: Session, dtMs: number, onWindupDone: () => void)
       return true;
     }
     case "recover":
+      // Moves only after a bump (recoilFrom sets the velocity; a finished lunge leaves it 0).
+      if (e.vx !== 0 || e.vy !== 0) e.integrateVelocity(dtMs, 0.8);
       if (e.stateMs >= RECOVER_MS) e.setState("chase");
       return true;
     default:
