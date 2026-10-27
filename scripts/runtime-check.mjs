@@ -175,8 +175,9 @@ await check("the key from the chest opens the locked door", async () => {
   await page.keyboard.press("z");
   await wait(1500);
   await page.keyboard.press("z");
-  await tp(170, 150);
-  await hold("ArrowRight", 700);
+  // Walk to the door from the middle of the room: decor must not block the way.
+  await tp(130, 152);
+  await hold("ArrowRight", 1200);
   await wait(300);
   const s = await state();
   expect(s.keyDoor === "unlocked", JSON.stringify(s));

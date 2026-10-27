@@ -185,12 +185,12 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       for (let x = 36; x < W; x += 56) place(object.oak, x, H + 28);
       for (let y = 24; y < H; y += 56) place(object.tree, -36, y);
       for (const y of [24, 200]) place(object.tree, W + 40, y);
-      place(object.bush, 24, 24);
+      place(object.bush, 24, 216);
       place(object.mushroom, 176, 214);
       place(object.rock, 370, 214);
     } else {
       place(object.barrel, 176, 30);
-      place(object.crates, 172, 150);
+      place(object.crates, 172, 204);
       place(object.crate, 24, 136);
     }
 

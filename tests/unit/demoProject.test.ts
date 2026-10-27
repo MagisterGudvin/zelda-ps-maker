@@ -108,6 +108,24 @@ test("demo story: a new project id, library kept, old maps and events dropped, u
   assert.deepEqual(source, sourceStory());
 });
 
+test("demo story: decoration keeps clear of doors, chests, puzzles, the start and NPCs", async () => {
+  const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
+  const interactive = new Set(["chest", "block", "pressure_plate", "button", "bombable_wall", "sign"]);
+  for (const m of story.maps) {
+    const spots: { what: string; x: number; y: number; clear: number }[] = [];
+    for (const a of m.initialActions) {
+      const p = a.pluginParams?.position;
+      if (!p) continue;
+      if (a.actionName === "Zelda: Create Door") spots.push({ what: "door", ...p, clear: 40 });
+      else if (a.actionName === "Zelda: Create Chest") spots.push({ what: "chest", ...p, clear: 28 });
+      else if (a.actionName === "Zelda: Create Object" && interactive.has(a.pluginParams.type)) spots.push({ what: a.pluginParams.type, ...p, clear: 28 });
+    }
+    for (const a of m.setupActions) if (a.position) spots.push({ what: a.type, ...a.position, clear: 28 });
+    for (const o of m.mapObjects)
+      for (const s of spots) assert.ok(Math.hypot(o.position.x - s.x, o.position.y - s.y) >= s.clear, `${m.name}: decoration at ${o.position.x},${o.position.y} blocks the ${s.what} at ${s.x},${s.y}`);
+  }
+});
+
 test("demo story: a project without the pack gets a clear message", async () => {
   const source = sourceStory();
   source.terrains = source.terrains.filter((t: Any) => t.name !== "Fence");
