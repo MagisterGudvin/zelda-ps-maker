@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { previewItems, startEditorPreview, zeldaActions, type PreviewItem } from "../../src/editor/editorPreview.ts";
+import { actionRoute, previewItems, startEditorPreview, zeldaActions, type PreviewItem } from "../../src/editor/editorPreview.ts";
 import { buildDemoStory, DEMO_ASSETS } from "../../scripts/demo-project.mjs";
 import { MAPS } from "../../examples/harness/demo-maps.js";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
@@ -73,4 +73,28 @@ test("editor preview overlay: drawn only on a map in editor mode, redrawn on cha
   tick();
   assert.ok(rig.created.some((o) => !o.destroyed));
   startEditorPreview({});
+});
+
+test("editor preview: each picture knows its action (for click and double click) and its collision box", async () => {
+  const story = await demo();
+  const field = story.maps[0];
+  assert.ok(zeldaActions(field).every(({ root }) => root === "__map_start__"));
+  const items = previewItems(field, story);
+  const chest = sprites(items).find((s) => s.label === "bombs")!;
+  const action = field.initialActions.find((a: Any) => a.actionName === "Zelda: Create Chest" && a.pluginParams.item === "bombs");
+  assert.deepEqual(chest.ref, { id: action.id, root: "__map_start__" });
+  assert.deepEqual(chest.box, { w: 16, h: 16 }, "chests are solid");
+  assert.equal(sprites(items).find((s) => s.sprite === "obj_grass")?.box, null, "grass is not");
+  assert.deepEqual(sprites(items).find((s) => s.sprite === "obj_door")?.box, { w: 16, h: 32 }, "closed gate: its size");
+  assert.deepEqual(sprites(items).find((s) => s.label === "slime G1")?.box, { w: 14, h: 14 }, "enemy body: the type's size");
+  const withLook = previewItems(field, { ...story, characters: story.characters.map((c: Any) => (c.name === "Slime" ? { ...c, animationSets: [{ id: "s", animations: {}, collision: { enabled: true, box: { x: 26, y: 25, width: 14, height: 15 } } }] } : c)) });
+  assert.deepEqual(sprites(withLook).find((s) => s.label === "slime G1")?.box, { w: 14, h: 15 }, "with a Look: the character's collision box");
+
+  assert.equal(
+    actionRoute("/editor/Zelda%20Demo/maps/zelda-demo-field", "zelda-demo-field", { id: "Ab_1", root: "__map_start__" }),
+    "/editor/Zelda%20Demo/maps/zelda-demo-field/Ab_1?bc=root%3A__map_start__",
+  );
+  assert.equal(actionRoute("/editor/P/maps/m/old-action", "m", { id: "x", root: "__map_enter__" }), "/editor/P/maps/m/x?bc=root%3A__map_enter__");
+  assert.equal(actionRoute("/editor/P/play", "m", { id: "x", root: "__map_start__" }), null, "not on a map page");
+  assert.equal(actionRoute("/editor/P/maps/m", "m", { id: "x", root: "" }), null, "actions inside events are not opened");
 });
