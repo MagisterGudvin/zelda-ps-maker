@@ -437,6 +437,23 @@ export function resolveTexture(textures: TextureManagerLike, id: string): string
   if (!tex) return null;
   tex.context.imageSmoothingEnabled = false;
   def.paint(tex.context);
+  crispEdges(tex.context, def.w, def.h);
   tex.refresh();
   return key;
+}
+
+/**
+ * Canvas circles and polygons get soft, half-transparent edges; magnified in a pixel-art game
+ * they look blurred. Every pixel becomes fully opaque or fully transparent.
+ */
+export function crispEdges(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  try {
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    if (!(d instanceof Uint8ClampedArray)) return;
+    for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 128 ? 255 : 0;
+    ctx.putImageData(img, 0, 0);
+  } catch {
+    // No pixel access (headless test canvas): keep the drawing as it is.
+  }
 }

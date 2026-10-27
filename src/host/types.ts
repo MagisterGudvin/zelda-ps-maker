@@ -15,6 +15,8 @@ export interface HostAdapter {
   readPlayerBox(out: AABB): boolean;
   /** Writes the player's displayed sprite bounds (sword pivot, overlays). False if unknown. */
   readPlayerVisual(out: AABB): boolean;
+  /** Optional: world y of the top of the player's drawn pixels (head), null when unknown. */
+  readPlayerTop?(): number | null;
   /** Draws animation frames over the player sprite (attack, weapon); null restores the sprite. */
   setPlayerOverlay(layers: OverlayLayer[] | null): void;
   /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */
@@ -108,6 +110,8 @@ export interface EntityView {
   setRotation(radians: number): void;
   setScale(scale: number): void;
   setFlipX(flip: boolean): void;
+  /** Optional: sort the view as if it stood at `y` (null = its own position), e.g. carried overhead in front of the player. */
+  setDepthY?(y: number | null): void;
   /** Shows frame `frame` of an author sprite sheet (keeps the current look while it loads). */
   setAnimFrame(sheet: string, frame: number, flipX: boolean): void;
   destroy(): void;

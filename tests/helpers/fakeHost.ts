@@ -65,9 +65,13 @@ export class FakeView implements EntityView {
   constructor(spec: ViewSpec) {
     this.sprite = spec.sprite;
   }
+  depthY: number | null = null;
   setPosition(x: number, y: number): void {
     this.x = x;
     this.y = y;
+  }
+  setDepthY(y: number | null): void {
+    this.depthY = y;
   }
   setVisible(v: boolean): void {
     this.visible = v;
@@ -163,6 +167,11 @@ export class FakeHost implements HostAdapter {
     out.hw = this.player.hw;
     out.hh = this.player.hh;
     return true;
+  }
+  /** Top of the drawn player pixels (head); null = unknown (like a host that cannot read images). */
+  playerTop: number | null = null;
+  readPlayerTop(): number | null {
+    return this.playerTop === null || !this.player ? null : this.player.y - this.player.hh - this.playerTop;
   }
   /** Sprite drawn 16px taller than the body (feet collision box), like many PS Maker characters. */
   readPlayerVisual(out: AABB): boolean {

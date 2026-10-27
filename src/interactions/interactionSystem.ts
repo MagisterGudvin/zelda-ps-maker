@@ -5,7 +5,10 @@ import type { HitResult } from "../core/types.ts";
 import { Projectile } from "../items/projectile.ts";
 import { Interactable } from "./interactable.ts";
 
+/** Carried object above the body centre when the host cannot tell where the head is. */
 const CARRY_OFFSET_Y = 14;
+/** How far a carried object sinks into the top of the head (pixels). */
+const CARRY_OVERLAP = 3;
 /**
  * How long a push survives losing contact. In PS Maker the engine moves the player into the block
  * and the toolkit pushes it back out, so contact shows up only every second or third frame.
@@ -150,8 +153,11 @@ export class InteractionSystem implements SessionSystem {
   private updateCarried(): void {
     const obj = this.carried!;
     const p = this.s.player.box;
+    // Rest on the head (PS Maker frames are taller than the body), drawn in front of the player.
+    const head = this.s.host.readPlayerTop?.();
     obj.x = p.x;
-    obj.y = p.y - CARRY_OFFSET_Y;
+    obj.y = typeof head === "number" ? Math.min(head + CARRY_OVERLAP - obj.hh, p.y - p.hh - obj.hh) : p.y - CARRY_OFFSET_Y;
+    obj.view?.setDepthY?.(p.y + p.hh + 1);
     obj.view?.setPosition(obj.x, obj.y);
   }
 
@@ -159,6 +165,7 @@ export class InteractionSystem implements SessionSystem {
     const obj = this.carried;
     if (!obj) return;
     this.carried = null;
+    obj.view?.setDepthY?.(null);
     const p = this.s.player;
     obj.view?.setVisible(false);
     const v = FACING_VECTORS[p.facing];
@@ -171,6 +178,7 @@ export class InteractionSystem implements SessionSystem {
     const obj = this.carried;
     if (!obj) return;
     this.carried = null;
+    obj.view?.setDepthY?.(null);
     obj.x = this.s.player.box.x;
     obj.y = this.s.player.box.y;
     obj.destroy();

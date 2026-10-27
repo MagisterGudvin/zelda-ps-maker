@@ -214,3 +214,13 @@ test("walking is still walking when PS Maker moves the player only every other t
   rig.run(300);
   assert.equal(bodyFrame(rig), 3, "standing again: the charge pose");
 });
+
+test("built-in sprites have crisp edges: no half-transparent pixels", async () => {
+  const { crispEdges } = await import("../../src/host/textures.ts");
+  const data = new Uint8ClampedArray([10, 20, 30, 40, 1, 2, 3, 200, 9, 9, 9, 127, 9, 9, 9, 128]);
+  let put: Uint8ClampedArray | null = null;
+  const ctx = { getImageData: () => ({ data }), putImageData: (img: { data: Uint8ClampedArray }) => (put = img.data) } as unknown as CanvasRenderingContext2D;
+  crispEdges(ctx, 2, 2);
+  assert.deepEqual([...put!].filter((_, i) => i % 4 === 3), [0, 255, 0, 255]);
+  crispEdges({} as CanvasRenderingContext2D, 1, 1); // no pixel access: nothing happens
+});

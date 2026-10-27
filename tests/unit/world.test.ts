@@ -214,3 +214,29 @@ test("object reset restores the initial state and forgets persistence", () => {
   assert.equal(wall.solid, true);
   assert.equal(rig.tk.state.objects["test_map/w"], undefined);
 });
+
+test("a carried object rests on the head and is drawn in front of the player", () => {
+  const rig = createRig();
+  face(rig, 1, 0);
+  const p = rig.host.player!;
+  rig.host.playerTop = 20; // head 20 px above the body (a tall PS Maker frame)
+  const pot = createObject(rig.session, "pot", p.x + 14, p.y, { id: "pot1" })!;
+  rig.host.input.tap("action");
+  rig.step(2);
+  assert.ok(rig.session.interactions!.isCarrying());
+  const head = p.y - p.hh - 20;
+  assert.equal(pot.y, head + 3 - pot.hh, "bottom of the pot sinks 3 px into the head");
+  const view = (pot as unknown as { view: { depthY: number | null } }).view;
+  assert.equal(view.depthY, p.y + p.hh + 1, "sorted in front of the player");
+  rig.host.input.tap("action");
+  rig.step();
+  assert.equal(view.depthY, null, "thrown: normal sorting");
+  // A host that cannot tell where the head is: the old fixed height.
+  const rig2 = createRig();
+  face(rig2, 1, 0);
+  const p2 = rig2.host.player!;
+  const pot2 = createObject(rig2.session, "pot", p2.x + 14, p2.y, { id: "pot2" })!;
+  rig2.host.input.tap("action");
+  rig2.step(2);
+  assert.equal(pot2.y, p2.y - 14);
+});

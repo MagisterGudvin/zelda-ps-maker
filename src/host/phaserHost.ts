@@ -42,6 +42,27 @@ interface DepthSource {
   sheetFrame(sheet: string, frame: number): { key: string; frame: string } | null;
 }
 
+/** First row of a Phaser frame with a visible pixel, or null (no canvas / unreadable image). */
+function opaqueTopRow(frame: any): number | null {
+  try {
+    const src = frame.source?.image;
+    const w = frame.cutWidth ?? frame.width;
+    const h = frame.cutHeight ?? frame.height;
+    const doc = (globalThis as { document?: { createElement(t: string): any } }).document;
+    if (!src || !doc || !w || !h) return null;
+    const canvas = doc.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(src, frame.cutX ?? 0, frame.cutY ?? 0, w, h, 0, 0, w, h);
+    const data: Uint8ClampedArray = ctx.getImageData(0, 0, w, h).data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (data[(y * w + x) * 4 + 3] > 16) return y;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** A Phaser Image owned by the toolkit. */
 class ImageView implements EntityView {
   private readonly scene: any;
@@ -50,6 +71,7 @@ class ImageView implements EntityView {
   private readonly host: DepthSource;
   private sprite: string;
   private frameKey = "";
+  private depthY: number | null = null;
 
   constructor(scene: any, host: DepthSource, spec: ViewSpec, textureKey: string) {
     this.scene = scene;
@@ -76,7 +98,10 @@ class ImageView implements EntityView {
   setPosition(x: number, y: number): void {
     this.img.setPosition(x + (this.spec.offsetX ?? 0), y + (this.spec.offsetY ?? 0));
     if (this.spec.overlay) return;
-    this.img.setDepth(this.host.depthFor(y, this.spec.layer ?? 0));
+    this.img.setDepth(this.host.depthFor(this.depthY ?? y, this.spec.layer ?? 0));
+  }
+  setDepthY(y: number | null): void {
+    this.depthY = y;
   }
   setVisible(visible: boolean): void {
     this.img.setVisible(visible);
@@ -516,6 +541,30 @@ export class PhaserHost implements HostAdapter, DepthSource {
     out.hw = w / 2;
     out.hh = h / 2;
     return true;
+  }
+
+  private readonly opaqueTops = new Map<string, number | null>();
+
+  /**
+   * World y of the highest drawn pixel of the player's current frame (the head). PS Maker
+   * character frames (e.g. 64x64) have empty space above the head, so the sprite bounds are too
+   * high. Rows are scanned once per frame and cached; null when the image cannot be read.
+   */
+  readPlayerTop(): number | null {
+    const p = this.player;
+    const f = p?.frame;
+    if (!p || !f?.texture || typeof p.y !== "number") return null;
+    const key = `${f.texture.key}|${f.name}`;
+    let row = this.opaqueTops.get(key);
+    if (row === undefined) {
+      row = opaqueTopRow(f);
+      if (this.opaqueTops.size > 256) this.opaqueTops.clear();
+      this.opaqueTops.set(key, row);
+    }
+    if (row === null) return null;
+    const scaleY = Math.abs(p.scaleY ?? 1);
+    const top = p.y - (p.displayOriginY ?? (p.originY ?? 0.5) * (f.height ?? 0)) * scaleY;
+    return top + row * scaleY;
   }
 
   /** Overlay images copy the player's transform each frame; layers behind use a lower depth. */
