@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.15.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.16.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **37**. Все имена начинаются с `Zelda: `.
 
@@ -147,7 +147,9 @@ Creates an interactive object: bushes, pots, rocks, walls to bomb, levers, butto
 | `staysOn` (Stays on) | boolean | `false` | Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым. |
 | `text` (Text) | string | `""` | Sign text, or a message shown when the object is used. / Текст таблички или сообщение. |
 | `reactsTo` (Reacts to) | string-enum-multi | `[]` | For eye switches, crystals and breakables: what hits it. / Реагирует на. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
-| `sprite` (Sprite) | image | — | Optional custom image for the object. |
+| `look` (Look (map object)) | string-enum | `""` | A map object of your library (e.g. a Mana Seed bush): its picture and collision box. Built-in = the toolkit's sprite. / Вид — объект карты из библиотеки. Варианты: Built-in. |
+| `lookUsed` (Look when used) | string-enum | `""` | Picture after use: cut bush, broken pot, lever on, plate pressed, torch lit, chest open... Built-in = the toolkit's sprite. / Вид после использования. Варианты: Built-in. |
+| `sprite` (Sprite (image)) | image | — | Or an image of your library instead of a map object. / Или картинка из библиотеки. |
 | `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
 | `height` (Height) | number | `0` | Pixels; 0 = normal size (16). / Высота. |
 | `turnOnVariable` (On use: turn on variable) | variable | `""` | Project variable set to true when the object is activated (opened, switched on, lit, destroyed). / Включить переменную при активации. |
@@ -165,6 +167,8 @@ Places a treasure chest with an item inside. Opened chests stay open. / Сунд
 | `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `requiresBigKey` (Needs Big Key) | boolean | `false` | Big chest that needs the dungeon's Big Key. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it with a rule or Zelda: Change Object (reveal). |
+| `look` (Look: closed) | string-enum | `""` | A map object of your library for the closed chest. Built-in = the toolkit's chest. / Вид закрытого сундука. Варианты: Built-in. |
+| `lookOpen` (Look: open) | string-enum | `""` | Map object for the opened chest. / Вид открытого сундука. Варианты: Built-in. |
 
 ## Zelda: Create Door
 
@@ -177,6 +181,8 @@ Places a door. Lock: none (opens by action), small key, Big Key, or switch (only
 | `startOpen` (Start open) | boolean | `false` | Shutter doors that close when a fight starts. |
 | `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
 | `height` (Height) | number | `0` | Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота. |
+| `look` (Look: closed) | string-enum | `""` | A map object of your library for the closed door. Built-in = the toolkit's door. / Вид закрытой двери. Варианты: Built-in. |
+| `lookOpen` (Look: open) | string-enum | `""` | Map object for the open door (empty passage if you like). / Вид открытой двери. Варианты: Built-in. |
 
 ## Zelda: Place Item
 
@@ -188,6 +194,7 @@ Puts a collectible on the ground (key, heart, rupees, bombs...). / Предме�
 | `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `position` (Position) | map-position | — | Where it lies: pick it on the map. / Где лежит. |
 | `once` (Only once) | boolean | `true` | Once taken it never comes back (keys, heart containers). / Не появляется снова. |
+| `look` (Look (map object)) | string-enum | `""` | A map object of your library for the item on the ground. Built-in = the toolkit's sprite. / Вид предмета. Варианты: Built-in. |
 
 ## Zelda: Change Object
 

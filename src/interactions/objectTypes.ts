@@ -110,6 +110,13 @@ export interface ObjectConfig {
   onActivate: RuleAction[];
   onDeactivate: RuleAction[];
   tint: number | null;
+  /** Picture drawn offset from the object's body (a map object look whose collision box is not centred). */
+  spriteOffsetX: number;
+  spriteOffsetY: number;
+  /** Picture scale; 0 = fit an author image to the object size (map object looks use 1: natural size). */
+  spriteScale: number;
+  /** A destroyed object stays visible with its active sprite (a stump, shards) instead of vanishing. */
+  keepWhenDestroyed: boolean;
 }
 
 const BASE: ObjectConfig = {
@@ -146,6 +153,10 @@ const BASE: ObjectConfig = {
   onActivate: [],
   onDeactivate: [],
   tint: null,
+  spriteOffsetX: 0,
+  spriteOffsetY: 0,
+  spriteScale: 0,
+  keepWhenDestroyed: false,
 };
 
 const PRESETS: Record<ObjectType, Partial<ObjectConfig>> = {

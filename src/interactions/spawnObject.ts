@@ -34,8 +34,8 @@ export function createObject(s: Session, type: string, x: number, y: number, opt
  * Places an item on the ground. With an id it is persistent: once collected it
  * will not reappear (keys, heart containers placed by the author).
  */
-export function placePickup(s: Session, item: string, count: number, x: number, y: number, id?: string): Pickup | null {
+export function placePickup(s: Session, item: string, count: number, x: number, y: number, id?: string, sprite?: string): Pickup | null {
   const persistentId = id ? objectKey(s.mapId, id) : undefined;
   if (persistentId && s.state.objects[persistentId] === "collected") return null;
-  return s.world.add(new Pickup(s, x, y, { item, count, persistentId, lifetimeMs: 0, silent: false }));
+  return s.world.add(new Pickup(s, x, y, { item, count, persistentId, lifetimeMs: 0, silent: false, ...(sprite ? { sprite } : {}) }));
 }

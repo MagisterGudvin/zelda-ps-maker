@@ -2,6 +2,15 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.16.0] — 2026-10-27
+
+### Добавлено
+- **Свои картинки прямо в объекте** (просил пользователь): у `Zelda: Create Object` поля *Look (map object)* и *Look when used*, у `Create Chest` и `Create Door` — *Look: closed* / *Look: open*, у `Place Item` — *Look (map object)*. В списке — объекты библиотеки *Map objects* открытого проекта (например, из набора Mana Seed); первый вариант *Built-in* — встроенная картинка. Тело объекта берётся из коробки коллизии объекта карты, картинка рисуется в натуральную величину и стоит относительно тела, как в PS Maker; анимированный объект показывается первым кадром. После разрушения остаётся картинка *Look when used* (пень, осколки). Предпросмотр на карте редактора показывает выбранные картинки (docs/SPRITES.md).
+- `ObjectConfig`: `spriteOffsetX`, `spriteOffsetY`, `spriteScale`, `keepWhenDestroyed` (docs/OBJECTS.md).
+
+### Изменено
+- Поле *Sprite* у `Create Object` называется *Sprite (image)*; раздел *Size* у `Create Door` — *Look and size*.
+
 ## [0.15.0] — 2026-10-27
 
 ### Изменено

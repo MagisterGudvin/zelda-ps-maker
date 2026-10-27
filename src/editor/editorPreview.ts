@@ -1,8 +1,8 @@
 import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { isObjectType, resolveObjectConfig } from "../interactions/objectTypes.ts";
 import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
-import { characterFromParam, findStory, isStory, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
-import { areaOf, pathOf, pointOf, textOf } from "./fields.ts";
+import { characterFromParam, findStory, isStory, mapObjectLook, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
+import { areaOf, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
 
 /**
  * Shows what the Zelda actions of a map will create, on the map in the PS Maker editor.
@@ -34,7 +34,22 @@ interface Box {
   h: number;
 }
 export type PreviewItem =
-  | { kind: "sprite"; sprite: string; x: number; y: number; w?: number; h?: number; alpha?: number; look?: PsCharacter; label?: string; box?: Box | null; ref?: ActionRef }
+  | {
+      kind: "sprite";
+      /** Texture or built-in sprite id; "key#frame" for one frame of a sheet (map object look). */
+      sprite: string;
+      x: number;
+      y: number;
+      w?: number;
+      h?: number;
+      alpha?: number;
+      look?: PsCharacter;
+      label?: string;
+      box?: Box | null;
+      /** Collision box inside the picture (map object look): the picture is placed around the body. */
+      boxIn?: { x: number; y: number; width: number; height: number } | null;
+      ref?: ActionRef;
+    }
   | { kind: "area"; x: number; y: number; w: number; h: number; label: string; ref?: ActionRef }
   | { kind: "path"; points: { x: number; y: number }[] }
   | { kind: "link"; from: { x: number; y: number }; to: { x: number; y: number } }
@@ -88,6 +103,11 @@ export function previewItems(map: MapLike, story: PsStory | null): PreviewItem[]
   const templates = new EnemyTemplateRegistry();
   const looks = new Map<string, PsCharacter>();
   const look = (v: unknown) => (story ? characterFromParam(story, v) ?? undefined : undefined);
+  /** A map object picked as an object's look: its picture, and its collision box as the body. */
+  const objectLook = (v: unknown, sprite: string, box: Box | null) => {
+    const found = story && textOf(v) ? mapObjectLook(story, v) : null;
+    return found ? { sprite: found.sprite, box: found.box ? { w: found.box.width, h: found.box.height } : box, boxIn: found.box } : { sprite, box, boxIn: null };
+  };
   const items: PreviewItem[] = [];
   const actions = zeldaActions(map);
   // Define Enemy first: its types are used by enemies listed before or after it.
@@ -136,7 +156,10 @@ export function previewItems(map: MapLike, story: PsStory | null): PreviewItem[]
         const type = textOf(p.type);
         if (at && isObjectType(type)) {
           const cfg = resolveObjectConfig(type);
-          items.push({ kind: "sprite", sprite: cfg.sprite, x: at.x, y: at.y, alpha: type === "hidden_passage" ? 0.5 : 1, box: cfg.solid ? { w: cfg.width, h: cfg.height } : null, ref });
+          const sized = Number(p.width) > 0 || Number(p.height) > 0;
+          const box = cfg.solid ? { w: Number(p.width) || cfg.width, h: Number(p.height) || cfg.height } : null;
+          const lk = objectLook(p.look, cfg.sprite, box);
+          items.push({ kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, alpha: type === "hidden_passage" ? 0.5 : 1, box: cfg.solid ? (sized ? box : lk.box) : null, boxIn: sized ? null : lk.boxIn, ref });
         }
         // "When used": the door it opens or the thing it reveals.
         if (at) for (const to of [pointOf(p.openDoorAt), pointOf(p.revealAt)]) if (to) items.push({ kind: "link", from: at, to });
@@ -144,18 +167,24 @@ export function previewItems(map: MapLike, story: PsStory | null): PreviewItem[]
       }
       case "Zelda: Create Chest": {
         const cfg = resolveObjectConfig("chest");
-        if (at) items.push({ kind: "sprite", sprite: "obj_chest", x: at.x, y: at.y, alpha: p.hidden === true ? 0.5 : 1, label: textOf(p.item), box: { w: cfg.width, h: cfg.height }, ref });
+        const lk = objectLook(p.look, "obj_chest", { w: cfg.width, h: cfg.height });
+        if (at) items.push({ kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, alpha: p.hidden === true ? 0.5 : 1, label: textOf(p.item), box: lk.box, boxIn: lk.boxIn, ref });
         break;
       }
       case "Zelda: Create Door": {
         const w = Number(p.width) || 16;
         const h = Number(p.height) || 16;
-        if (at) items.push({ kind: "sprite", sprite: "obj_door", x: at.x, y: at.y, w, h, label: textOf(p.lock) === "none" ? "" : textOf(p.lock) || "small_key", box: p.startOpen === true ? null : { w, h }, ref });
+        const sized = Number(p.width) > 0 || Number(p.height) > 0;
+        const lk = objectLook(p.look, "obj_door", { w, h });
+        const custom = lk.sprite !== "obj_door";
+        if (at)
+          items.push({ kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, ...(custom ? {} : { w, h }), label: textOf(p.lock) === "none" ? "" : textOf(p.lock) || "small_key", box: p.startOpen === true ? null : sized ? { w, h } : lk.box, boxIn: sized ? null : lk.boxIn, ref });
         break;
       }
       case "Zelda: Place Item": {
         const item = textOf(p.item) || "key";
-        if (at) items.push(PICKUPS[item] ? { kind: "sprite", sprite: PICKUPS[item], x: at.x, y: at.y, ref } : { kind: "label", x: at.x, y: at.y, label: item, ref });
+        const lk = objectLook(p.look, PICKUPS[item] ?? "", null);
+        if (at) items.push(lk.sprite ? { kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, ref } : { kind: "label", x: at.x, y: at.y, label: item, ref });
         break;
       }
       case "Zelda: Set Respawn Point":
@@ -245,6 +274,8 @@ export function startEditorPreview(win: any = globalThis): void {
     // An action opened from the list (its route) is selected on the map too.
     const opened = /\/maps\/[^/]+\/([^/?#]+)/.exec(win.location?.pathname ?? "")?.[1];
     if (opened && decodeURIComponent(opened) !== selected && zeldaActions(scene.map).some(({ action }) => action.id === decodeURIComponent(opened))) select(decodeURIComponent(opened));
+    // The "Look (map object)" dropdowns list this project's map objects.
+    fillMapObjectOptions(storyOf(scene)?.mapObjects);
     const sig = signature(scene.map);
     if (!overlay || overlay.scene !== scene || overlay.sig !== sig) {
       clear();
@@ -382,9 +413,13 @@ function draw(scene: any, sig: string, items: PreviewItem[], onClick: (ref: Acti
   for (const it of items) {
     if (it.kind === "sprite") {
       const frame = it.look ? lookFrame(scene, story, it.look) : null;
-      const key = frame?.key ?? resolveTexture(scene.textures as TextureManagerLike, it.sprite);
+      const hash = it.sprite.lastIndexOf("#");
+      const [base, sheetFrame] = hash > 0 ? [it.sprite.slice(0, hash), it.sprite.slice(hash + 1)] : [it.sprite, undefined];
+      const key = frame?.key ?? resolveTexture(scene.textures as TextureManagerLike, base);
       if (!key) continue;
-      const img = scene.add.image(it.x + (frame?.dx ?? 0), it.y + (frame?.dy ?? 0), key, frame?.frame);
+      const img = scene.add.image(it.x + (frame?.dx ?? 0), it.y + (frame?.dy ?? 0), key, frame?.frame ?? sheetFrame);
+      // A map object look stands with its collision box on the point, like the map object itself.
+      if (it.boxIn) img.setPosition(it.x + Math.round(img.width / 2 - (it.boxIn.x + it.boxIn.width / 2)), it.y + Math.round(img.height / 2 - (it.boxIn.y + it.boxIn.height / 2)));
       if (it.w || it.h) img.setDisplaySize(it.w ?? img.width, it.h ?? img.height);
       img.setAlpha(it.alpha ?? 1).setDepth(it.y);
       objects.push(img);
@@ -392,7 +427,7 @@ function draw(scene: any, sig: string, items: PreviewItem[], onClick: (ref: Acti
       const h = img.displayHeight ?? 16;
       clickable(img, it.ref, { x: img.x - w / 2, y: img.y - h / 2, w, h });
       if (it.box) collisions.fillStyle(0xff0000, 0.5).fillRect(it.x - it.box.w / 2, it.y - it.box.h / 2, it.box.w, it.box.h);
-      label(it.x, frame ? img.y - 11 : it.y - h / 2 - 1, it.label ?? "", it.ref);
+      label(it.x, frame ? img.y - 11 : img.y - h / 2 - 1, it.label ?? "", it.ref);
     } else if (it.kind === "area") {
       g.lineStyle(1, 0xffa030, 0.9).strokeRect(it.x, it.y, it.w, it.h);
       g.fillStyle(0xffa030, 0.08).fillRect(it.x, it.y, it.w, it.h);

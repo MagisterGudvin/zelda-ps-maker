@@ -63,6 +63,16 @@ function opaqueTopRow(frame: any): number | null {
   }
 }
 
+/** "key#frame" names one frame of a sheet texture (a map object look); plain keys use the whole image. */
+export function spriteKey(sprite: string): string {
+  const i = sprite.lastIndexOf("#");
+  return i > 0 ? sprite.slice(0, i) : sprite;
+}
+export function spriteFrame(sprite: string): string | undefined {
+  const i = sprite.lastIndexOf("#");
+  return i > 0 ? sprite.slice(i + 1) : undefined;
+}
+
 /** Per-axis scale that fits a sprite to an entity when the entity is a whole multiple of it, else 1. */
 export function wholeScale(texW: number, texH: number, w: number, h: number): [number, number] {
   const fx = texW > 0 && w % texW === 0 ? w / texW : 1;
@@ -85,7 +95,7 @@ class ImageView implements EntityView {
     this.host = host;
     this.spec = spec;
     this.sprite = spec.sprite;
-    this.img = scene.add.image(0, 0, textureKey);
+    this.img = scene.add.image(0, 0, textureKey, spriteFrame(spec.sprite));
     this.fitSize();
     if (spec.tint !== undefined) this.img.setTint(spec.tint);
     if (spec.originX !== undefined || spec.originY !== undefined) this.img.setOrigin(spec.originX ?? 0.5, spec.originY ?? 0.5);
@@ -126,11 +136,11 @@ class ImageView implements EntityView {
   }
   setSprite(sprite: string): void {
     if (sprite === this.sprite && !this.frameKey) return;
-    const key = resolveTexture(this.scene.textures, sprite);
+    const key = resolveTexture(this.scene.textures, spriteKey(sprite));
     if (!key) return;
     this.sprite = sprite;
     this.frameKey = "";
-    this.img.setTexture(key);
+    this.img.setTexture(key, spriteFrame(sprite));
     this.fitSize();
   }
   setAnimFrame(sheet: string, frame: number, flipX: boolean): void {
@@ -372,7 +382,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.renderer = {
       createView: (spec: ViewSpec): EntityView => {
         if (spec.adopt && typeof spec.adopt === "object") return new AdoptedView(spec.adopt);
-        let key = resolveTexture(scene.textures, spec.sprite);
+        let key = resolveTexture(scene.textures, spriteKey(spec.sprite));
         if (!key) {
           logger.warnOnce(`tex-${spec.sprite}`, `Sprite "${spec.sprite}" is neither a loaded texture nor a built-in sprite; using a placeholder.`);
           key = resolveTexture(scene.textures, "icon_generic")!;
@@ -591,6 +601,14 @@ export class PhaserHost implements HostAdapter, DepthSource {
       z.body.updateFromGameObject();
     });
     for (let i = boxes.length; i < this.solidZones.length; i++) this.solidZones[i].body.enable = false;
+  }
+
+  textureSize(sprite: string): { w: number; h: number } | null {
+    const tex = this.scene?.textures;
+    const key = spriteKey(sprite);
+    if (!tex?.exists?.(key)) return null;
+    const frame = tex.getFrame?.(key, spriteFrame(sprite));
+    return frame && frame.width > 0 ? { w: frame.width, h: frame.height } : null;
   }
 
   readPlayerTouching(): { up: boolean; down: boolean; left: boolean; right: boolean } | null {

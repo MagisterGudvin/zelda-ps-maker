@@ -20,9 +20,9 @@ import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
-import { animFromPick, characterFromParam, characterPlan, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { animFromPick, characterFromParam, characterPlan, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -97,8 +97,42 @@ const columnsOf = (s: Session, story: PsStory) => (sheet: PsSheet) => (s.host as
 /** PS Maker project data via the host, warning once when it is not reachable. */
 function psStory(s: Session, what: string): PsStory | null {
   const found = (s.host as PsHost).psMakerStory?.() ?? null;
-  if (!found) s.logger.warnOnce("ps-story", `${what}: PS Maker project data is not reachable from the plugin, so PS Maker animations cannot be used here. Use Zelda: Define Sprite Sheet / Define Animation instead.`);
+  if (!found) s.logger.warnOnce("ps-story", `${what}: PS Maker project data is not reachable from the plugin, so PS Maker characters, animations and map objects cannot be used here; built-in sprites are shown.`);
   return found?.story ?? null;
+}
+
+/**
+ * A map object picked as a look: its picture for the normal and the used state, and (unless the
+ * author set a size) the body from its collision box with the picture placed around it, as PS
+ * Maker places map objects.
+ */
+function applyObjectLook(s: Session, overrides: Partial<ObjectConfig>, look: unknown, used: unknown, what: string, sizeSet: boolean): void {
+  if (!textOf(look) && !textOf(used)) return;
+  const story = psStory(s, what);
+  if (!story) return;
+  const pick = (v: unknown) => {
+    if (!textOf(v)) return null;
+    const found = mapObjectLook(story, v);
+    if (!found) s.logger.warn(`${what}: map object "${textOf(v)}" is not in the project's library; the built-in sprite is used.`);
+    return found;
+  };
+  const normal = pick(look);
+  const active = pick(used);
+  if (normal) overrides.sprite = normal.sprite;
+  if (active) overrides.activeSprite = active.sprite;
+  // A chosen "after use" look is shown: a cut bush leaves its stump, a pot its shards.
+  if (active) overrides.keepWhenDestroyed = true;
+  // Map objects keep their own size: the body is their collision box, not the picture.
+  if (normal || active) overrides.spriteScale = 1;
+  const main = normal ?? active;
+  if (!main?.box || sizeSet) return;
+  const size = s.host.textureSize?.(main.sprite) ?? main.frame;
+  overrides.width = main.box.width;
+  overrides.height = main.box.height;
+  if (size) {
+    overrides.spriteOffsetX = Math.round(size.w / 2 - (main.box.x + main.box.width / 2));
+    overrides.spriteOffsetY = Math.round(size.h / 2 - (main.box.y + main.box.height / 2));
+  }
 }
 
 /** Registers PS Maker sheets as toolkit sheets (by texture key or URL). */
@@ -606,7 +640,9 @@ const createObjectAction = defineEvent({
   parameterDefs: {
     type: choice("Type", "Object type. / Тип объекта.", OBJECT_TYPES, "bush"),
     position: mapPos("Position", "Object center: pick it on the map. / Центр объекта."),
-    sprite: img("Sprite", "Optional custom image for the object."),
+    look: mapObjectField("Look (map object)", "A map object of your library (e.g. a Mana Seed bush): its picture and collision box. Built-in = the toolkit's sprite. / Вид — объект карты из библиотеки."),
+    lookUsed: mapObjectField("Look when used", "Picture after use: cut bush, broken pot, lever on, plate pressed, torch lit, chest open... Built-in = the toolkit's sprite. / Вид после использования."),
+    sprite: img("Sprite (image)", "Or an image of your library instead of a map object. / Или картинка из библиотеки."),
     hidden: bool("Hidden", "Starts invisible; reveal it later. / Скрыт до открытия.", false),
     staysOn: bool("Stays on", "Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым.", false),
     width: num("Width", "Pixels; 0 = normal size (16). / Ширина.", 0),
@@ -625,6 +661,7 @@ const createObjectAction = defineEvent({
       const overrides: Partial<ObjectConfig> = legacy<Partial<ObjectConfig>>(s, params, "config", "Create Object") ?? {};
       const sprite = resolveImage(params.sprite);
       if (sprite) overrides.sprite = overrides.sprite ?? sprite;
+      applyObjectLook(s, overrides, params.look, params.lookUsed, "Create Object", numOr(params.width, 0) > 0 || numOr(params.height, 0) > 0);
       if (boolOr(params.hidden, false)) overrides.hidden = true;
       if (boolOr(params.staysOn, false)) {
         overrides.plateMode = "latch";
@@ -653,15 +690,16 @@ const createChest = defineEvent({
     count: num("Count", "How many (rupees, bombs, arrows...). / Сколько.", 1),
     requiresBigKey: bool("Needs Big Key", "Big chest that needs the dungeon's Big Key.", false),
     hidden: bool("Hidden", "Starts invisible; reveal it with a rule or Zelda: Change Object (reveal).", false),
+    look: mapObjectField("Look: closed", "A map object of your library for the closed chest. Built-in = the toolkit's chest. / Вид закрытого сундука."),
+    lookOpen: mapObjectField("Look: open", "Map object for the opened chest. / Вид открытого сундука."),
   },
   execute(params, ctx) {
     run("Zelda: Create Chest", ctx, params, (s) => {
       const at = where(s, params.position, "Create Chest");
       if (!at) return;
-      createObject(s, "chest", at.x, at.y, {
-        id: idFor(s, params, "chest", at.x, at.y),
-        overrides: { contents: params.item ? { item: params.item, count: Math.max(1, params.count || 1) } : null, requires: params.requiresBigKey ? { bigKey: true } : {}, hidden: !!params.hidden },
-      });
+      const overrides: Partial<ObjectConfig> = { contents: params.item ? { item: params.item, count: Math.max(1, params.count || 1) } : null, requires: params.requiresBigKey ? { bigKey: true } : {}, hidden: !!params.hidden };
+      applyObjectLook(s, overrides, params.look, params.lookOpen, "Create Chest", false);
+      createObject(s, "chest", at.x, at.y, { id: idFor(s, params, "chest", at.x, at.y), overrides });
     });
   },
 });
@@ -675,6 +713,8 @@ const createDoor = defineEvent({
     startOpen: bool("Start open", "Shutter doors that close when a fight starts.", false),
     width: num("Width", "Pixels; 0 = normal size (16). / Ширина.", 0),
     height: num("Height", "Pixels; 0 = normal size (16), e.g. 32 for a two-tile gate. / Высота.", 0),
+    look: mapObjectField("Look: closed", "A map object of your library for the closed door. Built-in = the toolkit's door. / Вид закрытой двери."),
+    lookOpen: mapObjectField("Look: open", "Map object for the open door (empty passage if you like). / Вид открытой двери."),
   },
   execute(params, ctx) {
     run("Zelda: Create Door", ctx, params, (s) => {
@@ -695,6 +735,7 @@ const createDoor = defineEvent({
       const overrides: Partial<ObjectConfig> = { lock: lock as ObjectConfig["lock"], startOpen: boolOr(params.startOpen, false) };
       if (numOr(params.width, 0) > 0) overrides.width = numOr(params.width, 0);
       if (numOr(params.height, 0) > 0) overrides.height = numOr(params.height, 0);
+      applyObjectLook(s, overrides, params.look, params.lookOpen, "Create Door", numOr(params.width, 0) > 0 || numOr(params.height, 0) > 0);
       createObject(s, "door", at.x, at.y, { id: idFor(s, params, "door", at.x, at.y), overrides });
     });
   },
@@ -708,6 +749,7 @@ const placeItem = defineEvent({
     count: num("Count", "How many (rupees, bombs, arrows...). / Сколько.", 1),
     position: mapPos("Position", "Where it lies: pick it on the map. / Где лежит."),
     once: bool("Only once", "Once taken it never comes back (keys, heart containers). / Не появляется снова.", true),
+    look: mapObjectField("Look (map object)", "A map object of your library for the item on the ground. Built-in = the toolkit's sprite. / Вид предмета."),
   },
   execute(params, ctx) {
     run("Zelda: Place Item", ctx, params, (s) => {
@@ -715,7 +757,10 @@ const placeItem = defineEvent({
       if (!at) return;
       const item = textOf(params.item) || "key";
       const id = textOf((params as Record<string, unknown>).id) || (boolOr(params.once, true) ? autoId(s, `item_${item}`, at.x, at.y) : undefined);
-      placePickup(s, item, Math.max(1, Math.round(numOr(params.count, 1))), at.x, at.y, id);
+      const story = textOf(params.look) ? psStory(s, "Place Item") : null;
+      const look = story ? mapObjectLook(story, params.look) : null;
+      if (textOf(params.look) && story && !look) s.logger.warn(`Place Item: map object "${textOf(params.look)}" is not in the project's library; the built-in sprite is used.`);
+      placePickup(s, item, Math.max(1, Math.round(numOr(params.count, 1))), at.x, at.y, id, look?.sprite);
     });
   },
 });

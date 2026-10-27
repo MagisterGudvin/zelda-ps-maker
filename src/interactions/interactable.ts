@@ -53,7 +53,7 @@ export class Interactable extends Entity implements Damageable {
     this.objState = this.initialState();
     if (this.objState === "opened") this.solid = false;
     this.persistentKey = cfg.persistent && explicitId ? objectKey(session.mapId, id) : null;
-    this.view = session.host.renderer.createView({ sprite: cfg.sprite, width: cfg.width, height: cfg.height, tint: cfg.tint ?? undefined, layer: cfg.solid ? 0 : -1000 });
+    this.view = session.host.renderer.createView({ sprite: cfg.sprite, width: cfg.width, height: cfg.height, tint: cfg.tint ?? undefined, layer: cfg.solid ? 0 : -1000, offsetX: cfg.spriteOffsetX || undefined, offsetY: cfg.spriteOffsetY || undefined, scale: cfg.spriteScale || undefined });
     this.restoreFromState();
     this.applyVisual();
   }
@@ -145,7 +145,7 @@ export class Interactable extends Entity implements Damageable {
       case "destroyed":
         this.solid = false;
         this.hookable = false;
-        if (this.cfg.type !== "bombable_wall" && this.cfg.type !== "breakable") this.visible = false;
+        if (this.cfg.type !== "bombable_wall" && this.cfg.type !== "breakable" && !this.cfg.keepWhenDestroyed) this.visible = false;
         break;
       case "opened":
       case "unlocked":

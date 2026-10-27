@@ -45,9 +45,19 @@ export interface PsCharacter {
   defaultAnimationSetId?: string;
 }
 
+/** An object of the PS Maker map object library (static picture or animated sheet). */
+export interface PsMapObject {
+  id: string;
+  name: string;
+  type?: string;
+  collision?: { enabled?: boolean; box?: { x: number; y: number; width: number; height: number } };
+  animationConfig?: { frameWidth?: number; frameHeight?: number };
+}
+
 export interface PsStory {
   characters: PsCharacter[];
   spritesheetAnimations: PsSheet[];
+  mapObjects?: PsMapObject[];
   player?: { animationSets: PsAnimationSet[]; defaultAnimationSetId?: string };
 }
 
@@ -379,4 +389,20 @@ export function sheetImage(textures: TextureManagerLike, sheet: PsSheet, story: 
     if (hit) return url.slice(0, url.length - hit.length) + sheet.src;
   }
   return null;
+}
+
+/**
+ * A map object picked as an object's look. PS Maker loads every library map object as a texture
+ * under its id (animated ones as a sheet "<id>_frames"; LoadingScene in PS Maker 1.2.1). The sprite
+ * is "<texture>#<frame>" for sheets: the toolkit shows their first frame.
+ */
+export function mapObjectLook(story: PsStory, value: unknown): { sprite: string; box: { x: number; y: number; width: number; height: number } | null; frame: { w: number; h: number } | null } | null {
+  const v = typeof value === "string" ? value : "";
+  if (!v) return null;
+  const mo = story.mapObjects?.find((m) => m.id === v) ?? story.mapObjects?.find((m) => m.name === v);
+  if (!mo) return null;
+  const animated = mo.type === "animated";
+  const box = mo.collision?.enabled && mo.collision.box ? mo.collision.box : null;
+  const frame = animated && mo.animationConfig?.frameWidth && mo.animationConfig.frameHeight ? { w: mo.animationConfig.frameWidth, h: mo.animationConfig.frameHeight } : null;
+  return { sprite: animated ? `${mo.id}_frames#0` : mo.id, box, frame };
 }

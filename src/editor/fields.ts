@@ -260,3 +260,32 @@ export function enemyStats(p: Record<string, unknown>): Partial<EnemyConfig> {
   if (numOr(p.spriteScale, 0) > 0) out.spriteScale = numOr(p.spriteScale, 0);
   return out;
 }
+
+// ---- map objects of the project as a look ---------------------------------------------------
+
+/**
+ * Options of the "Look (map object)" dropdowns: "Built-in" plus the project's map object library.
+ * PS Maker has no map object field for plugins, but its plugin registry keeps the action
+ * definitions by reference, so the toolkit fills this list in the editor from the open project
+ * (editorPreview.ts) and the dropdowns show the project's objects.
+ */
+export const MAP_OBJECT_OPTIONS: { label: string; value: string }[] = [{ label: "Built-in", value: "" }];
+
+/** A dropdown of the project's map objects (raw value: the map object id; "" = built-in sprite). */
+export const mapObjectField = (label: string, description: string) =>
+  ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: MAP_OBJECT_OPTIONS }) as unknown as ReturnType<typeof str>;
+
+/** Refills MAP_OBJECT_OPTIONS in place; true when it changed. */
+export function fillMapObjectOptions(objects: readonly { id: string; name: string }[] | undefined): boolean {
+  const seen = new Map<string, number>();
+  const next = [{ label: "Built-in", value: "" }];
+  for (const o of objects ?? []) {
+    if (!o?.id) continue;
+    const n = (seen.get(o.name) ?? 0) + 1;
+    seen.set(o.name, n);
+    next.push({ label: n > 1 ? `${o.name} (${n})` : o.name || o.id, value: o.id });
+  }
+  if (next.length === MAP_OBJECT_OPTIONS.length && next.every((o, i) => o.value === MAP_OBJECT_OPTIONS[i].value && o.label === MAP_OBJECT_OPTIONS[i].label)) return false;
+  MAP_OBJECT_OPTIONS.splice(0, MAP_OBJECT_OPTIONS.length, ...next);
+  return true;
+}

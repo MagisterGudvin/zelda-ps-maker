@@ -17,6 +17,8 @@ export interface HostAdapter {
   readPlayerVisual(out: AABB): boolean;
   /** Optional: world y of the top of the player's drawn pixels (head), null when unknown. */
   readPlayerTop?(): number | null;
+  /** Optional: pixel size of a loaded texture ("key" or "key#frame"), null when not loaded. */
+  textureSize?(sprite: string): { w: number; h: number } | null;
   /** Optional: makes these toolkit solids stop the player in the engine's physics (called every tick). */
   syncSolids?(boxes: readonly AABB[]): void;
   /** Optional: sides on which the engine's physics stopped the player this frame. */

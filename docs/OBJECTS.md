@@ -8,7 +8,8 @@
 |---|---|
 | Type | тип объекта (список; таблица ниже) |
 | Position | точка на карте |
-| Sprite | своя картинка вместо встроенной |
+| Sprite (image) | своя картинка из *Images* PS Maker вместо встроенной |
+| Look (map object), Look when used | объект из библиотеки *Map objects* PS Maker: обычный вид и вид после использования (пень, осколки, нажатая кнопка); тело — его коробка коллизии (docs/SPRITES.md) |
 | Hidden | создать скрытым (показать — *Reveal object at* в правиле или `Change Object` → Reveal) |
 | Stays on | плита остаётся нажатой, рычаг/кнопка не выключаются обратно |
 | Width, Height | размер в пикселях; 0 = 16 |
@@ -20,9 +21,9 @@
 
 Состояние объекта (открыт, включён, разрушен) запоминается по его типу и месту на карте — id вводить не нужно.
 
-`Zelda: Create Door`: *Lock* — None (открывается клавишей действия), Small key, Big Key, Switch / rule (только переключатель, правило или `Change Object`); *Width*/*Height* — для широких ворот (например, высота 32).
+`Zelda: Create Door`: *Lock* — None (открывается клавишей действия), Small key, Big Key, Switch / rule (только переключатель, правило или `Change Object`); *Width*/*Height* — для широких ворот (например, высота 32); *Look: closed* / *Look: open* — свои картинки из *Map objects*.
 
-`Zelda: Create Chest`: *Item* (список), *Count*, *Needs Big Key*, *Hidden*. `Zelda: Place Item`: *Item*, *Count*, *Only once* (взятый предмет не появляется снова).
+`Zelda: Create Chest`: *Item* (список), *Count*, *Needs Big Key*, *Hidden*, *Look: closed* / *Look: open*. `Zelda: Place Item`: *Item*, *Count*, *Only once* (взятый предмет не появляется снова), *Look (map object)*.
 
 Внутри все типы — один класс `Interactable` с конфигурацией `ObjectConfig` (таблица полей ниже); поля, которых нет в форме, доступны из кода (`ZeldaMakerToolkit.createObject(type, x, y, { overrides })`).
 
@@ -78,6 +79,9 @@
 | `emit` | строка | событие `zelda:custom:<emit>` при активации |
 | `onActivate`, `onDeactivate` | массив действий правил | что выполнить |
 | `tint` | число | цветовой тинт |
+| `spriteOffsetX`, `spriteOffsetY` | число | сдвиг картинки относительно центра тела |
+| `spriteScale` | число | масштаб картинки; 0 = растянуть до размера объекта (встроенные — кратно) |
+| `keepWhenDestroyed` | bool | разрушенный объект остаётся на месте с картинкой `activeSprite` (пень, осколки) |
 
 ## Состояния
 
