@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.7.1) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.8.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **37**. Все имена начинаются с `Zelda: `.
 
@@ -143,13 +143,13 @@ Creates an interactive object: bushes, pots, rocks, walls to bomb, levers, butto
 |---|---|---|---|
 | `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. Варианты: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, hook_post, sign. |
 | `position` (Position) | map-position | — | Object center: pick it on the map. / Центр объекта. |
-| `sprite` (Sprite) | image | — | Optional custom image for the object. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it later. / Скрыт до открытия. |
 | `staysOn` (Stays on) | boolean | `false` | Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым. |
-| `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
-| `height` (Height) | number | `0` | Pixels; 0 = normal size (16). / Высота. |
 | `text` (Text) | string | `""` | Sign text, or a message shown when the object is used. / Текст таблички или сообщение. |
 | `reactsTo` (Reacts to) | string-enum-multi | `[]` | For eye switches, crystals and breakables: what hits it. / Реагирует на. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `sprite` (Sprite) | image | — | Optional custom image for the object. |
+| `width` (Width) | number | `0` | Pixels; 0 = normal size (16). / Ширина. |
+| `height` (Height) | number | `0` | Pixels; 0 = normal size (16). / Высота. |
 | `turnOnVariable` (On use: turn on variable) | variable | `""` | Project variable set to true when the object is activated (opened, switched on, lit, destroyed). / Включить переменную при активации. |
 | `openDoorAt` (On use: open door at) | map-position | — | Door picked on the map, opened when the object is activated. / Открыть дверь при активации. |
 | `revealAt` (On use: reveal object at) | map-position | — | Hidden object picked on the map, revealed when the object is activated. / Показать объект при активации. |
@@ -226,6 +226,7 @@ When the conditions become true (every filled When field), do the filled actions
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
+| `once` (Once) | boolean | `true` | Fire only the first time (remembered in saves). |
 | `whenGroup` (When group defeated) | string-enum | `""` | Every enemy of this group is beaten (Group of Create Enemy). / Побеждена вся группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
 | `whenObjectAt` (When object at) | map-position | — | Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт. |
 | `whenObjectAt2` (…and object at) | map-position | — | Optional second object. / Второй объект. |
@@ -240,7 +241,6 @@ When the conditions become true (every filled When field), do the filled actions
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
 | `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
 | `spawnAt` (Spawn at) | map-position | — | Where the enemy appears. / Где появится. |
-| `once` (Once) | boolean | `true` | Fire only the first time (remembered in saves). |
 
 ## Zelda: Run Actions
 

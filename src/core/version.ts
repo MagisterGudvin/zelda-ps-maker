@@ -1,2 +1,2 @@
 /** Toolkit version. Keep in sync with the literal in src/index.ts (read by the PS Maker CLI). */
-export const TOOLKIT_VERSION = "0.7.1";
+export const TOOLKIT_VERSION = "0.8.0";

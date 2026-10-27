@@ -18,6 +18,7 @@ import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession }
 import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
+import { withUi } from "./ui.ts";
 import { animFromPick, characterFromParam, characterPlan, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { ABILITY_OPTIONS, animation, areaOf, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
@@ -1253,4 +1254,4 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   defineEnemy,
   setPlayerSprites,
   setSound,
-].map(endsAction);
+].map((e) => withUi(endsAction(e)));

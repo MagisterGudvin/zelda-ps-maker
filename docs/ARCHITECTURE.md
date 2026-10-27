@@ -17,7 +17,8 @@ src/
     actions.ts              37 действий редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     paramResolvers.ts       разбор параметров position / npc / image
-    fields.ts               поля форм: чтение со значениями по умолчанию, группы When/Then, характеристики врагов
+    fields.ts               поля форм: типы виджетов PS Maker, чтение со значениями по умолчанию, группы When/Then
+    ui.ts                   вид в редакторе: разделы, видимость полей, превью, ключевые слова поиска
     publicApi.ts            globalThis.ZeldaMakerToolkit
     pageErrors.ts           ошибки страницы, console.error/warn → панель диагностики
     pluginShape.ts          events + actions (совместимость версий API)

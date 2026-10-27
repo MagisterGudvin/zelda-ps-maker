@@ -238,11 +238,28 @@ PS Maker получает просто объект `export default { name, desc
 | `variable` | список переменных проекта | id переменной |
 | `key-bindings` | выбор клавиш / управления проекта | `[{ type: "key", key: "KeyX" } \| { type: "control", controlId }]` |
 | `animation` | любая анимация проекта | id анимации |
-Все они используются Toolkit с 0.7.0. Переменные проекта: `game.variables.get(id)` → `{ type: "boolean" \| "number" \| "string", value }`, `game.variables.set(id, value)`. Как редактор рисует эти типы именно для плагинов, по рантайму не видно (кода редактора в экспорте нет), но `position` и `npc` у плагинов выглядели ровно как у встроенных действий.
+Все они используются Toolkit с 0.7.0. Переменные проекта: `game.variables.get(id)` → `{ type: "boolean" \| "number" \| "string", value }`, `game.variables.set(id, value)`. Что редактор рисует эти типы для плагинов теми же виджетами, подтверждено по коду редактора (раздел 12).
 
 **Карта и персонажи** (`game/Maps/GameMap/*`, `game/classes/*`)
 - `GameMap`: `player`, `NPCs` (у NPC — `inGameCharacterId`), `collisions` (прямоугольники `GameMapCollision` со статическими телами Arcade и коллайдером с игроком), `story`, `map`, `playingDialogue`.
 - Глубина персонажей: `низ спрайта − depthOrigin% × высота` (у игрока из присланного проекта: 84 − 31% × 64 = 64,2 — совпадает с диагностикой).
 - Анимации (`game/story/StoryAnimations/loadAnimations.ts`): каждая анимация (строка листа) грузится как текстура всего листа с ключом `<id анимации>frames` и создаётся анимация Phaser с ключом `<id анимации>`; номер кадра = `строка × floor(ширина / frameWidth) + столбец`. Toolkit с 0.6.0 находит текстуры по этому ключу и считает столбцы по ширине картинки.
 - Данные проекта во время игры — `scene.sys.settings.data.story`.
+
+## 12. Редактор PS Maker 1.2.1 (сборка из app.asar, 2026-10-27)
+
+Пользователь прислал собранный код редактора (Steam-версия, `resources/app.asar` → `build/_app/immutable/*.js`, `electron/*.cjs`). Source maps в нём нет, код минифицирован; прочитан для совместимости, в репозиторий и плагин не копировался.
+
+**Загрузка плагинов** (`electron/main.cjs`, загрузчик в редакторе)
+- Electron только читает файлы `<проект>/plugins/*.ps-maker.js`; редактор импортирует каждый как ES-модуль через blob URL и требует `default` с полями **`name` и `actions`** — плагин только с `events` не загрузится («did not produce a valid Plugin»). Toolkit экспортирует оба поля.
+- Ошибка при импорте пишется в консоль «Failed to execute plugin …», плагин пропускается.
+- Новое действие получает в `pluginParams` **только поля, у которых есть `defaultValue`** — поэтому нетронутый Position не сохраняется (раздел 10).
+
+**Поля** — один компонент для встроенных действий и плагинов, выбор виджета по `type`; изменение пишется в `pluginParams[ключ]`. При копировании карты поля плагина типов `variable` и `story-event-id` перепривязываются так же, как у встроенных действий.
+
+Свойства поля, которые читает редактор: `label`, `description` (подсказка у названия), `defaultValue`, **`group`** (сворачиваемый раздел), `hidden`, `ui` (`dropdown`, **`radio`**, `checkbox`, `textarea`), `options`, **`min` / `max` / `step`**, `placeholder`, `maxLength`, `rows`, **`required`** (подсветка незаполненного), `nullable`, `setPositionBtnLabel`, `setPathBtnLabel`, **`showPreview`** (показ точки, области или пути на карте редактора: для точек и областей включён по умолчанию, для путей выключен), `fitBoundsInView`, `columnDisplay`, `json`, `showPlayerOption`, `inMapNpcParamKey`, `variableParamKey`, `allowAll`, `allowedSources`, `previewInActionsList`.
+
+Свойства действия: **`parameterVisibility`** (`{ поле: (значения) => boolean }`, значения — сохранённые или `defaultValue`; функции из модуля плагина работают), **`collapsedGroups`** (разделы, свёрнутые при открытии), **`getPreview(params, { resolveParam })`** (текст рядом с действием в списке событий; `resolveParam(ключ)` форматирует поле как редактор: подпись варианта, «x: …, y: …», «w × h», имя анимации), **`meta.keywords`** (поиск действий), `meta.category` (категория в результатах поиска; в списке действия плагина идут под его именем), `meta.disableInDialogueAction`.
+
+**Что Toolkit использует с 0.8.0** (`src/editor/ui.ts`, отдельно от логики действий): разделы (Stats, Animations, Patrol, When, Then, When used, Look and size, Weapon layer, Placement, Interface, Debug) со свёрнутыми второстепенными, скрытие неприменимых полей, превью каждого действия, ключевые слова на русском и английском, радиокнопки для коротких выборов, пределы чисел, обязательные поля, подписи кнопок выбора на карте, показ маршрута патруля и порядка переключателей на карте редактора.
 
