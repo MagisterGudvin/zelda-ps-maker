@@ -77,12 +77,16 @@ export function pathOf(v: unknown): { x: number; y: number }[] {
   return Array.isArray(v) ? v.map(pointOf).filter((p): p is { x: number; y: number } => p !== null) : [];
 }
 
-/** An area drawn on the map, or null. */
+/**
+ * An area drawn on the map as a top-left rectangle, or null. PS Maker saves the area's centre in
+ * x/y (its area editor draws from x - width / 2), and a negative size when drawn backwards.
+ */
 export function areaOf(v: unknown): { x: number; y: number; width: number; height: number } | null {
   const o = v as { x?: unknown; y?: unknown; width?: unknown; height?: unknown } | null;
   if (!o || typeof o !== "object") return null;
-  const [x, y, w, h] = [o.x, o.y, o.width, o.height].map(Number);
-  return [x, y, w, h].every(Number.isFinite) && w > 0 && h > 0 ? { x, y, width: w, height: h } : null;
+  const [x, y] = [o.x, o.y].map(Number);
+  const [w, h] = [o.width, o.height].map((n) => Math.abs(Number(n)));
+  return [x, y, w, h].every(Number.isFinite) && w > 0 && h > 0 ? { x: x - w / 2, y: y - h / 2, width: w, height: h } : null;
 }
 
 /** Options of a multi-select (or a legacy comma list). */

@@ -6,6 +6,11 @@ import { Projectile } from "../items/projectile.ts";
 import { Interactable } from "./interactable.ts";
 
 const CARRY_OFFSET_Y = 14;
+/**
+ * How long a push survives losing contact. In PS Maker the engine moves the player into the block
+ * and the toolkit pushes it back out, so contact shows up only every second or third frame.
+ */
+const PUSH_GRACE_MS = 150;
 
 /** Thrown pot/bush/rock: flies like a projectile and shatters where it lands. */
 class ThrownObject extends Projectile {
@@ -53,6 +58,8 @@ export class InteractionSystem implements SessionSystem {
   private carried: Interactable | null = null;
   private pushTarget: Interactable | null = null;
   private pushMs = 0;
+  private pushLostMs = 0;
+  private pushDir: Facing = "down";
   private touchedDoor: Interactable | null = null;
   private readonly reach: AABB = makeBox();
   private readonly found: Entity[] = [];
@@ -176,20 +183,37 @@ export class InteractionSystem implements SessionSystem {
     } else {
       this.touchedDoor = null;
     }
-    if (!target || target.cfg.type !== "block" || !target.canPush(p.facing) || this.carried) {
+    const pushing = !!target && target.cfg.type === "block" && target.canPush(p.facing) && !this.carried;
+    if (pushing && target) {
+      if (this.pushTarget !== target || this.pushDir !== p.facing) this.pushMs = 0;
+      this.pushTarget = target;
+      this.pushDir = p.facing;
+      this.pushLostMs = 0;
+    } else if (this.pushTarget && !this.carried && p.facing === this.pushDir && this.pushTarget.canPush(p.facing) && this.leaning(this.pushTarget) && this.pushLostMs + dtMs <= PUSH_GRACE_MS) {
+      this.pushLostMs += dtMs;
+    } else {
       this.pushTarget = null;
       this.pushMs = 0;
       return;
     }
-    if (this.pushTarget !== target) {
-      this.pushTarget = target;
-      this.pushMs = 0;
-    }
+    const block = this.pushTarget;
     this.pushMs += dtMs;
     if (this.pushMs >= this.s.config.interactions.pushMs) {
       this.pushMs = 0;
-      target.tryPush(p.facing);
+      block.tryPush(p.facing);
     }
+  }
+
+  /** The player stands right against the block on the side it faces (within 2 px). */
+  private leaning(block: Interactable): boolean {
+    const b = this.s.player.box;
+    const v = FACING_VECTORS[this.pushDir];
+    const r = this.reach;
+    r.x = b.x + v.x * 2;
+    r.y = b.y + v.y * 2;
+    r.hw = b.hw;
+    r.hh = b.hh;
+    return overlaps(r, block);
   }
 
   /** Pressure plates and hazards. */

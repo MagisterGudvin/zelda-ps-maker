@@ -7,10 +7,10 @@
  *  - `onLoad`: the map's On-load events (plugin actions + their parameters),
  *  - `triggers`: event-group trigger areas with the events they run on touch.
  * The harness (host-emulator.js) replays them through the real plugin bundle.
- * All coordinates are pixels; tiles are 16x16.
+ * All coordinates are pixels; tiles are 16x16 and walls, doors and triggers sit on the tile grid.
  */
 
-const RIGHT_GATE = { x: 384, y: 104, w: 16, h: 32 };
+const RIGHT_GATE = { x: 384, y: 96, w: 16, h: 32 };
 
 export const MAPS = {
   field: {
@@ -22,14 +22,14 @@ export const MAPS = {
       { x: 0, y: 0, w: 400, h: 16 },
       { x: 0, y: 224, w: 400, h: 16 },
       { x: 0, y: 0, w: 16, h: 240 },
-      { x: 384, y: 0, w: 16, h: 104 },
-      { x: 384, y: 136, w: 16, h: 104 },
+      { x: 384, y: 0, w: 16, h: 96 },
+      { x: 384, y: 128, w: 16, h: 112 },
       // Secret room (top-left), entered through a bombable wall.
       { x: 16, y: 80, w: 32, h: 16 },
       { x: 64, y: 80, w: 32, h: 16 },
       { x: 96, y: 16, w: 16, h: 80 },
       // Switch ledge (top-right), reachable only by boomerang.
-      { x: 284, y: 16, w: 16, h: 72 },
+      { x: 288, y: 16, w: 16, h: 64 },
     ],
     npcs: [{ name: "npc_guard", x: 120, y: 184, color: "#d9822b" }],
     onLoad: [
@@ -72,8 +72,8 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "pit", position: { x: 340, y: 80 } }],
       ["Zelda: Create Object", { type: "pit", position: { x: 356, y: 80 } }],
       ["Zelda: Create Object", { type: "pit", position: { x: 372, y: 80 } }],
-      ["Zelda: Create Door", { position: { x: 392, y: 120 }, lock: "switch", startOpen: false, height: 32 }],
-      ["Zelda: Add Rule", { whenObjectAt: { x: 340, y: 40 }, openDoorAt: { x: 392, y: 120 }, message: "The gate opened!", once: true }],
+      ["Zelda: Create Door", { position: { x: 392, y: 112 }, lock: "switch", startOpen: false, height: 32 }],
+      ["Zelda: Add Rule", { whenObjectAt: { x: 340, y: 40 }, openDoorAt: { x: 392, y: 112 }, message: "The gate opened!", once: true }],
       ["Zelda: Add Rule", { whenGroup: "1", giveItem: "rupees", giveCount: 20, message: "Field cleared!", once: true }],
     ],
     triggers: [{ rect: { x: 396, y: RIGHT_GATE.y, w: 8, h: RIGHT_GATE.h }, transfer: { map: "dungeon", x: 40, y: 200 } }],
@@ -87,14 +87,15 @@ export const MAPS = {
     walls: [
       { x: 0, y: 0, w: 400, h: 16 },
       { x: 0, y: 224, w: 400, h: 16 },
-      { x: 0, y: 0, w: 16, h: 184 },
+      { x: 0, y: 0, w: 16, h: 176 },
       { x: 384, y: 0, w: 16, h: 240 },
-      // Left half split horizontally with a shutter in the middle (puzzle door).
-      { x: 16, y: 104, w: 76, h: 16 },
-      { x: 108, y: 104, w: 84, h: 16 },
+      // Left half split horizontally with a shutter in the middle (puzzle door). Doorways are two
+      // tiles wide: in PS Maker the player's body has no corner sliding.
+      { x: 16, y: 104, w: 64, h: 16 },
+      { x: 112, y: 104, w: 80, h: 16 },
       // Vertical wall between the left half and the arena with a locked door.
-      { x: 192, y: 16, w: 16, h: 96 },
-      { x: 192, y: 128, w: 16, h: 96 },
+      { x: 192, y: 16, w: 16, h: 120 },
+      { x: 192, y: 168, w: 16, h: 56 },
     ],
     npcs: [],
     onLoad: [
@@ -104,15 +105,15 @@ export const MAPS = {
       // 8. Block + pressure plate opens the puzzle shutter.
       ["Zelda: Create Object", { type: "block", position: { x: 88, y: 168 } }],
       ["Zelda: Create Object", { type: "pressure_plate", position: { x: 104, y: 168 }, staysOn: true }],
-      ["Zelda: Create Door", { position: { x: 100, y: 112 }, lock: "switch", startOpen: false }],
-      ["Zelda: Add Rule", { whenObjectAt: { x: 104, y: 168 }, openDoorAt: { x: 100, y: 112 }, once: true }],
+      ["Zelda: Create Door", { position: { x: 96, y: 112 }, lock: "switch", startOpen: false, width: 32 }],
+      ["Zelda: Add Rule", { whenObjectAt: { x: 104, y: 168 }, openDoorAt: { x: 96, y: 112 }, once: true }],
       // 7. Chest with a small key + locked door.
       ["Zelda: Create Chest", { position: { x: 60, y: 48 }, item: "key", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Object", { type: "torch", position: { x: 150, y: 40 } }],
-      ["Zelda: Create Door", { position: { x: 200, y: 120 }, lock: "small_key", startOpen: false }],
+      ["Zelda: Create Door", { position: { x: 200, y: 152 }, lock: "small_key", startOpen: false, height: 32 }],
       // Arena: an area drawn on the map; two waves start when the player walks in, then the mini-boss.
       ["Zelda: Create Chest", { position: { x: 300, y: 60 }, item: "rupees", count: 50, requiresBigKey: false, hidden: true }],
-      ["Zelda: Create Wave Room", { area: { x: 212, y: 16, width: 172, height: 208 }, startAtOnce: false, delayMs: 800, spawnEnemy: "ogre", spawnAt: { x: 300, y: 120 }, message: "The guardian awakens!" }],
+      ["Zelda: Create Wave Room", { area: { x: 298, y: 120, width: 172, height: 208 }, startAtOnce: false, delayMs: 800, spawnEnemy: "ogre", spawnAt: { x: 300, y: 120 }, message: "The guardian awakens!" }],
       ["Zelda: Add Wave Enemy", { wave: 1, template: "slime", position: { x: 300, y: 80 } }],
       ["Zelda: Add Wave Enemy", { wave: 1, template: "slime", position: { x: 320, y: 160 } }],
       ["Zelda: Add Wave Enemy", { wave: 2, template: "soldier", position: { x: 340, y: 120 } }],
@@ -120,7 +121,7 @@ export const MAPS = {
       ["Zelda: Add Rule", { whenBoss: true, revealAt: { x: 300, y: 60 }, once: true }],
     ],
     triggers: [
-      { rect: { x: 0, y: 184, w: 6, h: 40 }, transfer: { map: "field", x: 370, y: 120 } },
+      { rect: { x: 0, y: 176, w: 6, h: 48 }, transfer: { map: "field", x: 370, y: 120 } },
     ],
   },
 };

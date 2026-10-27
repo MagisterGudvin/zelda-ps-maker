@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
 import { normalizeKey } from "../../src/host/keyboardInput.ts";
+import { areaOf } from "../../src/editor/fields.ts";
 
 type AnyAction = { name: string; parameterDefs: Record<string, { type: string; label?: string; description: string }>; execute(params: Record<string, unknown>, ctx: unknown): void };
 
@@ -169,10 +170,10 @@ test("switch order is a path on the map; wave rooms are areas", async () => {
   s.update(50);
   assert.equal((s.world.get("door@160,60") as unknown as { objState: string }).objState, "opened");
 
-  // Wave room: an area; a door inside locks; enemies inside belong to it; walking in starts it.
+  // Wave room: an area (PS Maker saves its centre); a door inside locks; enemies inside belong to it; walking in starts it.
   run("Zelda: Create Door", { position: { x: 400, y: 300 }, lock: "none", startOpen: true });
   run("Zelda: Add Wave Enemy", { wave: 1, template: "slime", position: { x: 450, y: 320 } });
-  run("Zelda: Create Wave Room", { area: { x: 380, y: 280, width: 160, height: 120 }, delayMs: 100, giveItem: "rupees", giveCount: 20 });
+  run("Zelda: Create Wave Room", { area: { x: 460, y: 340, width: 160, height: 120 }, delayMs: 100, giveItem: "rupees", giveCount: 20 });
   s.update(50);
   assert.equal(s.world.count("enemy"), 0, "not started before the player walks in");
   s.host.setPlayerPosition(460, 340);
@@ -210,4 +211,11 @@ test("items and enemy types by slot; stats into project variables; animations pi
   for (let i = 0; i < 8; i++) s.update(17);
   assert.equal(vars.get("var_rupees")!.value, 42);
   done();
+});
+
+test("a drawn area is read from its centre, as the PS Maker area editor saves it", () => {
+  assert.deepEqual(areaOf({ x: 100, y: 100, width: 40, height: 20 }), { x: 80, y: 90, width: 40, height: 20 });
+  assert.deepEqual(areaOf({ x: 100, y: 100, width: -40, height: 20 }), { x: 80, y: 90, width: 40, height: 20 }, "drawn backwards");
+  assert.equal(areaOf({ x: 1, y: 1, width: 0, height: 5 }), null);
+  assert.equal(areaOf(undefined), null);
 });

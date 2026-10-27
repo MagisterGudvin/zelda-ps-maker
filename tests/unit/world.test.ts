@@ -85,6 +85,33 @@ test("push a block onto a pressure plate and a rule opens a door", () => {
   assert.equal(door.objState, "opened");
 });
 
+test("a block is pushed when contact shows up only every third frame (PS Maker moves the player)", () => {
+  const rig = createRig({ interactions: { pushMs: 100 } });
+  const p = rig.host.player!;
+  const block = createObject(rig.session, "block", p.x + 16, p.y, { id: "b1" })!;
+  const bx0 = block.x;
+  face(rig, 1, 0);
+  for (let i = 0; i < 90 && block.x === bx0; i++) {
+    rig.host.walk(i % 3 === 0 ? 1 : 0, 0);
+    rig.step();
+  }
+  rig.run(400);
+  assert.equal(block.x, bx0 + rig.tk.config.world.tileSize, "block moved one tile");
+
+  // Walking away (or turning) stops the push.
+  const block2 = createObject(rig.session, "block", p.x, p.y + 16, { id: "b2" })!;
+  const by0 = block2.x;
+  face(rig, 0, 1);
+  rig.host.walk(0, 1);
+  rig.step();
+  for (let i = 0; i < 30; i++) {
+    rig.host.walk(-1, 0);
+    rig.step();
+  }
+  rig.run(400);
+  assert.equal(block2.x, by0, "not pushed after walking away");
+});
+
 test("lever toggles and sets/clears its flag", () => {
   const rig = createRig();
   face(rig, 1, 0);

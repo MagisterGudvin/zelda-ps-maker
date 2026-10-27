@@ -263,3 +263,27 @@ PS Maker получает просто объект `export default { name, desc
 
 **Что Toolkit использует с 0.8.0** (`src/editor/ui.ts`, отдельно от логики действий): разделы (Stats, Animations, Patrol, When, Then, When used, Look and size, Weapon layer, Placement, Interface, Debug) со свёрнутыми второстепенными, скрытие неприменимых полей, превью каждого действия, ключевые слова (только латиница, с 0.8.1), радиокнопки для коротких выборов, пределы чисел, обязательные поля, подписи кнопок выбора на карте, показ маршрута патруля и порядка переключателей на карте редактора.
 
+
+## 13. Формат проекта, жизненный цикл карт и проверка в настоящем рантайме (2026-10-27)
+
+По исходникам рантайма 1.2.1 (раздел 11), коду Electron-части редактора (раздел 12) и экспорту игры пользователя. Код PS Maker прочитан для совместимости и не копировался.
+
+**Где лежат проекты** (`electron/main.cjs`: `getProjectsDataDir`): Linux — `$XDG_DATA_HOME` или `~/.local/share/PS Maker/projects/<папка>`, Windows — `%LOCALAPPDATA%\PS Maker\projects`, macOS — `~/Library/Application Support/PS Maker/projects`. Проект — папка с `story.json`, `assets/` (файлы по ключам ассетов) и `plugins/`; список проектов — просто подпапки. Запись сверяет `metadata.storyId`, поэтому у нового проекта свой id. `metadata.schemaVersion` 32 — последняя схема 1.2.1.
+
+**Карта** (`Maps.ts`, `MapCollisions`, команды редактора):
+- `terrainLayers[].terrainGrid[x][y]` = id террейна (ячейки по `tileSize`), автотайл «wang blob» по 8 соседям; первый слой («Details») рисуется над «Ground».
+- `mapObjects[]`: `{ id, mapObjectId, position }`, позиция — **центр** картинки; коллизия — `collision.box` объекта из библиотеки.
+- `mapCollisions[]`: `{ inGameId, x, y, width, height }` — прямоугольники от левого верхнего угла.
+- `setupActions` («Map setup»: позиция игрока, NPC), `initialActions` («Map start», «When map first starts»), `enterActions` («Map enter», при каждом входе), `leaveActions`.
+- Действие плагина в списке: `{ type: "plugin:<sanitizeName(плагин)>:<sanitizeName(действие)>", name, id, pluginName, actionName, pluginParams }`.
+- Триггер «Add event trigger»: `triggerType` (`interact`, `touch`, …), `staticArea` и событие в `ownedStoryEvents` с `owner: { type: "action", actionId, relation: "local-trigger" }`.
+
+**Области сохраняются по центру.** Редактор областей (`AreaEditor/areaGeometry.ts`) рисует прямоугольник от `x − width / 2`, а `TouchTrigger` — Phaser-прямоугольник с началом в центре. До 0.9.0 Toolkit считал `x/y` области `Create Wave Room` левым верхним углом: в настоящем редакторе арена сдвигалась на половину размера. Исправлено (`areaOf`), ширина/высота берутся по модулю (область, нарисованная «назад»).
+
+**Возврат на карту.** Смена карты — `scene.switch` (`ActiveMap.switchMap`): уходящая карта **засыпает**, её состояние снимается (`MapStateTracker`), при возврате сцена **просыпается** и восстанавливается без повторного запуска «Map start» (`initialActions`); «Map setup» тоже не повторяется, «Map enter» выполняется при каждом входе. В 0.8.x Toolkit после возврата оставался привязан к другой карте — на поле не было ни врагов, ни объектов (воспроизведено в рантайме). С 0.9.0 Toolkit запоминает действия, построившие карту, и выполняет их снова по событию `wake` (`src/editor/mapReplay.ts`); на `sleep` сессия останавливается, прогресс сохраняется.
+
+**Толкание блока.** Игрока двигает PS Maker (`body.setVelocity`), Toolkit выталкивает его из своих твёрдых объектов; в рантайме касание блока видно только в каждом 2–3-м кадре, и счётчик толчка сбрасывался. С 0.9.0 толчок переживает потерю касания до 150 мс, пока игрок стоит вплотную и смотрит на блок.
+
+**Экспорт игры.** `game.dat` — BSON-версия `story.json`, ключи ассетов переписаны в `game-assets/<файл>`; плагины — `plugins/manifest.json` (`{ "plugins": ["….ps-maker.js"] }`) и файлы рядом. На этом основан `scripts/runtime-check.mjs`: демо-проект запускается в настоящем рантайме из экспорта пользователя (файлы рантайма в репозиторий не попадают).
+
+**Проверено в рантайме PS Maker 1.2.1** (headless Chromium, экспорт пользователя, демо-проект из `scripts/make-demo-project.mjs`): загрузка плагина через manifest, все действия «Map start», внешний вид врагов из персонажей встроенного набора, сундук, переход «Change map» по триггеру касания, блок на плите, ключ и дверь, волны и страж, тайный сундук, возврат на поле с сохранением прогресса, без ошибок страницы.

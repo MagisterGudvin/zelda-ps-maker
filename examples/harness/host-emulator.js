@@ -1,10 +1,11 @@
 /**
  * PS Maker host EMULATOR for testing Zelda Maker Toolkit outside the editor.
  *
- * It reproduces only what the plugin API documents: a Phaser GameMap scene,
- * an Arcade-physics player Actor moved by the host (8 directions), map
- * collision rectangles as static bodies, NPC sprites, On-load events and
- * trigger areas that call plugin actions with `(params, { game, scene, player })`.
+ * It reproduces what the plugin relies on: one Phaser scene per map (key = map id), an
+ * Arcade-physics player moved by the host (8 directions), map collision rectangles as static
+ * bodies, NPC sprites, "Map start" events and trigger areas that call plugin actions with
+ * `(params, { game, scene, player, endAction })`. Like PS Maker 1.2.1, changing maps uses
+ * `scene.switch`: the map you leave sleeps and later wakes up without running "Map start" again.
  * It is NOT PS Maker; see docs/TESTING.md for what still needs checking there.
  */
 import plugin from "../../dist/zelda-maker-toolkit.ps-maker.js";
@@ -33,15 +34,28 @@ function makeTexture(scene, key, w, h, paint) {
   tex.refresh();
 }
 
+/** Where the player arrives on the next map (set by a transfer trigger). */
+const arrival = {};
+
 class GameMap extends Phaser.Scene {
-  constructor() {
-    super("GameMap");
+  constructor(mapId) {
+    super(mapId);
+    this.mapId = mapId;
   }
 
-  init(data) {
-    this.mapId = data?.mapId ?? "field";
-    this.spawnAt = data?.spawn ?? null;
+  init() {
+    this.spawnAt = arrival[this.mapId] ?? null;
+    delete arrival[this.mapId];
     this.firedTriggers = new Set();
+    this.events.on("wake", () => {
+      const at = arrival[this.mapId];
+      delete arrival[this.mapId];
+      if (at) {
+        this.player.setPosition(at.x, at.y);
+        this.player.body.reset(at.x, at.y);
+      }
+      window.dispatchEvent(new CustomEvent("demo:map-loaded", { detail: this.mapId }));
+    });
   }
 
   create() {
@@ -94,7 +108,8 @@ class GameMap extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true);
     if (MAP_ZOOM === 1) this.cameras.main.setBounds(0, 0, map.size.w, map.size.h);
 
-    // PS Maker runs the map's On-load events after the map is built.
+    // PS Maker runs the map's "Map start" events once, after the map is built.
+    this.onLoadRuns = (this.onLoadRuns ?? 0) + 1;
     this.playEvent(map.onLoad);
     window.dispatchEvent(new CustomEvent("demo:map-loaded", { detail: this.mapId }));
   }
@@ -140,8 +155,10 @@ class GameMap extends Phaser.Scene {
       const inside = b.right > r.x && b.x < r.x + r.w && b.bottom > r.y && b.y < r.y + r.h;
       if (!inside) continue;
       if (t.transfer) {
-        // "Transfer player": PS Maker fades and reloads the map scene.
-        this.scene.restart({ mapId: t.transfer.map, spawn: { x: t.transfer.x, y: t.transfer.y } });
+        // "Change map": this map sleeps, the destination starts (first visit) or wakes up.
+        this.player.setVelocity(0, 0);
+        arrival[t.transfer.map] = { x: t.transfer.x, y: t.transfer.y };
+        this.scene.switch(t.transfer.map);
         return;
       }
       const key = JSON.stringify(r);
@@ -161,12 +178,15 @@ const game = new Phaser.Game({
   pixelArt: true,
   backgroundColor: "#000000",
   physics: { default: "arcade", arcade: { debug: false } },
-  scene: [GameMap],
+  scene: Object.keys(MAPS).map((id) => new GameMap(id)),
 });
+
+/** The map scene being played. */
+const activeMap = () => game.scene.getScenes(true).find((s) => s instanceof GameMap);
 
 // Harness-only shortcuts that an author would wire to PS Maker menu events.
 window.addEventListener("keydown", (e) => {
-  const scene = game.scene.getScene("GameMap");
+  const scene = activeMap();
   if (!scene?.player) return;
   if (e.code === "F5") scene.playEvent([["Zelda: Save Progress", { slot: "default" }]]);
   else if (e.code === "F8") scene.playEvent([["Zelda: Load Progress", { slot: "default" }]]);
@@ -178,10 +198,10 @@ window.addEventListener("keydown", (e) => {
 window.__harness = {
   game,
   plugin,
-  scene: () => game.scene.getScene("GameMap"),
-  player: () => game.scene.getScene("GameMap")?.player,
+  scene: activeMap,
+  player: () => activeMap()?.player,
   run: (name, params) => {
-    game.scene.getScene("GameMap").playEvent([[name, params]]);
+    activeMap().playEvent([[name, params]]);
   },
   api: () => window.ZeldaMakerToolkit,
 };

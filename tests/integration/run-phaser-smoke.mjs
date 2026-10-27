@@ -190,7 +190,7 @@ await check("boomerang over the pits hits the switch; the rule opens the gate", 
   await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.equip("boomerang"));
   await tapKey("c");
   await sleep(1600);
-  const r = await ev(() => ({ sw: window.ZeldaMakerToolkit.session.world.get("button@340,40").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,120").objState }));
+  const r = await ev(() => ({ sw: window.ZeldaMakerToolkit.session.world.get("button@340,40").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,112").objState }));
   assert(r.sw === "on" && r.gate === "opened", JSON.stringify(r));
 });
 
@@ -208,22 +208,22 @@ await check("debug overlay: clicking the map shows and copies its coordinates", 
 await page.screenshot({ path: `${ARTIFACTS}field.png` });
 await page.keyboard.press("F9");
 
-await check("map transfer restarts the scene without leaking listeners", async () => {
+await check("map transfer (the map sleeps and wakes up, as in PS Maker) does not leak listeners", async () => {
   // Phaser registers some listeners of its own when the HUD scene is first
   // created, so compare repeated visits: counts must not grow per transfer.
-  await teleport(392, 120);
+  await teleport(392, 112);
   await waitForMap("dungeon");
   const d1 = await listenerCounts();
   await teleport(4, 200);
   await waitForMap("field");
   const f2 = await listenerCounts();
-  await teleport(392, 120);
+  await teleport(392, 112);
   await waitForMap("dungeon");
   const d2 = await listenerCounts();
   await teleport(4, 200);
   await waitForMap("field");
   const f3 = await listenerCounts();
-  await teleport(392, 120);
+  await teleport(392, 112);
   await waitForMap("dungeon");
   assert(JSON.stringify(d1) === JSON.stringify(d2), `dungeon listeners grew: ${JSON.stringify(d1)} → ${JSON.stringify(d2)}`);
   assert(JSON.stringify(f2) === JSON.stringify(f3), `field listeners grew: ${JSON.stringify(f2)} → ${JSON.stringify(f3)}`);
@@ -240,7 +240,7 @@ await check("dungeon: push the block onto the plate, the shutter opens", async (
   await page.waitForFunction(() => window.ZeldaMakerToolkit.session.world.get("pressure_plate@104,168").objState === "on", null, { timeout: 4000 });
   await page.keyboard.up("ArrowRight");
   await sleep(200);
-  const door = await ev(() => window.ZeldaMakerToolkit.session.world.get("door@100,112").objState);
+  const door = await ev(() => window.ZeldaMakerToolkit.session.world.get("door@96,112").objState);
   assert(door === "opened", `door ${door}`);
 });
 
@@ -253,17 +253,17 @@ await check("dungeon: key from the chest opens the locked door", async () => {
   // Poll instead of a fixed delay: under load the chest can open a few frames later.
   await page.waitForFunction(() => window.ZeldaMakerToolkit.toolkit.inventory.count("key") > 0, null, { timeout: 1500 }).catch(() => {});
   const keys = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.count("key"));
-  await teleport(180, 120);
+  await teleport(180, 152);
   await page.keyboard.down("ArrowRight");
   await sleep(500);
   await page.keyboard.up("ArrowRight");
-  const r = await ev(() => ({ door: window.ZeldaMakerToolkit.session.world.get("door@200,120").objState, keys: window.ZeldaMakerToolkit.toolkit.inventory.count("key") }));
+  const r = await ev(() => ({ door: window.ZeldaMakerToolkit.session.world.get("door@200,152").objState, keys: window.ZeldaMakerToolkit.toolkit.inventory.count("key") }));
   assert(keys === 1, `keys after chest ${keys}`);
   assert(r.door === "unlocked" && r.keys === 0, JSON.stringify(r));
 });
 
 await check("arena trigger starts waves at points picked on the map (Add Wave Enemy)", async () => {
-  await teleport(224, 120);
+  await teleport(224, 152);
   await sleep(300);
   const pts = await ev(() => window.ZeldaMakerToolkit.session.world.list("enemy").filter((e) => e.alive).map((e) => [Math.round(e.x), Math.round(e.y), e.cfg.template]));
   assert(pts.length === 2, `enemies ${JSON.stringify(pts)}`);
@@ -276,8 +276,11 @@ await page.screenshot({ path: `${ARTIFACTS}dungeon.png` });
 await check("progress persists across maps (opened chests stay open)", async () => {
   await teleport(4, 200);
   await waitForMap("field");
-  const r = await ev(() => ({ chest: window.ZeldaMakerToolkit.session.world.get("chest@200,40").objState, wall: window.ZeldaMakerToolkit.session.world.get("bombable_wall@56,88").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,120").objState }));
+  const r = await ev(() => ({ chest: window.ZeldaMakerToolkit.session.world.get("chest@200,40").objState, wall: window.ZeldaMakerToolkit.session.world.get("bombable_wall@56,88").objState, gate: window.ZeldaMakerToolkit.session.world.get("door@392,112").objState, enemies: window.ZeldaMakerToolkit.session.world.count("enemy"), started: window.__harness.scene().onLoadRuns }));
   assert(r.chest === "opened" && r.wall === "destroyed" && r.gate === "opened", JSON.stringify(r));
+  // "Map start" ran once; the Toolkit re-created the field's enemies and objects when it woke up.
+  assert(r.started === 1 && r.enemies > 0, JSON.stringify(r));
+  return JSON.stringify(r);
 });
 
 await check("save (F5) and load (F8) restore progress from localStorage", async () => {

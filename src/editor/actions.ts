@@ -19,6 +19,7 @@ import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosit
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
+import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { ABILITY_OPTIONS, animation, areaOf, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
@@ -302,7 +303,8 @@ const startToolkit = defineEvent({
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
       // The map is remembered by its PS Maker map id (scene key); a Map ID typed in older versions still wins.
       const mapId = textOf(old.mapId) || undefined;
-      const reason = sessionMismatch(tk.session, ctx, mapId);
+      // A session re-created when PS Maker woke the map up gives way to a Start Toolkit in "Map enter".
+      const reason = sessionMismatch(tk.session, ctx, mapId) ?? (isReplayedSession(tk.session) && !isReplaying() ? "the map's actions run again" : null);
       if (!reason) {
         tk.logger.info(`Already running on map "${tk.session!.mapId}"; kept existing objects.`);
         ensureSession(ctx);
@@ -1206,9 +1208,15 @@ function endsAction(e: PluginEvent<any>): PluginEvent<any> {
   return {
     ...e,
     execute(params: any, ctx: any) {
+      const before = getToolkit().session;
       try {
         execute.call(e, params, ctx);
       } finally {
+        try {
+          recordMapAction(e.name, (p, c) => execute.call(e, p as any, c as any), params, ctx, before);
+        } catch (err) {
+          getToolkit().logger.error(`Could not remember "${e.name}" for this map:`, err);
+        }
         (ctx as { endAction?: (result?: object) => void } | undefined)?.endAction?.({});
       }
     },
