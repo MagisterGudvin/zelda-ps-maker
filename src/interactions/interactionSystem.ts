@@ -76,6 +76,11 @@ export class InteractionSystem implements SessionSystem {
     return this.carried !== null;
   }
 
+  /** The player is leaning on a block it can push (push animation). */
+  isPushing(): boolean {
+    return this.pushTarget !== null;
+  }
+
   tick(dtMs: number): void {
     const p = this.s.player;
     if (!p.present) return;

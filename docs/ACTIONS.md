@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.10.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.11.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **37**. Все имена начинаются с `Zelda: `.
 
@@ -471,14 +471,27 @@ Makes your own enemy type from an existing one: other stats and a PS Maker chara
 
 ## Zelda: Set Player Sprites
 
-Player attack animations from PS Maker (e.g. Mana Seed Sword Attack): pick any direction, all directions of that sheet are used. Empty = built-in blade. / Анимации атаки игрока из PS Maker.
+Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, lifting, pushing, shield and death: pick any direction, all directions of that sheet are used. Empty = not used (the normal PS Maker sprite or the built-in blade). / Анимации игрока из PS Maker.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `attack` (Attack) | player-animation-picker | `""` | Sword swing, e.g. Sword Attack. / Удар мечом. |
 | `spin` (Spin attack) | player-animation-picker | `""` | Optional; empty = Attack. / Круговой удар. |
 | `charge` (Charging) | player-animation-picker | `""` | Optional: while the sword is held; empty = last Attack frame. / Зарядка удара. |
+| `chargeWalk` (Walking while charging) | player-animation-picker | `""` | Optional: walking with the sword held, e.g. Sword Walk; empty = normal walk with the built-in blade. / Ходьба с заряженным мечом. |
 | `hurt` (Hurt) | player-animation-picker | `""` | Optional, e.g. Sword Hurt. / Получение урона. |
+| `death` (Death) | player-animation-picker | `""` | Optional, e.g. Sword Death; the last frame stays until respawn. / Смерть. |
+| `shield` (Shield up) | player-animation-picker | `""` | Optional: while the shield button is held (Start Toolkit: Shield on a button). / Щит поднят. |
+| `bow` (Bow) | player-animation-picker | `""` | Optional: shooting an arrow; empty = Use item. / Лук. |
+| `boomerang` (Boomerang) | player-animation-picker | `""` | Optional: throwing the boomerang; empty = Use item. / Бумеранг. |
+| `bomb` (Bomb) | player-animation-picker | `""` | Optional: placing a bomb; empty = Use item. / Бомба. |
+| `hookshot` (Hookshot) | player-animation-picker | `""` | Optional: firing the hookshot; empty = Use item. / Крюк. |
+| `item` (Use item) | player-animation-picker | `""` | Optional: any other item (rods, magic, your own items) and the fallback for the four above. / Использование предмета. |
+| `lift` (Lift) | player-animation-picker | `""` | Optional: picking up a pot, bush or rock. / Поднять. |
+| `carry` (Carry) | player-animation-picker | `""` | Optional: walking with the object overhead; stands on the first frame. / Нести над головой. |
+| `throw` (Throw) | player-animation-picker | `""` | Optional: throwing what you carry. / Бросить. |
+| `push` (Push) | player-animation-picker | `""` | Optional: leaning on a block to push it. / Толкать блок. |
+| `itemGet` (Item get) | player-animation-picker | `""` | Optional: holding up an item from a chest for a second (the player stands still meanwhile). / Достать предмет из сундука. |
 | `weaponAttack` (Weapon layer: attack) | animation | `""` | Optional: a separate weapon sheet drawn over the body (when the weapon is not in the body frames). / Слой оружия: удар. |
 | `weaponSpin` (Weapon layer: spin) | animation | `""` | Optional. / Слой оружия: круговой. |
 | `weaponCharge` (Weapon layer: charging) | animation | `""` | Optional. / Слой оружия: зарядка. |

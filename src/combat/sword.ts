@@ -4,7 +4,7 @@ import { type AABB, boxCircleOverlap, type Facing, makeBox } from "../core/math.
 import type { EntityView } from "../host/types.ts";
 import type { DamageType, HitResult } from "../core/types.ts";
 import { AttackInstance, isDamageable, makeDamage, resolveHit } from "./combat.ts";
-import { buildOverlay } from "../player/overlay.ts";
+import { buildOverlay, OVERLAY_PRIORITY } from "../player/overlay.ts";
 
 export type SwordPhase = "idle" | "windup" | "active" | "recovery" | "charging" | "spin";
 
@@ -20,6 +20,8 @@ const SPIN_TURNS = 1;
 export class SwordSystem implements SessionSystem {
   readonly name = "sword";
   phase: SwordPhase = "idle";
+  /** An author animation is drawn for the current phase (else the built-in blade is). */
+  private animShown = false;
   phaseMs = 0;
   charged = false;
   /** Current hitbox (valid when `hitboxActive`). */
@@ -254,7 +256,7 @@ export class SwordSystem implements SessionSystem {
     const mode = this.cfg.showBlade;
     if (mode !== "auto") return mode === "always";
     const sp = this.s.config.player.sprites;
-    return !(sp.attack || sp.weaponAttack) || !this.s.config.sprites.animations[sp.attack || sp.weaponAttack];
+    return !(sp.attack || sp.weaponAttack) || !this.s.config.sprites.animations[sp.attack || sp.weaponAttack] || !this.animShown;
   }
 
   private updateView(): void {
@@ -293,11 +295,16 @@ export class SwordSystem implements SessionSystem {
       layers = buildOverlay(this.s.config, sp.attack, sp.weaponAttack, facing, this.swingMs, c.windupMs + c.activeMs + c.recoveryMs);
     } else if (this.phase === "spin") {
       layers = buildOverlay(this.s.config, sp.spin || sp.attack, sp.weaponSpin || sp.weaponAttack, facing, this.phaseMs, c.charge.spinMs);
+    } else if (this.phase === "charging" && this.s.player.isMoving) {
+      // Walking with the sword held: its own animation, or PS Maker's walk with the built-in blade
+      // (a single held attack frame would slide along without moving its legs).
+      layers = sp.chargeWalk ? buildOverlay(this.s.config, sp.chargeWalk, sp.weaponCharge, facing, this.s.player.walkMs) : null;
     } else if (this.phase === "charging") {
       // Without a charge animation, hold the last frame of the attack (sword pointed forward).
       layers = sp.charge || sp.weaponCharge ? buildOverlay(this.s.config, sp.charge, sp.weaponCharge, facing, this.phaseMs) : buildOverlay(this.s.config, sp.attack, sp.weaponAttack, facing, 1e9, 1);
     }
-    this.s.player.requestOverlay(2, layers);
+    this.animShown = layers !== null;
+    this.s.player.requestOverlay(OVERLAY_PRIORITY.sword, layers);
   }
 
   dispose(): void {

@@ -145,7 +145,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
   // Player attack/hurt sheets, if the project's player has the Tiles 'N Such sword sheets.
   const playerSheet = (sheetName) =>
     (source.spritesheetAnimations ?? []).find((s) => s.ownerRef?.type === "player" && s.name === sheetName)?.animations?.[0]?.id;
-  const sprites = { attack: playerSheet("Sword Attack"), hurt: playerSheet("Sword Hurt") };
+  const sprites = { attack: playerSheet("Sword Attack"), hurt: playerSheet("Sword Hurt"), chargeWalk: playerSheet("Sword Walk"), death: playerSheet("Sword Death") };
 
   // ---- maps ---------------------------------------------------------------------------------
   const builtMaps = Object.entries(maps).map(([key, m]) => {
@@ -217,7 +217,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Create Wave Room" && slotOf[p.spawnEnemy]) p.spawnEnemy = slotOf[p.spawnEnemy];
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
-        if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", { attack: sprites.attack, ...(sprites.hurt ? { hurt: sprites.hurt } : {}) }));
+        if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }

@@ -3,6 +3,9 @@ import type { ToolkitConfig } from "../core/config.ts";
 import type { Facing } from "../core/math.ts";
 import type { OverlayLayer } from "../host/types.ts";
 
+/** Which player animation wins when several want to show (higher wins). */
+export const OVERLAY_PRIORITY = { pose: 1, hurt: 2, sword: 3, action: 4, itemGet: 5, death: 6 } as const;
+
 /**
  * Builds the player overlay (body + optional weapon layer) for one moment of
  * an action. Returns null when the body animation is not configured or not

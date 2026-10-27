@@ -3,7 +3,7 @@ import type { Entity } from "../core/entity.ts";
 import { type AABB, copyBox, type Facing, FACING_VECTORS, facingFromVector, isInFront, makeBox, normalize, penetration, type Vec2 } from "../core/math.ts";
 import type { Damageable, DamageInfo, HitResult } from "../core/types.ts";
 import { changeHealth, changeMagic } from "./health.ts";
-import { buildOverlay } from "./overlay.ts";
+import { buildOverlay, OVERLAY_PRIORITY } from "./overlay.ts";
 import type { OverlayLayer } from "../host/types.ts";
 
 export type PlayerState = "normal" | "dead";
@@ -11,6 +11,17 @@ export type PlayerState = "normal" | "dead";
 const BLINK_PERIOD_MS = 66;
 const HURT_TINT = 0xff4444;
 const DEAD_TINT = 0x555577;
+/** Shortest time a one-shot body animation (item, lift, throw) is shown. */
+const POSE_MIN_MS = 250;
+const ITEM_GET_MS = 1000;
+const DEATH_ANIM_MS = 1000;
+/**
+ * Still counts as walking this long after the last step: PS Maker moves the player once per
+ * rendered frame, so at a low frame rate some 60 Hz ticks see no movement.
+ */
+const WALK_GRACE_MS = 120;
+/** Item ids with their own animation slot (others use `item`). */
+const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb" | "hookshot"> = { bow: "bow", boomerang: "boomerang", bomb: "bomb", hookshot: "hookshot" };
 
 /**
  * Wraps the PS Maker player Actor. Movement stays under PS Maker's control;
@@ -65,9 +76,56 @@ export class PlayerSystem implements SessionSystem, Damageable {
   private overlayReq: { prio: number; layers: OverlayLayer[] } | null = null;
   private overlayShown = false;
   private hurtMs = -1;
+  /** One-shot body animation (item use, lift, throw, item get) and its clock. */
+  private pose: { anim: string; ms: number; durationMs: number; lock: boolean } | null = null;
+  private deadAnimMs = 0;
+  private clockMs = 0;
+  private stillMs = WALK_GRACE_MS;
+  /** Time spent walking (drives walk-like animations: carrying, charging). */
+  walkMs = 0;
+  private readonly offs: (() => void)[] = [];
 
   constructor(session: Session) {
     this.s = session;
+    const sp = () => session.config.player.sprites;
+    this.offs.push(
+      session.bus.on("zelda:item:used", ({ itemId }) => {
+        const slot = ITEM_SLOTS[itemId];
+        const useMs = session.toolkit.items.get(itemId)?.useMs ?? 0;
+        this.playPose((slot && sp()[slot]) || sp().item, Math.max(POSE_MIN_MS, useMs));
+      }),
+      session.bus.on("zelda:object:lifted", () => this.playPose(sp().lift, POSE_MIN_MS)),
+      session.bus.on("zelda:object:thrown", () => this.playPose(sp().throw, POSE_MIN_MS)),
+      session.bus.on("zelda:chest:opened", ({ itemId }) => {
+        if (itemId) this.playPose(sp().itemGet, ITEM_GET_MS, true);
+      }),
+    );
+  }
+
+  /** The player moved this tick (PS Maker moved it). */
+  get isMoving(): boolean {
+    return this.stillMs < WALK_GRACE_MS;
+  }
+
+  /**
+   * Shows a one-shot body animation for `durationMs` (frames spread over that time; the last one
+   * is held). Empty or unknown animation ids do nothing. `lock` keeps the player still meanwhile.
+   */
+  playPose(anim: string, durationMs: number, lock = false): void {
+    if (!anim || !this.s.config.sprites.animations[anim] || this.state === "dead") return;
+    if (this.pose?.lock) this.unlock("pose");
+    this.pose = { anim, ms: 0, durationMs, lock };
+    if (lock) this.lock("pose");
+  }
+
+  private tickPose(dtMs: number): void {
+    this.clockMs += dtMs;
+    const pose = this.pose;
+    if (!pose) return;
+    pose.ms += dtMs;
+    if (pose.ms < pose.durationMs) return;
+    if (pose.lock) this.unlock("pose");
+    this.pose = null;
   }
 
   get x(): number {
@@ -144,9 +202,16 @@ export class PlayerSystem implements SessionSystem, Damageable {
   }
 
   flushOverlay(): void {
-    if (this.hurtMs >= 0 && this.knockMs > 0 && this.state === "normal") {
-      const sp = this.s.config.player.sprites;
-      this.requestOverlay(1, buildOverlay(this.s.config, sp.hurt, "", this.facing, this.hurtMs));
+    const cfg = this.s.config;
+    const sp = cfg.player.sprites;
+    if (this.state === "dead") {
+      this.requestOverlay(OVERLAY_PRIORITY.death, buildOverlay(cfg, sp.death, "", this.facing, this.deadAnimMs, Math.min(DEATH_ANIM_MS, cfg.player.respawnDelayMs)));
+    } else {
+      if (this.pose) this.requestOverlay(this.pose.lock ? OVERLAY_PRIORITY.itemGet : OVERLAY_PRIORITY.action, buildOverlay(cfg, this.pose.anim, "", this.facing, this.pose.ms, this.pose.durationMs));
+      if (this.hurtMs >= 0 && this.knockMs > 0) this.requestOverlay(OVERLAY_PRIORITY.hurt, buildOverlay(cfg, sp.hurt, "", this.facing, this.hurtMs));
+      // Ongoing states: carrying (walks), pushing a block, holding the shield up.
+      const pose = this.s.interactions?.isCarrying() ? sp.carry : this.s.interactions?.isPushing() ? sp.push : this.shieldRaised() ? sp.shield : "";
+      if (pose) this.requestOverlay(OVERLAY_PRIORITY.pose, buildOverlay(cfg, pose, "", this.facing, pose === sp.push ? this.clockMs : this.isMoving ? this.walkMs : 0));
     }
     const req = this.overlayReq;
     this.overlayReq = null;
@@ -182,10 +247,15 @@ export class PlayerSystem implements SessionSystem, Damageable {
     // Health can reach zero from scripts (Change Player Health) as well as hits.
     if (this.state === "normal" && this.s.state.player.hp <= 0) this.die();
     if (this.state === "dead") {
+      this.deadAnimMs += dtMs;
       this.tickDead(dtMs);
       return;
     }
 
+    const stepped = this.hasPrev && Math.abs(this.box.x - this.prevX) + Math.abs(this.box.y - this.prevY) > 0.05;
+    this.stillMs = stepped ? 0 : this.stillMs + dtMs;
+    if (this.isMoving) this.walkMs += dtMs;
+    this.tickPose(dtMs);
     this.updateFacing();
     this.applyKnockback(dtMs);
     this.resolveSolids();
@@ -302,6 +372,13 @@ export class PlayerSystem implements SessionSystem, Damageable {
     }
   }
 
+  /** The shield is held up with its button (shield on a button). */
+  private shieldRaised(): boolean {
+    const cfg = this.s.config.shield;
+    const inv = this.s.toolkit.inventory;
+    return cfg.enabled && cfg.mode === "hold" && this.s.host.input.isDown("shield") && inv.owns("shield") && inv.isAbilityEnabled("shield") && !this.s.sword?.isAttacking();
+  }
+
   /** True when the shield would block a hit coming from (srcX, srcY). */
   canBlock(info: DamageInfo): boolean {
     const cfg = this.s.config.shield;
@@ -363,6 +440,9 @@ export class PlayerSystem implements SessionSystem, Damageable {
   die(): void {
     if (this.state === "dead") return;
     this.state = "dead";
+    this.deadAnimMs = 0;
+    if (this.pose?.lock) this.unlock("pose");
+    this.pose = null;
     this.s.state.stats.deaths++;
     this.knockMs = 0;
     this.invulnMs = 0;
@@ -427,6 +507,8 @@ export class PlayerSystem implements SessionSystem, Damageable {
 
   dispose(): void {
     // Leave the PS Maker player exactly as we found it.
+    for (const off of this.offs) off();
+    this.offs.length = 0;
     this.locks.clear();
     if (this.overlayShown) this.s.host.setPlayerOverlay(null);
     this.s.host.setPlayerLocked(false);

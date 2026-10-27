@@ -106,6 +106,24 @@ export interface ToolkitConfig {
       weaponAttack: string;
       weaponSpin: string;
       weaponCharge: string;
+      /** Walking while the sword is charged (e.g. Mana Seed "Sword Walk"); empty = PS Maker walk + built-in blade. */
+      chargeWalk: string;
+      /** Holding the shield up (shield on a button). */
+      shield: string;
+      /** Using items: bow, boomerang, placing a bomb, hookshot; `item` = any other item and the fallback. */
+      bow: string;
+      boomerang: string;
+      bomb: string;
+      hookshot: string;
+      item: string;
+      /** Lifting, carrying (walking with an object overhead), throwing, pushing a block. */
+      lift: string;
+      carry: string;
+      throw: string;
+      push: string;
+      /** Holding up an item taken from a chest. */
+      itemGet: string;
+      death: string;
       /** Directions where the weapon layer is drawn behind the body (typical for Mana Seed: up). */
       weaponBehind: Facing[];
       /** Hide the PS Maker sprite while an overlay animation plays. */
@@ -311,7 +329,7 @@ export function createDefaultConfig(): ToolkitConfig {
       magicRegenPerSecond: 0,
       startItems: ["sword", "shield"],
       startCounts: {},
-      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
+      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", hookshot: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
     },
     sword: {
       enabled: true,

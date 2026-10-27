@@ -821,12 +821,25 @@ const switchSequence = defineEvent({
 
 const setPlayerSprites = defineEvent({
   name: "Zelda: Set Player Sprites",
-  description: "Player attack animations from PS Maker (e.g. Mana Seed Sword Attack): pick any direction, all directions of that sheet are used. Empty = built-in blade. / Анимации атаки игрока из PS Maker.",
+  description: "Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, lifting, pushing, shield and death: pick any direction, all directions of that sheet are used. Empty = not used (the normal PS Maker sprite or the built-in blade). / Анимации игрока из PS Maker.",
   parameterDefs: {
     attack: playerAnim("Attack", "Sword swing, e.g. Sword Attack. / Удар мечом."),
     spin: playerAnim("Spin attack", "Optional; empty = Attack. / Круговой удар."),
     charge: playerAnim("Charging", "Optional: while the sword is held; empty = last Attack frame. / Зарядка удара."),
+    chargeWalk: playerAnim("Walking while charging", "Optional: walking with the sword held, e.g. Sword Walk; empty = normal walk with the built-in blade. / Ходьба с заряженным мечом."),
     hurt: playerAnim("Hurt", "Optional, e.g. Sword Hurt. / Получение урона."),
+    death: playerAnim("Death", "Optional, e.g. Sword Death; the last frame stays until respawn. / Смерть."),
+    shield: playerAnim("Shield up", "Optional: while the shield button is held (Start Toolkit: Shield on a button). / Щит поднят."),
+    bow: playerAnim("Bow", "Optional: shooting an arrow; empty = Use item. / Лук."),
+    boomerang: playerAnim("Boomerang", "Optional: throwing the boomerang; empty = Use item. / Бумеранг."),
+    bomb: playerAnim("Bomb", "Optional: placing a bomb; empty = Use item. / Бомба."),
+    hookshot: playerAnim("Hookshot", "Optional: firing the hookshot; empty = Use item. / Крюк."),
+    item: playerAnim("Use item", "Optional: any other item (rods, magic, your own items) and the fallback for the four above. / Использование предмета."),
+    lift: playerAnim("Lift", "Optional: picking up a pot, bush or rock. / Поднять."),
+    carry: playerAnim("Carry", "Optional: walking with the object overhead; stands on the first frame. / Нести над головой."),
+    throw: playerAnim("Throw", "Optional: throwing what you carry. / Бросить."),
+    push: playerAnim("Push", "Optional: leaning on a block to push it. / Толкать блок."),
+    itemGet: playerAnim("Item get", "Optional: holding up an item from a chest for a second (the player stands still meanwhile). / Достать предмет из сундука."),
     weaponAttack: animation("Weapon layer: attack", "Optional: a separate weapon sheet drawn over the body (when the weapon is not in the body frames). / Слой оружия: удар."),
     weaponSpin: animation("Weapon layer: spin", "Optional. / Слой оружия: круговой."),
     weaponCharge: animation("Weapon layer: charging", "Optional. / Слой оружия: зарядка."),
@@ -848,6 +861,7 @@ const setPlayerSprites = defineEvent({
           ? listOf(old.weaponBehind).filter((x): x is Facing => isFacing(x))
           : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
       const pick = (v: unknown) => psAnimation(s, tk, v, false, "Set Player Sprites");
+      const loop = (v: unknown) => psAnimation(s, tk, v, true, "Set Player Sprites");
       // 0.5.2 checkbox (sheets found by name) and 0.6.0 attackAnimation / hurtAnimation fields.
       const auto: Record<string, string> = {};
       if (boolOr(old.usePsMaker, false)) {
@@ -869,6 +883,20 @@ const setPlayerSprites = defineEvent({
               charge: pick(params.charge),
               weaponCharge: pick(params.weaponCharge),
               hurt: pick(params.hurt) || pick(old.hurtAnimation) || auto.hurt || "",
+              // Ongoing states loop while they last; one-shot actions play once and hold the last frame.
+              chargeWalk: loop(params.chargeWalk),
+              shield: loop(params.shield),
+              carry: loop(params.carry),
+              push: loop(params.push),
+              death: pick(params.death),
+              bow: pick(params.bow),
+              boomerang: pick(params.boomerang),
+              bomb: pick(params.bomb),
+              hookshot: pick(params.hookshot),
+              item: pick(params.item),
+              lift: pick(params.lift),
+              throw: pick(params.throw),
+              itemGet: pick(params.itemGet),
               weaponBehind: behind,
               hidePlayer: boolOr(params.hidePlayer, true),
               offsetX: numOr(params.offsetX, 0),

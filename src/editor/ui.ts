@@ -118,6 +118,9 @@ const STATS_UI: Record<string, FieldUi> = {
 
 // ---- per action ---------------------------------------------------------------------------
 
+/** Set Player Sprites fields that pick an animation. */
+const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "death", "shield", "bow", "boomerang", "bomb", "hookshot", "item", "lift", "carry", "throw", "push", "itemGet"];
+
 export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Start Toolkit": {
     keywords: ["start", "setup", "settings", "init", "difficulty", "hud", "language"],
@@ -344,8 +347,10 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (_p, show) => join([show("slot"), `based on ${show("basedOn") ?? "soldier"}`], ": "),
   },
   "Zelda: Set Player Sprites": {
-    keywords: ["sprite", "animation", "attack", "mana seed"],
+    keywords: ["sprite", "animation", "attack", "mana seed", "shield", "bow", "lift", "carry", "push", "death"],
     fields: {
+      ...Object.fromEntries(["shield", "bow", "boomerang", "bomb", "hookshot", "item"].map((k) => [k, { group: "Items and shield" }])),
+      ...Object.fromEntries(["lift", "carry", "throw", "push", "itemGet"].map((k) => [k, { group: "Lifting, pushing, chests" }])),
       weaponAttack: { group: "Weapon layer" },
       weaponSpin: { group: "Weapon layer" },
       weaponCharge: { group: "Weapon layer" },
@@ -363,7 +368,10 @@ export const ACTION_UI: Record<string, ActionUi> = {
       ["behindUp", "behindDown", "behindLeft", "behindRight"].map((k) => [k, (p: Params) => set(p.weaponAttack) || set(p.weaponSpin) || set(p.weaponCharge)]),
     ),
     collapsed: ["Weapon layer", "Placement"],
-    preview: (_p, show) => join([show("attack") && `attack: ${show("attack")}`, show("hurt") && `hurt: ${show("hurt")}`]),
+    preview: (p, show) => {
+      const others = PLAYER_ANIM_SLOTS.filter((k) => k !== "attack" && set(p[k])).length;
+      return join([show("attack") && `attack: ${show("attack")}`, others > 0 && `+${others} more`]);
+    },
   },
   "Zelda: Set Sound": {
     keywords: ["sound", "sfx", "audio", "effect"],
