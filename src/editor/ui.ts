@@ -32,7 +32,7 @@ interface PreviewContext {
 }
 
 export interface ActionUi {
-  /** Extra words for the action search (Russian and English). */
+  /** Extra words for the action search. Latin letters and digits only: the editor's search drops every other character (ENGINE_AUDIT, section 12). */
   keywords: string[];
   fields?: Record<string, FieldUi>;
   /** Field → shown only when this returns true (receives the current values with defaults). */
@@ -120,7 +120,7 @@ const STATS_UI: Record<string, FieldUi> = {
 
 export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Start Toolkit": {
-    keywords: ["start", "setup", "settings", "старт", "запуск", "настройки", "сложность", "сердца"],
+    keywords: ["start", "setup", "settings", "init", "difficulty", "hud", "language"],
     fields: {
       difficulty: { ui: "radio" },
       hearts: { min: 1, max: 20, step: 1 },
@@ -140,20 +140,20 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("difficulty"), `${p.hearts ?? 3} hearts`, `sword ${p.swordDamage ?? 2}`]),
   },
   "Zelda: Set Controls": {
-    keywords: ["keys", "controls", "keyboard", "клавиши", "управление", "кнопки"],
+    keywords: ["keys", "controls", "keyboard", "bindings", "input", "gamepad"],
     preview: (p) => join(["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory"].map((k) => set(p[k]) && k)),
   },
-  "Zelda: Stop Toolkit": { keywords: ["stop", "стоп", "выключить"] },
+  "Zelda: Stop Toolkit": { keywords: ["stop", "disable", "shutdown"] },
   "Zelda: Pause Combat": {
-    keywords: ["pause", "cutscene", "пауза", "катсцена", "бой"],
+    keywords: ["pause", "cutscene", "freeze", "combat"],
     preview: (p) => (p.paused === false ? "resume" : "pause"),
   },
   "Zelda: Debug": {
-    keywords: ["debug", "hitbox", "diagnostics", "отладка", "хитбоксы", "диагностика"],
+    keywords: ["debug", "hitbox", "diagnostics", "log"],
     preview: (p) => join([p.hitboxes !== false && "hitboxes", p.diagnostics === true && "diagnostics"]),
   },
   "Zelda: Create Enemy": {
-    keywords: ["enemy", "monster", "spawn", "враг", "монстр", "противник", "создать врага", "слизень"],
+    keywords: ["enemy", "monster", "spawn", "foe", "slime", "mob", "create enemy"],
     fields: {
       position: { setPositionBtnLabel: "Pick spawn point" },
       ...STATS_UI,
@@ -170,13 +170,13 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("template") ?? "slime", set(p.group) && show("group"), isPoint(p.position) ? show("position") : "next to the player"]),
   },
   "Zelda: Enemy From NPC": {
-    keywords: ["npc", "enemy", "нпс", "враг", "персонаж"],
+    keywords: ["npc", "enemy", "character", "hostile"],
     fields: { npc: { required: true }, ...STATS_UI },
     collapsed: ["Stats"],
     preview: (_p, show) => join([show("npc"), show("template")], " → "),
   },
   "Zelda: Create Object": {
-    keywords: ["object", "bush", "pot", "lever", "button", "plate", "block", "torch", "sign", "объект", "куст", "горшок", "рычаг", "кнопка", "плита", "блок", "факел", "табличка", "яма", "шипы"],
+    keywords: ["object", "bush", "pot", "lever", "button", "plate", "block", "torch", "sign", "pit", "spikes", "rock", "switch", "crystal"],
     fields: {
       position: { required: true },
       text: {},
@@ -200,48 +200,48 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("type") ?? "bush", isPoint(p.position) && show("position")]),
   },
   "Zelda: Create Chest": {
-    keywords: ["chest", "treasure", "сундук", "сокровище", "награда"],
+    keywords: ["chest", "treasure", "loot", "reward", "box"],
     fields: { position: { required: true }, count: { min: 1, step: 1 } },
     visible: { count: (p) => countable(p.item) },
     preview: (p, show) => join([`${countable(p.item) && Number(p.count) > 1 ? `${p.count} ` : ""}${show("item") ?? "key"}`, p.requiresBigKey === true && "big chest", p.hidden === true && "hidden"]),
   },
   "Zelda: Create Door": {
-    keywords: ["door", "gate", "shutter", "дверь", "ворота", "замок"],
+    keywords: ["door", "gate", "shutter", "lock", "boss door"],
     fields: { position: { required: true }, lock: { ui: "radio" }, width: { group: "Size", min: 0, step: 8 }, height: { group: "Size", min: 0, step: 8 } },
     collapsed: ["Size"],
     preview: (p, show) => join([show("lock") ?? "small key", p.startOpen === true && "starts open"]),
   },
   "Zelda: Place Item": {
-    keywords: ["item", "pickup", "key", "heart", "предмет", "ключ", "сердце", "рупии"],
+    keywords: ["item", "pickup", "key", "heart", "rupee", "drop", "collectible"],
     fields: { position: { required: true }, count: { min: 1, step: 1 } },
     visible: { count: (p) => countable(p.item) },
     preview: (p, show) => `${countable(p.item) && Number(p.count) > 1 ? `${p.count} ` : ""}${show("item") ?? "key"}`,
   },
   "Zelda: Change Object": {
-    keywords: ["open", "close", "switch", "reveal", "открыть", "закрыть", "переключить", "показать", "объект"],
+    keywords: ["open", "close", "switch", "reveal"],
     fields: { objectAt: { required: true, setPositionBtnLabel: "Pick object" } },
     preview: (p, show) => join([show("operation") ?? "open", isPoint(p.objectAt) && show("objectAt")]),
   },
   "Zelda: Remove Target": {
-    keywords: ["remove", "kill", "defeat", "убрать", "убить", "победить"],
+    keywords: ["remove", "kill", "defeat", "destroy", "despawn"],
     fields: { objectAt: { setPositionBtnLabel: "Pick object" } },
     visible: { objectAt: (p) => !set(p.group) },
     preview: (p, show) => (set(p.group) ? show("group") : isPoint(p.objectAt) ? "object" : undefined),
   },
   "Zelda: Damage Target": {
-    keywords: ["damage", "hurt", "урон", "ранить"],
+    keywords: ["damage", "hurt", "hit", "attack"],
     fields: { objectAt: { setPositionBtnLabel: "Pick object" }, amount: { min: 1, step: 1 } },
     visible: { group: (p) => p.player !== true, objectAt: (p) => p.player !== true && !set(p.group) },
     preview: (p, show) => join([p.player === true ? "player" : set(p.group) ? show("group") : "object", `${p.amount ?? 1}`], " −"),
   },
   "Zelda: Add Rule": {
-    keywords: ["rule", "condition", "puzzle", "when", "правило", "условие", "головоломка", "когда"],
+    keywords: ["rule", "condition", "puzzle", "when"],
     fields: { ...WHEN_UI, ...THEN_UI },
     visible: { ...WHEN_VISIBLE, ...THEN_VISIBLE },
     preview: (p, show) => join([whenSummary(p, show), thenSummary(p, show)], " → "),
   },
   "Zelda: Run Actions": {
-    keywords: ["run", "if", "condition", "выполнить", "если", "условие"],
+    keywords: ["run", "if", "condition", "check", "branch"],
     fields: { ...WHEN_UI, ...THEN_UI },
     visible: { ...WHEN_VISIBLE, ...THEN_VISIBLE },
     preview: (p, show) => {
@@ -251,42 +251,42 @@ export const ACTION_UI: Record<string, ActionUi> = {
     },
   },
   "Zelda: Create Switch Sequence": {
-    keywords: ["sequence", "order", "switches", "puzzle", "последовательность", "порядок", "переключатели"],
+    keywords: ["sequence", "order", "switches", "puzzle"],
     fields: { order: { required: true, setPathBtnLabel: "Click switches in order", showPreview: true }, ...THEN_UI },
     visible: THEN_VISIBLE,
     preview: (p, show) => join([Array.isArray(p.order) && p.order.length ? `${p.order.length} switches` : undefined, thenSummary(p, show)], " → "),
   },
   "Zelda: Create Wave Room": {
-    keywords: ["waves", "arena", "room", "волны", "арена", "комната"],
+    keywords: ["waves", "arena", "room"],
     fields: { area: { required: true }, delayMs: { min: 0, step: 100 }, ...THEN_UI },
     visible: THEN_VISIBLE,
     preview: (p, show) => join([show("area"), p.startAtOnce === true ? "at once" : "on enter", thenSummary(p, show)]),
   },
   "Zelda: Add Wave Enemy": {
-    keywords: ["wave", "enemy", "волна", "враг", "арена"],
+    keywords: ["wave", "enemy", "spawn", "arena"],
     fields: { wave: { min: 1, max: 9, step: 1 }, position: { required: true, setPositionBtnLabel: "Pick spawn point" }, ...STATS_UI },
     collapsed: ["Stats"],
     preview: (p, show) => `wave ${p.wave ?? 1}: ${show("template") ?? "slime"}`,
   },
   "Zelda: Enter Dungeon": {
-    keywords: ["dungeon", "keys", "подземелье", "данж", "ключи"],
+    keywords: ["dungeon", "keys", "small key", "big key", "map", "compass"],
     preview: (_p, show) => show("dungeonId") ?? "overworld",
   },
   "Zelda: Give Item": {
-    keywords: ["give", "item", "reward", "выдать", "предмет", "награда", "рупии", "бомбы"],
+    keywords: ["give", "item", "reward", "add", "rupees", "bombs"],
     fields: { count: { min: 1, step: 1 } },
     visible: { count: (p) => countable(p.item) },
     preview: (p, show) => `${countable(p.item) && Number(p.count) > 1 ? `${p.count} ` : ""}${show("item") ?? "bombs"}`,
   },
   "Zelda: Spend Resource": {
-    keywords: ["spend", "pay", "buy", "shop", "потратить", "купить", "магазин", "заплатить"],
+    keywords: ["spend", "pay", "buy", "shop"],
     fields: { amount: { min: 1, step: 1 } },
     preview: (p, show) => `${p.amount ?? 1} ${show("resource") ?? "rupees"}`,
   },
-  "Zelda: Remove Item": { keywords: ["remove", "take", "забрать", "убрать предмет"], preview: (_p, show) => show("item") },
-  "Zelda: Equip Item": { keywords: ["equip", "select", "экипировать", "выбрать предмет"], preview: (_p, show) => show("item") },
+  "Zelda: Remove Item": { keywords: ["remove", "take", "lose", "item"], preview: (_p, show) => show("item") },
+  "Zelda: Equip Item": { keywords: ["equip", "select", "item", "slot"], preview: (_p, show) => show("item") },
   "Zelda: Change Player Stats": {
-    keywords: ["health", "heal", "magic", "hearts", "здоровье", "лечить", "магия", "сердца"],
+    keywords: ["health", "heal", "magic", "hearts"],
     preview: (p) =>
       join([
         Number(p.health) ? `${p.set === true ? "=" : Number(p.health) > 0 ? "+" : ""}${p.health} health` : undefined,
@@ -295,30 +295,30 @@ export const ACTION_UI: Record<string, ActionUi> = {
       ]),
   },
   "Zelda: Show Stat In Variable": {
-    keywords: ["variable", "stat", "hud", "переменная", "рупии", "ключи", "показать"],
+    keywords: ["variable", "stat", "hud", "rupees", "counter", "sync"],
     fields: { variableId: { required: true } },
     preview: (_p, show) => join([show("stat"), show("variableId")], " → "),
   },
   "Zelda: Set Ability": {
-    keywords: ["ability", "disable", "enable", "способность", "запретить", "разрешить"],
+    keywords: ["ability", "disable", "enable"],
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
   },
   "Zelda: Show Message": {
-    keywords: ["message", "text", "toast", "сообщение", "текст", "надпись"],
+    keywords: ["message", "text", "toast", "notification", "say"],
     fields: { durationMs: { min: 0, step: 100 } },
     preview: (p) => (set(p.text) ? `"${String(p.text).slice(0, 40)}"` : undefined),
   },
   "Zelda: Set Respawn Point": {
-    keywords: ["respawn", "checkpoint", "возрождение", "чекпоинт"],
+    keywords: ["respawn", "checkpoint"],
     fields: { position: { setPositionBtnLabel: "Pick respawn point" } },
     preview: (p, show) => (isPoint(p.position) ? show("position") : "current position"),
   },
-  "Zelda: Respawn Player": { keywords: ["respawn", "revive", "возродить"] },
-  "Zelda: Save Progress": { keywords: ["save", "сохранить", "сохранение"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
-  "Zelda: Load Progress": { keywords: ["load", "загрузить", "сохранение"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
-  "Zelda: Reset Progress": { keywords: ["reset", "new game", "сброс", "новая игра"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
+  "Zelda: Respawn Player": { keywords: ["respawn", "revive", "death", "restart"] },
+  "Zelda: Save Progress": { keywords: ["save", "progress", "slot"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
+  "Zelda: Load Progress": { keywords: ["load", "progress", "continue"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
+  "Zelda: Reset Progress": { keywords: ["reset", "new game", "clear", "progress"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
   "Zelda: Define Item": {
-    keywords: ["item", "custom", "weapon", "magic", "предмет", "свой", "оружие", "магия", "жезл"],
+    keywords: ["item", "custom", "weapon", "magic", "rod", "wand", "define item"],
     fields: { cost: { min: 0, step: 1 }, damage: { min: 0, step: 1 }, stunMs: { min: 0, step: 100 }, heal: { min: 0, step: 1 } },
     visible: {
       cost: (p) => set(p.resource),
@@ -330,7 +330,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("slot"), set(p.name) && String(p.name)], ": "),
   },
   "Zelda: Define Enemy": {
-    keywords: ["enemy", "custom", "boss", "type", "враг", "свой", "босс", "тип"],
+    keywords: ["enemy", "custom", "boss", "type"],
     fields: {
       look: { group: "Look" },
       ...STATS_UI,
@@ -344,7 +344,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (_p, show) => join([show("slot"), `based on ${show("basedOn") ?? "soldier"}`], ": "),
   },
   "Zelda: Set Player Sprites": {
-    keywords: ["sprite", "animation", "attack", "mana seed", "анимация", "спрайт", "атака", "удар"],
+    keywords: ["sprite", "animation", "attack", "mana seed"],
     fields: {
       weaponAttack: { group: "Weapon layer" },
       weaponSpin: { group: "Weapon layer" },
@@ -366,7 +366,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (_p, show) => join([show("attack") && `attack: ${show("attack")}`, show("hurt") && `hurt: ${show("hurt")}`]),
   },
   "Zelda: Set Sound": {
-    keywords: ["sound", "sfx", "audio", "звук", "эффект"],
+    keywords: ["sound", "sfx", "audio", "effect"],
     fields: { volume: { min: 0, max: 1, step: 0.1 } },
     preview: (_p, show) => join([show("moment"), show("sound")], ": "),
   },

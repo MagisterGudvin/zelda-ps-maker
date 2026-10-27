@@ -33,6 +33,13 @@ test("every action has a presentation entry with search keywords", async () => {
   }
 });
 
+test("search keywords survive the editor's search normalisation", async () => {
+  // PS Maker 1.2.1 lowercases the query and every keyword, then turns each run of characters
+  // outside a-z and 0-9 into a space, so a Cyrillic keyword (or query) becomes empty.
+  const searchable = (w: string) => w.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === w.toLowerCase().trim();
+  for (const a of await actions()) for (const w of a.meta?.keywords ?? []) assert.ok(searchable(w), `${a.name}: keyword "${w}" is erased by the editor search`);
+});
+
 test("presentation refers only to existing fields; radio only on lists; sane limits; groups after main fields", async () => {
   for (const a of await actions()) {
     const ui = ACTION_UI[a.name];
