@@ -168,6 +168,13 @@ export class FakeHost implements HostAdapter {
     out.hh = this.player.hh;
     return true;
   }
+  /** Physics touching flags (set by a test to act like the engine stopping the player). */
+  touching: { up: boolean; down: boolean; left: boolean; right: boolean } | null = null;
+  readPlayerTouching(): { up: boolean; down: boolean; left: boolean; right: boolean } | null {
+    return this.touching;
+  }
+  /** Solids handed to the engine's physics on the last tick (null = the host has no physics). */
+  solids: { x: number; y: number }[] | null = null;
   /** Top of the drawn player pixels (head); null = unknown (like a host that cannot read images). */
   playerTop: number | null = null;
   readPlayerTop(): number | null {

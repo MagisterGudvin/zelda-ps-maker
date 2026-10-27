@@ -17,6 +17,10 @@ export interface HostAdapter {
   readPlayerVisual(out: AABB): boolean;
   /** Optional: world y of the top of the player's drawn pixels (head), null when unknown. */
   readPlayerTop?(): number | null;
+  /** Optional: makes these toolkit solids stop the player in the engine's physics (called every tick). */
+  syncSolids?(boxes: readonly AABB[]): void;
+  /** Optional: sides on which the engine's physics stopped the player this frame. */
+  readPlayerTouching?(): { up: boolean; down: boolean; left: boolean; right: boolean } | null;
   /** Draws animation frames over the player sprite (attack, weapon); null restores the sprite. */
   setPlayerOverlay(layers: OverlayLayer[] | null): void;
   /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */

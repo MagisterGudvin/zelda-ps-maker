@@ -339,6 +339,12 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private playerY = 0;
   private ySorted = true;
   private overlayImgs: any[] = [];
+  /** Arcade static bodies standing in for toolkit solids (pooled zones) and their collider. */
+  private solidGroup: any = null;
+  private solidCollider: any = null;
+  private solidColliderPlayer: any = null;
+  private readonly solidZones: any[] = [];
+  private solidSig = "";
   private overlayHidPlayer = false;
   private savedAlpha = 1;
   private previewing: string | null = null;
@@ -541,6 +547,46 @@ export class PhaserHost implements HostAdapter, DepthSource {
     out.hw = w / 2;
     out.hh = h / 2;
     return true;
+  }
+
+  /**
+   * Toolkit solids as Arcade static bodies colliding with the PS Maker player. Without them PS
+   * Maker moved the player into a block each rendered frame and the toolkit pushed it back on its
+   * own 60 Hz ticks; on faster screens the player (and the camera following it) shook.
+   */
+  syncSolids(boxes: readonly AABB[]): void {
+    const physics = this.scene?.physics;
+    const p = this.player;
+    if (!this.cfg.world.solidBodies || !physics?.add?.staticGroup || !physics.add.collider || !p?.body || !this.scene.add?.zone) return;
+    if (this.solidColliderPlayer !== p) {
+      this.solidCollider?.destroy?.();
+      this.solidGroup ??= physics.add.staticGroup();
+      this.solidCollider = physics.add.collider(p, this.solidGroup);
+      this.solidColliderPlayer = p;
+    }
+    let sig = "";
+    for (const b of boxes) sig += `${Math.round(b.x * 4)},${Math.round(b.y * 4)},${Math.round(b.hw * 4)},${Math.round(b.hh * 4)};`;
+    if (sig === this.solidSig) return;
+    this.solidSig = sig;
+    boxes.forEach((b, i) => {
+      let z = this.solidZones[i];
+      if (!z) {
+        z = this.scene.add.zone(b.x, b.y, b.hw * 2, b.hh * 2);
+        z.zmtSolid = true;
+        this.solidGroup.add(z);
+        this.solidZones.push(z);
+      }
+      z.setPosition(b.x, b.y);
+      z.setSize(b.hw * 2, b.hh * 2);
+      z.body.enable = true;
+      z.body.updateFromGameObject();
+    });
+    for (let i = boxes.length; i < this.solidZones.length; i++) this.solidZones[i].body.enable = false;
+  }
+
+  readPlayerTouching(): { up: boolean; down: boolean; left: boolean; right: boolean } | null {
+    const t = this.player?.body?.touching;
+    return t ? { up: !!t.up, down: !!t.down, left: !!t.left, right: !!t.right } : null;
   }
 
   private readonly opaqueTops = new Map<string, number | null>();
@@ -783,7 +829,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     if (this.cfg.world.useArcadeStaticBodies && statics) {
       const list: any[] = statics.entries ?? Array.from(statics as Iterable<any>);
       for (const body of list) {
-        if (!body || body.enable === false || body.gameObject === this.player) continue;
+        if (!body || body.enable === false || body.gameObject === this.player || body.gameObject?.zmtSolid) continue;
         const sb: StaticBox = { x: body.x + body.width / 2, y: body.y + body.height / 2, hw: body.width / 2, hh: body.height / 2, body };
         this.staticPool.push(sb);
         this.staticIndex.insert(sb);
@@ -807,7 +853,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.staticIndex.query(box, c);
     for (let i = 0; i < c.length; i++) {
       const sb = c[i];
-      if (sb.body.enable === false) continue;
+      if (sb.body.enable === false || sb.body.gameObject?.zmtSolid) continue;
       if (overlaps(sb, box)) {
         c.length = 0;
         return true;
@@ -847,5 +893,12 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.staticIndex.clear();
     this.staticPool.length = 0;
     this.tilemapLayers = [];
+    this.solidCollider?.destroy?.();
+    for (const z of this.solidZones) z.destroy?.();
+    this.solidZones.length = 0;
+    this.solidGroup?.destroy?.();
+    this.solidGroup = null;
+    this.solidCollider = null;
+    this.solidColliderPlayer = null;
   }
 }

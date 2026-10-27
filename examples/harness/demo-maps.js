@@ -90,7 +90,7 @@ export const MAPS = {
       { x: 0, y: 0, w: 16, h: 176 },
       { x: 384, y: 0, w: 16, h: 240 },
       // Left half split horizontally with a shutter in the middle (puzzle door). Doorways are two
-      // tiles wide: in PS Maker the player's body has no corner sliding.
+      // tiles wide: PS Maker slides the player around a corner only when slightly off-centre.
       { x: 16, y: 104, w: 64, h: 16 },
       { x: 112, y: 104, w: 80, h: 16 },
       // Vertical wall between the left half and the arena with a locked door.

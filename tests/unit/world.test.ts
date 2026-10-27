@@ -240,3 +240,25 @@ test("a carried object rests on the head and is drawn in front of the player", (
   rig2.step(2);
   assert.equal(pot2.y, p2.y - 14);
 });
+
+test("with solids in the engine's physics, the player stops at a block and pushes it by touching", () => {
+  const rig = createRig({ interactions: { pushMs: 100 } });
+  const host = rig.host as unknown as { syncSolids?: (b: readonly { x: number; y: number }[]) => void; solids: { x: number; y: number }[] | null; touching: unknown };
+  host.syncSolids = (boxes) => (host.solids = boxes.map((b) => ({ x: b.x, y: b.y })));
+  face(rig, 1, 0);
+  const p = rig.host.player!;
+  const block = createObject(rig.session, "block", p.x + p.hw + 8, p.y, { id: "b1" })!;
+  createObject(rig.session, "grass", p.x, p.y + 40, { id: "g1" });
+  rig.step();
+  assert.deepEqual(host.solids, [{ x: block.x, y: block.y }], "solid objects go to the physics, grass does not");
+  // The engine stops the player flush against the block: no overlap, only the touching flag.
+  const bx0 = block.x;
+  host.touching = { up: false, down: false, left: false, right: true };
+  rig.run(600);
+  assert.equal(block.x, bx0 + rig.tk.config.world.tileSize, "pushed one tile by touching (no longer adjacent after that)");
+  host.touching = { up: false, down: false, left: false, right: false };
+  rig.run(300);
+  const bx1 = block.x;
+  rig.run(300);
+  assert.equal(block.x, bx1, "no touch, no push");
+});

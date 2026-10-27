@@ -37,6 +37,11 @@ export interface ToolkitConfig {
     tileSize: number;
     /** Treat Arcade static bodies (PS Maker map collision rectangles) as walls. */
     useArcadeStaticBodies: boolean;
+    /**
+     * Toolkit solids (blocks, chests, doors, pots...) become Arcade static bodies that stop the
+     * PS Maker player, so it never walks into them and gets pushed back (screen shake).
+     */
+    solidBodies: boolean;
     /** Treat colliding tiles of Phaser tilemap layers as walls. */
     useTilemapLayers: boolean;
     /** PS Maker NPCs (moving Arcade bodies, colliding since PS Maker 1.1) block enemies and projectiles. */
@@ -289,6 +294,7 @@ export function createDefaultConfig(): ToolkitConfig {
       positionUnits: "pixels",
       tileSize: 16,
       useArcadeStaticBodies: true,
+      solidBodies: true,
       useTilemapLayers: true,
       npcsBlock: true,
       depthMode: "auto",

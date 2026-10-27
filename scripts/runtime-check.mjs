@@ -153,6 +153,30 @@ await check("a chest opens with Z", async () => {
   const s = await state();
   expect(s.chest === "opened", JSON.stringify(s));
 });
+await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
+  // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
+  await ev(() => (window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 15));
+  // Lean on the rock at (120, 128) from the right, the body centred on it (12 px tall body at
+  // y 122-134): off-centre, PS Maker slides the player around the rock.
+  await tp(144, 122);
+  await ev(() => {
+    const s = window.game.scene.getScenes(true).find((m) => m.map);
+    window.__shake = [];
+    window.__shakeOn = () => window.__shake.push([Math.round(s.player.x * 100), Math.round(s.cameras.main.scrollX * 100)]);
+    s.events.on("render", window.__shakeOn);
+  });
+  await hold("ArrowLeft", 1200);
+  const f = await ev(() => {
+    const s = window.game.scene.getScenes(true).find((m) => m.map);
+    s.events.off("render", window.__shakeOn);
+    window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 60;
+    return window.__shake.slice(-30);
+  });
+  const ys = new Set(f.map((x) => x[0]));
+  const cams = new Set(f.map((x) => x[1]));
+  expect(ys.size === 1 && cams.size === 1, `player x ${[...ys].join(",")} camera ${[...cams].join(",")}`);
+  return `${f.length} frames still`;
+});
 await check("PS Maker Change map trigger takes the player to the dungeon", async () => {
   await ev(() => window.ZeldaMakerToolkit.session.world.get("button@340,40").setState("on"));
   await wait(300);

@@ -258,7 +258,9 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.tickPose(dtMs);
     this.updateFacing();
     this.applyKnockback(dtMs);
+    this.syncSolidBodies();
     this.resolveSolids();
+    this.detectLeaning();
     this.updateTimers(dtMs);
     this.regenMagic(dtMs);
     this.syncHurtbox();
@@ -313,6 +315,38 @@ export class PlayerSystem implements SessionSystem, Damageable {
       this.box.y += my;
       this.s.host.movePlayerBy(mx, my);
     }
+  }
+
+  private readonly solidBoxes: AABB[] = [];
+
+  /** Hands the toolkit's solid objects to the host physics (they then stop the player there). */
+  private syncSolidBodies(): void {
+    if (!this.s.host.syncSolids) return;
+    const list = this.solidBoxes;
+    list.length = 0;
+    for (const e of this.s.world.list("object")) if (e.solid && !e.removed) list.push(e);
+    this.s.host.syncSolids(list);
+  }
+
+  /**
+   * With solids in the engine's physics the player stops at a block instead of entering it, so
+   * "walking into it" (pushing, unlocking a door) is the physics touching flag on the facing side.
+   */
+  private detectLeaning(): void {
+    if (this.pushTarget) return;
+    const touching = this.s.host.readPlayerTouching?.();
+    if (!touching?.[this.facing]) return;
+    const v = FACING_VECTORS[this.facing];
+    const probe = this.probe;
+    probe.x = this.box.x + v.x * 2;
+    probe.y = this.box.y + v.y * 2;
+    probe.hw = this.box.hw;
+    probe.hh = this.box.hh;
+    const found = this.scratch;
+    found.length = 0;
+    this.s.world.query(probe, found, (e) => e.solid && e.kind === "object");
+    this.pushTarget = found[0] ?? null;
+    found.length = 0;
   }
 
   /** Pushes the player out of toolkit solids (doors, blocks, rocks, chests). */
