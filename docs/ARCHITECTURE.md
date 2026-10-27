@@ -17,6 +17,7 @@ src/
     actions.ts              37 действий редактора (defineEvent)
     runtime.ts              синглтон Toolkit, привязка к сцене, авто-старт
     mapReplay.ts            возврат на карту: повтор действий карты по wake сцены
+    editorPreview.ts        предпросмотр действий на карте редактора
     paramResolvers.ts       разбор параметров position / npc / image
     fields.ts               поля форм: типы виджетов PS Maker, чтение со значениями по умолчанию, группы When/Then
     ui.ts                   вид в редакторе: разделы, видимость полей, превью, ключевые слова поиска
