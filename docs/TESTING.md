@@ -7,7 +7,7 @@
 | Проверка | Команда | Результат |
 |---|---|---|
 | Типы (исходники и тесты, strict) | `npm run typecheck` | без ошибок |
-| Юнит-тесты (`node:test`, фейковый хост) | `npm test` | **217 / 217** |
+| Юнит-тесты (`node:test`, фейковый хост) | `npm test` | **219 / 219** |
 | Сборка официальным CLI | `npm run build` | `dist/zelda-maker-toolkit.ps-maker.js`, 37 действий, импорт в Node без побочных эффектов |
 | Интеграция: бандл в реальном Phaser в Chromium через эмулятор хоста (карты засыпают и просыпаются, как в PS Maker) | `npm run test:integration` | **20 / 20**, без ошибок в консоли |
 | **Настоящий рантайм PS Maker 1.2.1** (веб-экспорт пользователя) с демо-проектом из `make-demo-project.mjs` | `node scripts/runtime-check.mjs --export … --project …` | **9 / 9** (см. ниже) |

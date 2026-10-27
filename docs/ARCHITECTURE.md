@@ -37,7 +37,8 @@ src/
     phaserHost.ts           HostAdapter: игрок, коллизии карты, рендер, отладка
     keyboardInput.ts        клавиатура и геймпад с защёлкиванием нажатий
     phaserHud.ts            HUD-сцена (одна на игру)
-    textures.ts             оригинальные процедурные спрайты, пиксельные цифры/иконки HUD
+    textures.ts             встроенные спрайты (canvas), пиксельные цифры/иконки HUD
+    worldSprites.ts         пиксельные спрайты мира в палитре набора PS Maker
     sheets.ts               нарезка спрайт-листов авторов (по ключу текстуры или URL)
     psmakerAssets.ts        данные проекта PS Maker: персонажи и их листы → анимации Toolkit (экспериментально)
   player/                   PlayerSystem (направление, урон, щит, смерть, оверлей анимаций), health.ts, overlay.ts

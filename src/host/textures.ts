@@ -1,8 +1,10 @@
 /**
- * Original placeholder art, drawn procedurally at runtime with the Canvas 2D
- * API (no image files, no third-party or Nintendo assets). Authors replace any
+ * Original placeholder art, drawn at runtime with the Canvas 2D API (world
+ * sprites as pixel grids from worldSprites.ts; no image files, no third-party or
+ * Nintendo assets). Authors replace any
  * sprite by passing their own PS Maker texture key instead of a built-in id.
  */
+import { WORLD_PALETTE, WORLD_SPRITES } from "./worldSprites.ts";
 
 type Ctx = CanvasRenderingContext2D;
 type Painter = (c: Ctx) => void;
@@ -407,6 +409,9 @@ const DEFS: Record<string, SpriteDef> = {
   hud_magic: { w: 8, h: 8, paint: (c) => grid(c, ["..bb....", "...b....", ".oooo...", "oggggo..", "oggggo..", "oggggo..", ".oooo...", "........"], { o: "#062010", g: "#3ad16b", b: "#a07040" }) },
   ...Object.fromEntries(DIGITS.map((_, n) => [`hud_digit_${n}`, { w: 6, h: 8, paint: (c: Ctx) => digit(c, n) }])),
 };
+
+// World sprites drawn as pixel grids in the PS Maker pack's palette replace the older drawings.
+for (const [id, rows] of Object.entries(WORLD_SPRITES)) DEFS[id] = { w: rows[0].length, h: rows.length, paint: (c) => grid(c, rows, WORLD_PALETTE) };
 
 export function builtinSpriteIds(): string[] {
   return Object.keys(DEFS);

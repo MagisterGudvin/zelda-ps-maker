@@ -63,6 +63,13 @@ function opaqueTopRow(frame: any): number | null {
   }
 }
 
+/** Per-axis scale that fits a sprite to an entity when the entity is a whole multiple of it, else 1. */
+export function wholeScale(texW: number, texH: number, w: number, h: number): [number, number] {
+  const fx = texW > 0 && w % texW === 0 ? w / texW : 1;
+  const fy = texH > 0 && h % texH === 0 ? h / texH : 1;
+  return [Math.max(1, fx), Math.max(1, fy)];
+}
+
 /** A Phaser Image owned by the toolkit. */
 class ImageView implements EntityView {
   private readonly scene: any;
@@ -93,6 +100,8 @@ class ImageView implements EntityView {
     // Author textures (from PS Maker image params) are scaled to the entity size.
     const key: string = this.img.texture?.key ?? "";
     if (!key.startsWith("zmt_") && this.spec.width && this.spec.height) this.img.setDisplaySize(this.spec.width, this.spec.height);
+    // Built-in pixel sprites only by whole multiples (a 16 px door on a 32 px gate), so pixels stay square.
+    else if (key.startsWith("zmt_") && this.spec.width && this.spec.height) this.img.setScale(...wholeScale(this.img.width, this.img.height, this.spec.width, this.spec.height));
   }
 
   setPosition(x: number, y: number): void {
