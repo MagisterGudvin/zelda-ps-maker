@@ -101,6 +101,7 @@ export function hudPreviewSetup(map: MapLike, story: (PsStory & Raw) | null, cam
     fontFamily: ui.fontFamily,
     skin: { ...ui.skin },
     barSlice: ui.barSlice,
+    panelSlice: ui.panelSlice,
     showLifeLabel: ui.showLifeLabel,
     textColor: ui.textColor,
     box: null,

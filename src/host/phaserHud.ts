@@ -46,6 +46,8 @@ export class PhaserHud implements HudSink {
   private boxG: any = null;
   private boxText: any = null;
   private boxPics!: Pool;
+  private panelPics!: Pool;
+  private cursorImg: any = null;
   private boxWrap: { key: string; lines: string[] } | null = null;
 
   /** Use getHud(); direct construction would duplicate the HUD scene. */
@@ -107,6 +109,10 @@ export class PhaserHud implements HudSink {
     this.previewLabels = new Pool(() => s.add.text(0, 0, "", { fontFamily: "monospace", color: "#ffff66", backgroundColor: "#000000aa" }).setOrigin(0, 0).setDepth(22));
     this.boxG = s.add.graphics().setDepth(15);
     this.boxPics = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(15));
+    // Inventory panel picture: over the HUD bar, under the HUD's graphics and item icons.
+    this.panelPics = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(-0.05));
+    // Inventory cursor picture: under the item icons (a highlight or a frame with an open middle).
+    this.cursorImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(0.15).setVisible(false);
     this.boxText = s.add.text(0, 0, "", { fontFamily: "monospace" }).setOrigin(0, 0).setDepth(16).setVisible(false);
   }
 
@@ -137,7 +143,10 @@ export class PhaserHud implements HudSink {
       const t = this.text(model.deathText, 0, 0, 10 * k, "#ffffff");
       t.setPosition(Math.round(W / 2 - t.width / 2), Math.round(H / 2 - t.height / 2));
     }
+    this.panelPics.begin();
+    this.cursorImg?.setVisible(false);
     if (model.inventoryOpen) this.drawInventory(model, L);
+    this.panelPics.end();
     painter.end();
   }
 
@@ -205,7 +214,7 @@ export class PhaserHud implements HudSink {
         g.lineStyle(bw, line.color, line.alpha).strokeRoundedRect(x + bw / 2, y + bw / 2, w - bw, h - bw, Math.max(0, r - bw / 2));
       }
     } else if (this.painter!.picSize(bg.imageId)) {
-      this.drawBoxPicture(bg, x, y, w, h, f);
+      this.drawBoxPicture(this.boxPics, bg, x, y, w, h, f);
     }
 
     const t = st.text;
@@ -241,13 +250,13 @@ export class PhaserHud implements HudSink {
     this.boxPics.end();
   }
 
-  private drawBoxPicture(bg: Extract<MessageBoxModel["style"]["background"], { type: "image" }>, x: number, y: number, w: number, h: number, f: number): void {
+  private drawBoxPicture(pics: Pool, bg: Extract<MessageBoxModel["style"]["background"], { type: "image" }>, x: number, y: number, w: number, h: number, f: number): void {
     const key = bg.imageId;
     const size = this.painter!.picSize(key)!;
     const alpha = Math.max(0, Math.min(1, bg.opacity / 100));
     const put = (frame: string | undefined, dx: number, dy: number, dw: number, dh: number) => {
       if (dw <= 0 || dh <= 0) return;
-      const img = this.boxPics.next();
+      const img = pics.next();
       if (frame) img.setTexture(key, frame);
       else img.setTexture(key);
       img.setScale(1).setPosition(Math.round(dx), Math.round(dy)).setDisplaySize(Math.round(dw), Math.round(dh)).setAlpha(alpha);
@@ -291,24 +300,36 @@ export class PhaserHud implements HudSink {
     const px = Math.round((W - pw) / 2);
     const py = Math.round(L.free.y * k + 4 * k);
     const g = this.g;
-    g.fillStyle(MSG_FILL, 0.95).fillRect(px, py, pw, ph);
-    g.lineStyle(k, MSG_BORDER, 1).strokeRect(px + k / 2, py + k / 2, pw - k, ph - k);
-    this.text(model.inventoryTitle, px + 6 * k, py + 4 * k, 8 * k, model.textColor);
+    const skin = model.skin;
+    const ownPanel = !!this.painter!.picSize(skin.inventoryPanel);
+    // Content inset (HUD pixels): clear of the panel picture's border.
+    const pad = ownPanel ? Math.max(6, model.panelSlice + 3) : 6;
+    if (ownPanel) {
+      // Own panel picture (HUD Style → Inventory panel): a 9-slice whose border is drawn in HUD pixels.
+      const sl = model.panelSlice;
+      this.drawBoxPicture(this.panelPics, { type: "image", imageId: skin.inventoryPanel, opacity: 100, mode: "nine-slice", borderWidth: sl, slice: { top: sl, right: sl, bottom: sl, left: sl } }, px, py, pw, ph, k);
+    } else {
+      g.fillStyle(MSG_FILL, 0.95).fillRect(px, py, pw, ph);
+      g.lineStyle(k, MSG_BORDER, 1).strokeRect(px + k / 2, py + k / 2, pw - k, ph - k);
+    }
+    const cursor = this.painter!.picSize(skin.inventoryCursor);
+    this.text(model.inventoryTitle, px + pad * k, py + (pad - 2) * k, 8 * k, model.textColor);
     const cell = 22;
-    const perRow = Math.max(1, Math.floor((pw / k - 12) / cell));
+    const perRow = Math.max(1, Math.floor((pw / k - 2 * pad) / cell));
     let desc = model.inventory.length === 0 ? "" : " ";
     model.inventory.forEach((slot, i) => {
-      const ix = px / k + 6 + (i % perRow) * cell;
-      const iy = py / k + 18 + Math.floor(i / perRow) * cell;
+      const ix = px / k + pad + (i % perRow) * cell;
+      const iy = py / k + pad + 12 + Math.floor(i / perRow) * cell;
       this.pixelImage(slot.icon, ix + 2, iy + 2, k, 16);
       if (slot.selected) {
-        g.lineStyle(k, 0xffd23a, 1).strokeRect(ix * k, iy * k, 20 * k, 20 * k);
+        if (cursor) this.cursorImg?.setTexture(skin.inventoryCursor).setScale(1).setPosition(ix * k, iy * k).setDisplaySize(20 * k, 20 * k).setVisible(true);
+        else g.lineStyle(k, 0xffd23a, 1).strokeRect(ix * k, iy * k, 20 * k, 20 * k);
         desc = `${slot.name}${slot.count !== null ? ` (${slot.count})` : ""}\n${slot.description}`;
       }
     });
     if (desc.trim()) {
-      const t = this.text(desc, px + 6 * k, 0, 7 * k, "#ffffff", { wordWrap: { width: pw - 12 * k, useAdvancedWrap: true } });
-      t.setPosition(px + 6 * k, py + ph - t.height - 4 * k);
+      const t = this.text(desc, px + pad * k, 0, 7 * k, "#ffffff", { wordWrap: { width: pw - 2 * pad * k, useAdvancedWrap: true } });
+      t.setPosition(px + pad * k, py + ph - t.height - (pad - 2) * k);
     }
   }
 

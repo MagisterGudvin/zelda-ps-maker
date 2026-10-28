@@ -49,6 +49,31 @@ test("HUD Style: pictures by slot, a project font as PS Maker registers it, empt
   resetToolkitForTests();
 });
 
+test("HUD Style: own icons for built-in items (item box, inventory) and an inventory panel picture", async () => {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  resetToolkitForTests();
+  const f = createFakeScene();
+  const run = (name: string, params: Record<string, unknown>) => (plugin.events as any[]).find((e) => e.name === name)!.execute(params, { game: f.game, scene: f.scene, player: f.player });
+  run("Zelda: Start Toolkit", { language: "en" });
+  const tk = getToolkit();
+  tk.configure({ debug: { logLevel: "silent" } });
+  run("Zelda: HUD Style", { iconBoomerang: "IMG_BOOM", inventoryPanel: "IMG_PANEL", panelSlice: 7, inventoryCursor: "IMG_CUR" });
+  tk.inventory.give("boomerang", 1, { silent: true });
+  tk.inventory.give("bow", 1, { silent: true });
+  tk.state.inventory.activeItem = "boomerang";
+  let model = tk.session!.hud!.buildModel();
+  assert.equal(model.activeItem!.icon, "IMG_BOOM", "own icon in the item box");
+  assert.deepEqual([model.skin.inventoryPanel, model.skin.inventoryCursor, model.panelSlice], ["IMG_PANEL", "IMG_CUR", 7]);
+  tk.state.inventory.activeItem = "bow";
+  model = tk.session!.hud!.buildModel();
+  assert.equal(model.activeItem!.icon, "icon_bow", "no own icon = built-in");
+  run("Zelda: HUD Style", {});
+  tk.state.inventory.activeItem = "boomerang";
+  assert.equal(tk.session!.hud!.buildModel().activeItem!.icon, "icon_boomerang");
+  resetToolkitForTests();
+});
+
 test("the Font dropdown lists the project's fonts (filled from the open project)", async () => {
   const { FONT_OPTIONS, fillFontOptions } = await import("../../src/editor/fields.ts");
   assert.equal(fillFontOptions([{ id: "f1", name: "PixelOperator" }, { id: "f2", name: "Mana" }]), true);

@@ -165,7 +165,7 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
     const names = m.initialActions.map((a: Any) => a.actionName).filter(Boolean);
     assert.ok(names.indexOf("Zelda: HUD Style") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: HUD Style after Start Toolkit`);
     const hud = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
-    for (const k of ["heartFull", "rupees", "digits", "itemBox", "bar"]) assert.ok(ids.has(hud[k]), `${k} = ${hud[k]}`);
+    for (const k of ["heartFull", "rupees", "digits", "itemBox", "bar", "inventoryPanel", "inventoryCursor"]) assert.ok(ids.has(hud[k]), `${k} = ${hud[k]}`);
     assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.layout, "zelda-dialogue-layout");
   }
   const field = story.maps[0];

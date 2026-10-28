@@ -112,6 +112,8 @@ export const UI_ASSETS = [
   { key: "zelda-ui-item-box.png", name: "Zelda Item Box", grid: frame(22, 22, ["k", "c", "C", "k"], "n") },
   { key: "zelda-ui-magic-frame.png", name: "Zelda Magic Frame", grid: frame(8, 30, ["k", "c"], "n") },
   { key: "zelda-ui-magic-fill.png", name: "Zelda Magic Fill", grid: magicFill(8, 30) },
+  // Inventory cursor: a gold frame with an open middle (the item icon shows through).
+  { key: "zelda-ui-cursor.png", name: "Zelda Inventory Cursor", grid: frame(20, 20, ["k", "y", "Y", "k"], ".") },
 ];
 
 function rgba(hex) {

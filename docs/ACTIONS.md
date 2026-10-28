@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.19.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.20.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
@@ -412,19 +412,11 @@ Shows toolkit messages (signs, "You got...") as PS Maker dialogues (or a toolkit
 
 ## Zelda: HUD Style
 
-Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.
+Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar, item icons, inventory panel. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `parts` (Toolkit HUD parts) | string-enum-multi | `["hearts","counters","item","magic"]` | What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit. Варианты: Hearts, Counters (rupees, bombs, arrows, keys), Item box, Magic meter. |
-| `heartsX` (Hearts X) | number | `-1` | Left edge of the hearts in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `heartsY` (Hearts Y) | number | `-1` | Top edge of the hearts in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `countersX` (Counters X) | number | `-1` | Left edge of the counters in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `countersY` (Counters Y) | number | `-1` | Top edge of the counters in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `itemX` (Item box X) | number | `-1` | Left edge of the item box in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `itemY` (Item box Y) | number | `-1` | Top edge of the item box in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `magicX` (Magic meter X) | number | `-1` | Left edge of the magic meter in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `magicY` (Magic meter Y) | number | `-1` | Top edge of the magic meter in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
 | `heartFull` (Heart: full) | image | — | Picture of a full heart (its size sets the size of all hearts). / Полное сердце. |
 | `heartHalf` (Heart: half) | image | — | Half a heart. Empty = the full heart. / Половина сердца. |
 | `heartEmpty` (Heart: empty) | image | — | An empty heart container. / Пустое сердце. |
@@ -438,10 +430,30 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | `magicFill` (Magic meter: fill) | image | — | Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии. |
 | `bar` (Bar background) | image | — | Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса. |
 | `barSlice` (Bar border (px)) | number | `4` | How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается. |
+| `iconSword` (Icon: sword) | image | — | Icon of the sword in the item box and the inventory. / Иконка предмета. |
+| `iconShield` (Icon: shield) | image | — | Icon of the shield in the item box and the inventory. / Иконка предмета. |
+| `iconGlove` (Icon: power glove) | image | — | Icon of the power glove in the item box and the inventory. / Иконка предмета. |
+| `iconBomb` (Icon: bomb item) | image | — | Icon of the bomb item in the item box and the inventory. / Иконка предмета. |
+| `iconBoomerang` (Icon: boomerang) | image | — | Icon of the boomerang in the item box and the inventory. / Иконка предмета. |
+| `iconBow` (Icon: bow) | image | — | Icon of the bow in the item box and the inventory. / Иконка предмета. |
+| `iconHookshot` (Icon: hookshot) | image | — | Icon of the hookshot in the item box and the inventory. / Иконка предмета. |
+| `iconFireRod` (Icon: fire rod) | image | — | Icon of the fire rod in the item box and the inventory. / Иконка предмета. |
+| `iconHealingSpell` (Icon: healing spell) | image | — | Icon of the healing spell in the item box and the inventory. / Иконка предмета. |
+| `inventoryPanel` (Inventory panel) | image | — | Background of the inventory panel (I), stretched; its border keeps its size (9-slice). / Фон панели предметов. |
+| `panelSlice` (Panel border (px)) | number | `4` | How many pixels of the panel picture's edge are not stretched. / Рамка фона панели, не растягивается. |
+| `inventoryCursor` (Inventory cursor) | image | — | Frame around the selected item in the inventory (20×20 HUD pixels). / Рамка выбранного предмета. |
 | `lifeLabel` (LIFE label) | boolean | `true` | Show the LIFE label above the hearts. / Надпись над сердцами. |
 | `font` (Font) | string-enum | `""` | A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта. Варианты: Default. |
 | `textColor` (Text color) | string-enum | `"#f8e0a0"` | Colour of the HUD texts. / Цвет текста. Варианты: Cream, White, Gold, Dark. |
 | `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = like the map (one HUD pixel = one map pixel), 4 = four screen pixels. / Масштаб: 0 — как у карты. |
+| `heartsX` (Hearts X) | number | `-1` | Left edge of the hearts in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `heartsY` (Hearts Y) | number | `-1` | Top edge of the hearts in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `countersX` (Counters X) | number | `-1` | Left edge of the counters in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `countersY` (Counters Y) | number | `-1` | Top edge of the counters in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `itemX` (Item box X) | number | `-1` | Left edge of the item box in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `itemY` (Item box Y) | number | `-1` | Top edge of the item box in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `magicX` (Magic meter X) | number | `-1` | Left edge of the magic meter in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `magicY` (Magic meter Y) | number | `-1` | Top edge of the magic meter in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
 
 ## Zelda: HUD Variables
 

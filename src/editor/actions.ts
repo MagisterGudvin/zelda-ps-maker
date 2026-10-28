@@ -16,7 +16,7 @@ import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
-import { HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
+import { HUD_ITEM_ICONS, HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
 import { styleFromLayout } from "../ui/messageBox.ts";
 import type { MessageKind } from "../core/events.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
@@ -1110,7 +1110,7 @@ const PART_LABEL: Record<string, string> = HUD_PART_LABELS;
 
 const hudStyle = defineEvent({
   name: "Zelda: HUD Style",
-  description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
+  description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar, item icons, inventory panel. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
   parameterDefs: {
     parts: { ...multi("Toolkit HUD parts", "What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit.", HUD_PART_OPTIONS), defaultValue: HUD_PART_OPTIONS.map(([v]) => v) },
     heartFull: img("Heart: full", "Picture of a full heart (its size sets the size of all hearts). / Полное сердце."),
@@ -1126,6 +1126,10 @@ const hudStyle = defineEvent({
     magicFill: img("Magic meter: fill", "Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии."),
     bar: img("Bar background", "Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса."),
     barSlice: num("Bar border (px)", "How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается.", 4),
+    ...Object.fromEntries(HUD_ITEM_ICONS.map(([field, , label]) => [field, img(`Icon: ${label.toLowerCase()}`, `Icon of the ${label.toLowerCase()} in the item box and the inventory. / Иконка предмета.`)])),
+    inventoryPanel: img("Inventory panel", "Background of the inventory panel (I), stretched; its border keeps its size (9-slice). / Фон панели предметов."),
+    panelSlice: num("Panel border (px)", "How many pixels of the panel picture's edge are not stretched. / Рамка фона панели, не растягивается.", 4),
+    inventoryCursor: img("Inventory cursor", "Frame around the selected item in the inventory (20×20 HUD pixels). / Рамка выбранного предмета."),
     lifeLabel: bool("LIFE label", "Show the LIFE label above the hearts. / Надпись над сердцами.", true),
     font: fontField("Font", "A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта."),
     textColor: choice("Text color", "Colour of the HUD texts. / Цвет текста.", [["#f8e0a0", "Cream"], ["#ffffff", "White"], ["#ffd23a", "Gold"], ["#202020", "Dark"]], "#f8e0a0"),

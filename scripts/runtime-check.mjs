@@ -317,6 +317,27 @@ await check("the boomerang chest: \"Получено: Бумеранг!\" is a P
   expect(await cyrillicIn("ps-maker-font-zelda-font-pixelify-sans"), "the dialogue font has no Cyrillic");
   return `"${box.text}" in ${box.font.split(",")[0]}`;
 });
+await check("I opens the inventory on the demo's panel picture (9-slice) with its own cursor; the title is visible", async () => {
+  await page.keyboard.press("i");
+  await wait(500);
+  const inv = await ev(() => {
+    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    return {
+      open: window.ZeldaMakerToolkit.session.inventoryUi?.open === true,
+      panel: shown.filter((o) => o.texture?.key === "zelda-ui-panel").length,
+      cursor: shown.filter((o) => o.texture?.key === "zelda-ui-cursor").length,
+      title: shown.filter((o) => o.type === "Text" && o.alpha === 1 && /Предметы|Items/.test(o.text)).length,
+    };
+  });
+  await page.screenshot({ path: path.join(OUT, "inventory.png") });
+  await page.keyboard.press("i");
+  await wait(400);
+  const closed = await ev(() => window.ZeldaMakerToolkit.session.inventoryUi?.open === false);
+  expect(inv.open && inv.panel === 9 && inv.cursor === 1 && inv.title === 1, JSON.stringify(inv));
+  expect(closed, "the inventory did not close");
+  return "panel in 9 pieces, cursor on the selected item";
+});
 await check("Escape opens the PS Maker options menu (game paused); Save game keeps the Toolkit's progress in the save", async () => {
   await page.keyboard.press("Escape");
   await button("Save game").waitFor({ state: "visible", timeout: 5000 });

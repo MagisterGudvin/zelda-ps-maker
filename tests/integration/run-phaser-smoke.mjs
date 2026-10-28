@@ -500,6 +500,48 @@ await check("HUD Style positions: a placed part is drawn there in the game (HUD 
   return `first heart at ${r.first.join(",")} screen px, ${r.panels} panels`;
 });
 
+await check("HUD Style: own icons for built-in items (item box, inventory), own inventory panel (9-slice) and cursor", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    const pic = (key, w, h, color) => {
+      if (scene.textures.exists(key)) return;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      g.fillStyle = color;
+      g.fillRect(0, 0, w, h);
+      scene.textures.addCanvas(key, c);
+    };
+    pic("IMG_ICON_BOOM", 16, 16, "#c08030");
+    pic("IMG_INV_PANEL", 24, 24, "#304060");
+    pic("IMG_INV_CURSOR", 20, 20, "#ffd23a");
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    H.run("Zelda: HUD Style", { iconBoomerang: "IMG_ICON_BOOM", inventoryPanel: "IMG_INV_PANEL", panelSlice: 6, inventoryCursor: "IMG_INV_CURSOR" });
+    tk.inventory.give("boomerang", 1, { silent: true });
+    tk.state.inventory.activeItem = "boomerang";
+    window.ZeldaMakerToolkit.session.inventoryUi.setOpen(true);
+    await new Promise((ok) => setTimeout(ok, 300));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    const by = (key) => shown.filter((o) => o.texture?.key === key);
+    const out = { title: shown.filter((o) => o.type === "Text" && o.text === "Items").map((t) => t.alpha), icons: by("IMG_ICON_BOOM").length, panel: by("IMG_INV_PANEL").length, cursor: by("IMG_INV_CURSOR").length, builtin: shown.filter((o) => /icon_boomerang/.test(o.texture?.key ?? "")).length };
+    return out;
+  });
+  await page.screenshot({ path: `${ARTIFACTS}hud-inventory-skin.png` });
+  await ev(() => {
+    window.ZeldaMakerToolkit.session.inventoryUi.setOpen(false);
+    window.__harness.run("Zelda: HUD Style", {});
+  });
+  // The boomerang in the item box and in the inventory; the panel as 9 pieces.
+  assert(r.icons === 2 && r.builtin === 0, `icons ${JSON.stringify(r)}`);
+  assert(r.panel === 9 && r.cursor === 1, `panel ${JSON.stringify(r)}`);
+  // The panel's title is drawn over the picture (pooled texts once kept a faded message's alpha 0).
+  assert(r.title.length === 1 && r.title[0] === 1, `title ${JSON.stringify(r.title)}`);
+  return `own icon ×${r.icons}, panel in ${r.panel} pieces, cursor, title visible`;
+});
+
 await check("Message Style: a sign's text in a box drawn like a PS Maker dialogue layout (9-slice picture), typed, closed with Z", async () => {
   const r = await ev(async () => {
     const H = window.__harness;

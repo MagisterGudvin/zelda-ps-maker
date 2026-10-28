@@ -236,11 +236,14 @@ export interface ToolkitConfig {
     /**
      * Own HUD pictures (Zelda: HUD Style), slot → texture key (a PS Maker image id). Slots:
      * heartFull, heartHalf, heartEmpty, rupees, bombs, arrows, keys, magic, digits (0-9 in one
-     * row), itemBox, magicFrame, magicFill, bar. Missing = the built-in picture.
+     * row), itemBox, magicFrame, magicFill, bar, inventoryPanel, inventoryCursor, and
+     * item_<item id> for the icon of a built-in item. Missing = the built-in picture.
      */
     skin: Record<string, string>;
     /** Border of the bar picture that is not stretched (9-slice), in picture pixels. */
     barSlice: number;
+    /** Border of the inventory panel picture that is not stretched (9-slice), in picture pixels. */
+    panelSlice: number;
     showLifeLabel: boolean;
     /** Colour of the HUD texts ("LIFE", inventory title). */
     textColor: string;
@@ -445,6 +448,7 @@ export function createDefaultConfig(): ToolkitConfig {
       fontFamily: "monospace",
       skin: {},
       barSlice: 4,
+      panelSlice: 4,
       showLifeLabel: true,
       textColor: "#f8e0a0",
       places: {},

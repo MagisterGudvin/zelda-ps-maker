@@ -208,6 +208,7 @@ export interface HudModel {
   /** Own pictures by slot (config.ui.skin). */
   skin: Record<string, string>;
   barSlice: number;
+  panelSlice: number;
   showLifeLabel: boolean;
   textColor: string;
   /** The open dialogue box (Zelda: Message Style), or null. */

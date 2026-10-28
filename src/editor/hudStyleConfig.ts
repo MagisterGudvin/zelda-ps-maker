@@ -4,7 +4,20 @@ import { resolveImage } from "./paramResolvers.ts";
 import type { HudPart } from "../ui/hudLayout.ts";
 
 /** Slots of Zelda: HUD Style, in form order (config.ui.skin). */
-export const HUD_SKIN_SLOTS = ["heartFull", "heartHalf", "heartEmpty", "rupees", "bombs", "arrows", "keys", "digits", "itemBox", "magicFrame", "magicFill", "bar"] as const;
+export const HUD_SKIN_SLOTS = ["heartFull", "heartHalf", "heartEmpty", "rupees", "bombs", "arrows", "keys", "digits", "itemBox", "magicFrame", "magicFill", "bar", "inventoryPanel", "inventoryCursor"] as const;
+
+/** HUD Style fields for the icons of the built-in items: field → item id (skin slot item_<id>), label. */
+export const HUD_ITEM_ICONS: [string, string, string][] = [
+  ["iconSword", "sword", "Sword"],
+  ["iconShield", "shield", "Shield"],
+  ["iconGlove", "glove", "Power glove"],
+  ["iconBomb", "bomb", "Bomb item"],
+  ["iconBoomerang", "boomerang", "Boomerang"],
+  ["iconBow", "bow", "Bow"],
+  ["iconHookshot", "hookshot", "Hookshot"],
+  ["iconFireRod", "fire_rod", "Fire rod"],
+  ["iconHealingSpell", "healing_spell", "Healing spell"],
+];
 export const HUD_PART_OPTIONS = [["hearts", "Hearts"], ["counters", "Counters (rupees, bombs, arrows, keys)"], ["item", "Item box"], ["magic", "Magic meter"]] as const;
 export const DEFAULT_COUNTERS = ["rupees", "bombs", "arrows", "keys"];
 
@@ -29,6 +42,7 @@ const text = (v: unknown) => (typeof v === "string" ? v : "");
 export function hudStyleConfig(p: Record<string, unknown>, story: PsStory | null): Partial<ToolkitConfig["ui"]> {
   const skin: Record<string, string> = {};
   for (const slot of HUD_SKIN_SLOTS) skin[slot] = resolveImage(p[slot]);
+  for (const [field, item] of HUD_ITEM_ICONS) skin[`item_${item}`] = resolveImage(p[field]);
   // An action saved before 0.18 has no parts: everything stays on.
   const parts = new Set(Array.isArray(p.parts) ? (p.parts as string[]) : HUD_PART_OPTIONS.map(([v]) => v));
   const places: Record<string, { x: number; y: number }> = {};
@@ -42,6 +56,7 @@ export function hudStyleConfig(p: Record<string, unknown>, story: PsStory | null
     skin,
     places,
     barSlice: Math.max(0, Math.round(num(p.barSlice, 4))),
+    panelSlice: Math.max(0, Math.round(num(p.panelSlice, 4))),
     showLifeLabel: p.lifeLabel === undefined ? true : p.lifeLabel === true || p.lifeLabel === "true",
     textColor: text(p.textColor) || "#f8e0a0",
     scale: Math.max(0, Math.round(num(p.scale, 0))),

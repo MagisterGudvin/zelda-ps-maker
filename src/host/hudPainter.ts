@@ -287,6 +287,8 @@ export class HudPainter {
     const t = this.texts.next();
     t.setStyle({ fontFamily: this.fontFamily, fontSize: `${Math.max(1, Math.round(px))}px`, color, fontStyle: "bold", ...opts });
     t.setShadow(1, 1, "#000000", 0, false, true);
+    // Pooled texts: a fading message may have left its alpha on this one.
+    t.setAlpha(1);
     t.setText(value);
     t.setOrigin(0, 0);
     t.setPosition(Math.round(x), Math.round(y));

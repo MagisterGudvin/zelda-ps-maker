@@ -71,7 +71,8 @@ export class HudSystem {
         itemId: id,
         name: inv.displayName(id),
         description: inv.displayDescription(id),
-        icon: def?.icon ?? `icon_${id}`,
+        // HUD Style → Item icons: an own picture for a built-in item (Define Item has its own icon).
+        icon: ui.skin[`item_${id}`] || (def?.icon ?? `icon_${id}`),
         count: counter && counter !== "magic" ? inv.count(counter) : null,
         selected: id === activeId,
       };
@@ -112,6 +113,7 @@ export class HudSystem {
       fontFamily: ui.fontFamily,
       skin: { ...ui.skin },
       barSlice: ui.barSlice,
+      panelSlice: ui.panelSlice,
       showLifeLabel: ui.showLifeLabel,
       textColor: ui.textColor,
       box: s.messageBox?.model() ?? null,

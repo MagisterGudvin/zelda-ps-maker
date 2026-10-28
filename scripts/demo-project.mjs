@@ -150,6 +150,10 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     magicFrame: "zelda-ui-magic-frame",
     magicFill: "zelda-ui-magic-fill",
     bar: "zelda-ui-hud-bar",
+    // The inventory panel (I) on the dialogue panel picture, with a gold cursor.
+    inventoryPanel: "zelda-ui-panel",
+    panelSlice: 7,
+    inventoryCursor: "zelda-ui-cursor",
     barSlice: 4,
     // Scale 0: one HUD pixel per map pixel, like the map.
     scale: 0,

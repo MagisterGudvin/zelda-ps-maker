@@ -1,4 +1,5 @@
 import type { PluginEvent } from "@ps-maker/plugin-api";
+import { HUD_ITEM_ICONS, HUD_PLACE_FIELDS } from "./hudStyleConfig.ts";
 
 /**
  * How the actions look in the PS Maker editor, kept apart from what they do:
@@ -337,9 +338,14 @@ export const ACTION_UI: Record<string, ActionUi> = {
       font: { group: "Bar and text" },
       textColor: { group: "Bar and text" },
       scale: { group: "Bar and text", min: 0, max: 8, step: 1 },
+      ...Object.fromEntries(HUD_ITEM_ICONS.map(([field]) => [field, { group: "Item icons" }])),
+      inventoryPanel: { group: "Inventory panel" },
+      panelSlice: { group: "Inventory panel", min: 0, max: 64, step: 1 },
+      inventoryCursor: { group: "Inventory panel" },
+      ...Object.fromEntries(Object.values(HUD_PLACE_FIELDS).flat().map((field) => [field, { group: "Positions", min: -1, max: 2000, step: 1 }])),
     },
-    visible: { barSlice: (p) => !!p.bar },
-    collapsed: ["Counters", "Item and magic", "Bar and text"],
+    visible: { barSlice: (p) => !!p.bar, panelSlice: (p) => !!p.inventoryPanel },
+    collapsed: ["Counters", "Item and magic", "Bar and text", "Item icons", "Inventory panel", "Positions"],
     preview: (p) => join(["heartFull", "rupees", "digits", "itemBox", "magicFrame", "bar"].filter((k) => set(p[k])).map((k) => k.replace(/[A-Z].*/, ""))) || "built-in pictures",
   },
   "Zelda: Message Style": {
