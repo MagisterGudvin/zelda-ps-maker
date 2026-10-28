@@ -430,6 +430,57 @@ await check("PS Maker NPC bodies block enemies; sounds load from a URL and play"
   return `enemy stopped at x=${Math.round(r.ex)} (NPC at ${Math.round(r.npcX)}), sound played: ${r.played}`;
 });
 
+await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits, item box, magic and a 9-slice bar", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    // Pictures as PS Maker loads the project's Images: textures under the image id.
+    const pic = (key, w, h, paint) => {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      paint(c.getContext("2d"), w, h);
+      scene.textures.addCanvas(key, c);
+    };
+    const fill = (color) => (g, w, h) => ((g.fillStyle = color), g.fillRect(0, 0, w, h));
+    pic("IMG_HEART", 16, 14, fill("#e03040"));
+    pic("IMG_HEART_E", 16, 14, fill("#402020"));
+    pic("IMG_RUPEE", 12, 12, fill("#30c060"));
+    pic("IMG_DIGITS", 80, 12, (g) => {
+      for (let d = 0; d < 10; d++) ((g.fillStyle = `hsl(${d * 36},80%,60%)`), g.fillRect(d * 8, 0, 7, 12));
+    });
+    pic("IMG_BOX", 32, 32, fill("#806040"));
+    pic("IMG_MFRAME", 12, 40, fill("#202020"));
+    pic("IMG_MFILL", 12, 40, fill("#40e080"));
+    pic("IMG_BAR", 32, 32, (g) => ((g.fillStyle = "#c0a070"), g.fillRect(0, 0, 32, 32), (g.fillStyle = "#302010"), g.fillRect(4, 4, 24, 24)));
+    H.run("Zelda: HUD Style", { heartFull: "IMG_HEART", heartEmpty: "IMG_HEART_E", rupees: "IMG_RUPEE", digits: "IMG_DIGITS", itemBox: "IMG_BOX", magicFrame: "IMG_MFRAME", magicFill: "IMG_MFILL", bar: "IMG_BAR", barSlice: 4, scale: 2 });
+    window.ZeldaMakerToolkit.toolkit.inventory.give("rupees", 7, { silent: true });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    const by = (key) => shown.filter((o) => o.texture?.key === key);
+    const heart = by("IMG_HEART")[0];
+    const out = {
+      hearts: by("IMG_HEART").length + by("IMG_HEART_E").length,
+      maxHearts: Math.ceil(window.ZeldaMakerToolkit.toolkit.state.player.maxHp / window.ZeldaMakerToolkit.toolkit.config.player.heartValue),
+      heartScale: heart?.scaleX,
+      rupee: by("IMG_RUPEE").length,
+      digits: by("IMG_DIGITS").map((o) => o.frame.name).join(","),
+      box: by("IMG_BOX").length,
+      magic: by("IMG_MFRAME").length + by("IMG_MFILL").length,
+      bar: by("IMG_BAR").map((o) => `${o.type}:${o.depth}`).join(","),
+    };
+    return out;
+  });
+  await page.screenshot({ path: `${ARTIFACTS}hud-style.png` });
+  await ev(() => window.__harness.run("Zelda: HUD Style", {}));
+  assert(r.hearts === r.maxHearts && r.heartScale === 2, `hearts ${r.hearts}/${r.maxHearts} at ×${r.heartScale}`);
+  assert(r.rupee === 1 && r.box === 1 && r.magic === 2, JSON.stringify(r));
+  assert(r.digits.split(",").includes("zmt_digit_7"), `digits ${r.digits}`);
+  assert(/^(NineSlice|Image):-1$/.test(r.bar), `bar ${r.bar}`);
+  return `${r.hearts} hearts, digits ${r.digits}, bar ${r.bar}`;
+});
+
 await check("no page errors or console errors", async () => {
   assert(pageErrors.length === 0, pageErrors.join("\n"));
   assert(consoleErrors.length === 0, consoleErrors.join("\n"));

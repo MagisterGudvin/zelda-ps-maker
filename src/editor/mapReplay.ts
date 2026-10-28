@@ -32,6 +32,7 @@ export const MAP_BUILDING_ACTIONS = new Set([
   "Zelda: Define Enemy",
   "Zelda: Set Player Sprites",
   "Zelda: Set Sound",
+  "Zelda: HUD Style",
 ]);
 
 type Execute = (params: unknown, ctx: PluginContextLike) => void;

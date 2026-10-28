@@ -2,7 +2,7 @@ import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { isObjectType, resolveObjectConfig } from "../interactions/objectTypes.ts";
 import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
 import { characterFromParam, findStory, isStory, mapObjectLook, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
-import { areaOf, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
+import { areaOf, fillFontOptions, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
 
 /**
  * Shows what the Zelda actions of a map will create, on the map in the PS Maker editor.
@@ -276,6 +276,7 @@ export function startEditorPreview(win: any = globalThis): void {
     if (opened && decodeURIComponent(opened) !== selected && zeldaActions(scene.map).some(({ action }) => action.id === decodeURIComponent(opened))) select(decodeURIComponent(opened));
     // The "Look (map object)" dropdowns list this project's map objects.
     fillMapObjectOptions(storyOf(scene)?.mapObjects);
+    fillFontOptions(storyOf(scene)?.gameUI?.fonts);
     const sig = signature(scene.map);
     if (!overlay || overlay.scene !== scene || overlay.sig !== sig) {
       clear();

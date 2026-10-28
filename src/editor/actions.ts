@@ -20,9 +20,9 @@ import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
-import { animFromPick, characterFromParam, characterPlan, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { animFromPick, characterFromParam, characterPlan, fontFamilyCss, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -1103,6 +1103,58 @@ const setAbility = defineEvent({
   },
 });
 
+/** Slots of Zelda: HUD Style, in form order (config.ui.skin). */
+export const HUD_SKIN_SLOTS = ["heartFull", "heartHalf", "heartEmpty", "rupees", "bombs", "arrows", "keys", "digits", "itemBox", "magicFrame", "magicFill", "bar"] as const;
+
+const hudStyle = defineEvent({
+  name: "Zelda: HUD Style",
+  description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
+  parameterDefs: {
+    heartFull: img("Heart: full", "Picture of a full heart (its size sets the size of all hearts). / Полное сердце."),
+    heartHalf: img("Heart: half", "Half a heart. Empty = the full heart. / Половина сердца."),
+    heartEmpty: img("Heart: empty", "An empty heart container. / Пустое сердце."),
+    rupees: img("Icon: rupees", "Icon above the rupee counter. / Значок рупий."),
+    bombs: img("Icon: bombs", "Icon above the bomb counter. / Значок бомб."),
+    arrows: img("Icon: arrows", "Icon above the arrow counter. / Значок стрел."),
+    keys: img("Icon: keys", "Icon above the small key counter. / Значок ключей."),
+    digits: img("Digits 0-9", "One picture with the ten digits 0 1 2 3 4 5 6 7 8 9 in a row, all the same width. / Цифры 0–9 в одну строку."),
+    itemBox: img("Item box", "Frame around the selected item. / Рамка предмета."),
+    magicFrame: img("Magic meter: frame", "The empty magic meter. / Рамка шкалы магии."),
+    magicFill: img("Magic meter: fill", "Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии."),
+    bar: img("Bar background", "Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса."),
+    barSlice: num("Bar border (px)", "How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается.", 4),
+    lifeLabel: bool("LIFE label", "Show the LIFE label above the hearts. / Надпись над сердцами.", true),
+    font: fontField("Font", "A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта."),
+    textColor: choice("Text color", "Colour of the HUD texts. / Цвет текста.", [["#f8e0a0", "Cream"], ["#ffffff", "White"], ["#ffd23a", "Gold"], ["#202020", "Dark"]], "#f8e0a0"),
+    scale: num("Scale", "Size of one HUD pixel on screen: 0 = automatic (largest that fits), 4 = four screen pixels. / Масштаб.", 0),
+  },
+  execute(params, ctx) {
+    run("Zelda: HUD Style", ctx, params, (s, tk) => {
+      const p = params as Record<string, unknown>;
+      const skin: Record<string, string> = {};
+      for (const slot of HUD_SKIN_SLOTS) {
+        const key = resolveImage(p[slot]);
+        skin[slot] = key;
+        if (key && s.host.textureSize && !s.host.textureSize(key)) s.logger.warn(`HUD Style: picture "${key}" (${slot}) is not loaded; the built-in one is shown.`);
+      }
+      const font = textOf(p.font);
+      tk.configure(
+        {
+          ui: {
+            skin,
+            barSlice: Math.max(0, Math.round(numOr(p.barSlice, 4))),
+            showLifeLabel: boolOr(p.lifeLabel, true),
+            textColor: textOf(p.textColor) || "#f8e0a0",
+            scale: Math.max(0, Math.round(numOr(p.scale, 0))),
+            fontFamily: font ? fontFamilyCss(psStory(s, "HUD Style"), font) : "monospace",
+          },
+        },
+        "HUD Style",
+      );
+    });
+  },
+});
+
 const showMessage = defineEvent({
   name: "Zelda: Show Message",
   description: "Shows a short HUD message (not a PS Maker dialogue box). / Короткое сообщение в HUD.",
@@ -1327,6 +1379,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   changePlayerStats,
   setAbility,
   showMessage,
+  hudStyle,
   linkVariable,
   setRespawn,
   respawnPlayer,

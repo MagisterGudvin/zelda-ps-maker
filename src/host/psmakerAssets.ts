@@ -54,10 +54,16 @@ export interface PsMapObject {
   animationConfig?: { frameWidth?: number; frameHeight?: number };
 }
 
+export interface PsFont {
+  id: string;
+  name: string;
+}
+
 export interface PsStory {
   characters: PsCharacter[];
   spritesheetAnimations: PsSheet[];
   mapObjects?: PsMapObject[];
+  gameUI?: { fonts?: PsFont[]; dialogLayouts?: unknown[]; defaultDialogLayoutId?: string | null };
   player?: { animationSets: PsAnimationSet[]; defaultAnimationSetId?: string };
 }
 
@@ -405,4 +411,16 @@ export function mapObjectLook(story: PsStory, value: unknown): { sprite: string;
   const box = mo.collision?.enabled && mo.collision.box ? mo.collision.box : null;
   const frame = animated && mo.animationConfig?.frameWidth && mo.animationConfig.frameHeight ? { w: mo.animationConfig.frameWidth, h: mo.animationConfig.frameHeight } : null;
   return { sprite: animated ? `${mo.id}_frames#0` : mo.id, box, frame };
+}
+
+/**
+ * CSS font family of a project font, as PS Maker registers it when it first shows one of its
+ * windows (fontAssets.ts: FontFace "ps-maker-font-<id>"), then its name and a fallback.
+ */
+export function fontFamilyCss(story: PsStory | null, fontId: string, fallback = "monospace"): string {
+  if (!fontId) return fallback;
+  const font = story?.gameUI?.fonts?.find((f) => f.id === fontId);
+  const safe = fontId.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const quote = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  return [quote(`ps-maker-font-${safe}`), ...(font?.name ? [quote(font.name)] : []), fallback].join(", ");
 }

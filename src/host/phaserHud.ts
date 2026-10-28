@@ -2,14 +2,14 @@ import type { ToolkitConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import type { HudModel, HudSink, SheetPreview } from "./types.ts";
 import { resolveTexture } from "./textures.ts";
-import { computeHudLayout, DIGIT_W, type HudLayout, type Rect } from "../ui/hudLayout.ts";
+import { computeHudLayout, type HudLayout, type HudMetrics, type Rect, type Size } from "../ui/hudLayout.ts";
 
 export const HUD_SCENE_KEY = "ZeldaMakerToolkitHUD";
 
 const HUDS = new WeakMap<object, PhaserHud>();
 const MSG_FILL = 0x101030;
 const MSG_BORDER = 0xf0f0f0;
-const LIFE_COLOR = "#f8e0a0";
+const DIGIT_FRAME = "zmt_digit_";
 
 /** One HUD per Phaser game, reused across maps (avoids duplicate HUD objects). */
 export function getHud(game: any, cfg: ToolkitConfig, logger: Logger): PhaserHud {
@@ -69,6 +69,9 @@ export class PhaserHud implements HudSink {
   private previewG: any = null;
   private previewImg: any = null;
   private previewLabels!: Pool;
+  /** Own bar picture (9-slice where the renderer supports it) and magic fill (cropped). */
+  private bar: { key: string; slice: number; obj: any } | null = null;
+  private magicFill: any = null;
 
   /** Use getHud(); direct construction would duplicate the HUD scene. */
   constructor(game: any, cfg: ToolkitConfig, logger: Logger) {
@@ -81,6 +84,10 @@ export class PhaserHud implements HudSink {
       if (this.pending) this.render(this.pending);
       this.renderDiagnostics();
       this.renderPreview();
+    });
+    // A project font PS Maker loads later (on its first dialogue or menu): draw the texts again.
+    (globalThis as { document?: { fonts?: { addEventListener?(e: string, f: () => void): void } } }).document?.fonts?.addEventListener?.("loadingdone", () => {
+      if (this.pending) this.render(this.pending);
     });
   }
 
@@ -123,6 +130,79 @@ export class PhaserHud implements HudSink {
     this.previewG = s.add.graphics().setDepth(20);
     this.previewImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(21).setVisible(false);
     this.previewLabels = new Pool(() => s.add.text(0, 0, "", { fontFamily: "monospace", color: "#ffff66", backgroundColor: "#000000aa" }).setOrigin(0, 0).setDepth(22));
+    this.magicFill = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setVisible(false);
+  }
+
+  /** Size of an own picture (a texture PS Maker loaded under the image id), or null. */
+  private picSize(key: string | undefined): Size | null {
+    if (!key || !this.scene.textures.exists(key)) return null;
+    const src = this.scene.textures.get(key)?.getSourceImage?.();
+    return src && src.width > 0 && src.height > 0 ? { w: src.width, h: src.height } : null;
+  }
+
+  /** HUD picture sizes from the own pictures; the layout keeps the built-in ones for the rest. */
+  private metrics(skin: Record<string, string>, counters: string[]): Partial<HudMetrics> {
+    const m: Partial<HudMetrics> = {};
+    const heart = this.picSize(skin.heartFull) ?? this.picSize(skin.heartEmpty);
+    if (heart) m.heart = heart;
+    const icons = counters.map((c) => this.picSize(skin[c])).filter((x): x is Size => !!x);
+    if (icons.length) m.icon = { w: Math.max(8, ...icons.map((i) => i.w)), h: Math.max(8, ...icons.map((i) => i.h)) };
+    const digits = this.picSize(skin.digits);
+    if (digits) m.digit = { w: Math.floor(digits.w / 10) + 1, h: digits.h };
+    const item = this.picSize(skin.itemBox);
+    if (item) m.item = item;
+    const magic = this.picSize(skin.magicFrame) ?? this.picSize(skin.magicFill);
+    if (magic) m.magic = magic;
+    return m;
+  }
+
+  /** Frames 0-9 on a digit strip (ten equal digits in one row). */
+  private digitFrames(key: string): boolean {
+    const size = this.picSize(key);
+    if (!size) return false;
+    const tex = this.scene.textures.get(key);
+    if (!tex.has?.(`${DIGIT_FRAME}0`)) {
+      const w = Math.floor(size.w / 10);
+      for (let d = 0; d < 10; d++) tex.add?.(`${DIGIT_FRAME}${d}`, 0, d * w, 0, w, size.h);
+    }
+    return !!tex.has?.(`${DIGIT_FRAME}0`);
+  }
+
+  /** An own picture fitted into a HUD rectangle (whole picture, centred), or false. */
+  private fitPic(key: string | undefined, r: Rect, k: number, frame?: string): boolean {
+    const size = this.picSize(key);
+    if (!size || !key) return false;
+    const w = frame ? (this.scene.textures.get(key).get(frame)?.width ?? size.w) : size.w;
+    const h = frame ? (this.scene.textures.get(key).get(frame)?.height ?? size.h) : size.h;
+    const f = Math.min(r.w / w, r.h / h);
+    const img = this.images.next();
+    if (frame) img.setTexture(key, frame);
+    else img.setTexture(key);
+    img.setScale(f * k);
+    img.setPosition(Math.round((r.x + (r.w - w * f) / 2) * k), Math.round((r.y + (r.h - h * f) / 2) * k));
+    return true;
+  }
+
+  /** The bar behind the HUD: own picture as a 9-slice (WebGL) or stretched. */
+  private drawBar(key: string | undefined, slice: number, r: Rect, k: number): void {
+    const size = this.picSize(key);
+    if (!size || !key) {
+      this.bar?.obj.setVisible(false);
+      return;
+    }
+    if (!this.bar || this.bar.key !== key || this.bar.slice !== slice) {
+      this.bar?.obj.destroy();
+      const s = this.scene;
+      const sl = Math.max(0, Math.min(Math.floor(slice), Math.floor(size.w / 2) - 1, Math.floor(size.h / 2) - 1));
+      const webgl = this.game.renderer?.type === 2;
+      const obj = webgl && typeof s.add.nineslice === "function" && sl > 0 ? s.add.nineslice(0, 0, key, undefined, size.w, size.h, sl, sl, sl, sl) : s.add.image(0, 0, key);
+      obj.setOrigin(0, 0).setDepth(-1);
+      this.bar = { key, slice, obj };
+    }
+    const o = this.bar.obj;
+    o.setVisible(true).setPosition(r.x * k, r.y * k);
+    if (typeof o.setSize === "function" && o.type === "NineSlice") o.setSize(r.w, r.h).setScale(k);
+    else o.setScale((r.w * k) / size.w, (r.h * k) / size.h);
   }
 
   private tex(id: string): string {
@@ -174,30 +254,41 @@ export class PhaserHud implements HudSink {
       showHearts: model.showHearts,
       counters: model.counters.map((c) => c.digits),
       hearts: Math.ceil(model.maxHp / Math.max(1, model.heartValue)),
+      metrics: this.metrics(model.skin, model.counters.map((c) => c.id)),
+      showLifeLabel: model.showLifeLabel,
     });
+    const skin = model.skin;
     const k = L.k;
     const g = this.g;
     g.clear();
     this.images.begin();
     this.texts.begin();
 
-    if (L.magic) this.drawMagic(L.magic, k, model.maxMagic > 0 ? model.magic / model.maxMagic : 0);
+    this.drawBar(skin.bar, model.barSlice, L.bar, k);
+    if (L.magic) this.drawMagic(L.magic, k, model.maxMagic > 0 ? model.magic / model.maxMagic : 0, skin);
+    else this.magicFill?.setVisible(false);
     if (L.item) this.drawItemBox(L.item, k, model);
+    const ownDigits = !!skin.digits && this.digitFrames(skin.digits);
     model.counters.forEach((c, i) => {
       const r = L.counters[i];
       if (!r) return;
-      this.pixelImage(c.icon, r.icon.x, r.icon.y, k, 8);
+      if (!this.fitPic(skin[c.id], r.icon, k)) this.pixelImage(c.icon, r.icon.x, r.icon.y, k, 8);
       const digits = String(Math.max(0, Math.min(c.value, 10 ** c.digits - 1))).padStart(c.digits, "0");
-      for (let d = 0; d < digits.length; d++) this.pixelImage(`hud_digit_${digits[d]}`, r.digits.x + d * DIGIT_W, r.digits.y, k);
+      const dw = r.digits.w / c.digits;
+      for (let d = 0; d < digits.length; d++) {
+        const cell = { x: r.digits.x + d * dw, y: r.digits.y, w: dw - (ownDigits ? 1 : 0), h: r.digits.h };
+        if (!ownDigits || !this.fitPic(skin.digits, cell, k, `${DIGIT_FRAME}${digits[d]}`)) this.pixelImage(`hud_digit_${digits[d]}`, cell.x, cell.y, k);
+      }
     });
     if (L.lifeLabel) {
-      const t = this.text(model.lifeLabel, 0, 0, 7 * k, LIFE_COLOR);
+      const t = this.text(model.lifeLabel, 0, 0, 7 * k, model.textColor, { fontFamily: model.fontFamily });
       t.setPosition(Math.round((L.lifeLabel.x + L.lifeLabel.w / 2) * k - t.width / 2), Math.round(L.lifeLabel.y * k - k));
     }
     L.hearts.forEach((h, n) => {
       const value = Math.max(0, Math.min(model.heartValue, model.hp - n * model.heartValue));
-      const id = value >= model.heartValue ? "hud_heart8_full" : value > 0 ? "hud_heart8_half" : "hud_heart8_empty";
-      this.pixelImage(id, h.x, h.y, k);
+      const state = value >= model.heartValue ? "full" : value > 0 ? "half" : "empty";
+      const own = state === "full" ? skin.heartFull : state === "half" ? (skin.heartHalf ?? skin.heartFull) : skin.heartEmpty;
+      if (!this.fitPic(own, h, k)) this.pixelImage(`hud_heart8_${state}`, h.x, h.y, k);
     });
 
     this.drawMessages(model, L);
@@ -210,20 +301,36 @@ export class PhaserHud implements HudSink {
     this.texts.end();
   }
 
-  private drawMagic(r: Rect, k: number, frac: number): void {
+  private drawMagic(r: Rect, k: number, frac: number, skin: Record<string, string>): void {
     const g = this.g;
-    g.fillStyle(0x000000, 0.85).fillRect(r.x * k, r.y * k, r.w * k, r.h * k);
-    g.lineStyle(k, 0xf0f0e0, 1).strokeRect(r.x * k + k / 2, r.y * k + k / 2, r.w * k - k, r.h * k - k);
-    const inner = (r.h - 4) * Math.max(0, Math.min(1, frac));
+    const f = Math.max(0, Math.min(1, frac));
+    const frame = this.fitPic(skin.magicFrame, r, k);
+    if (!frame) {
+      g.fillStyle(0x000000, 0.85).fillRect(r.x * k, r.y * k, r.w * k, r.h * k);
+      g.lineStyle(k, 0xf0f0e0, 1).strokeRect(r.x * k + k / 2, r.y * k + k / 2, r.w * k - k, r.h * k - k);
+    }
+    const fill = this.picSize(skin.magicFill);
+    if (fill && this.magicFill) {
+      // The fill picture over the frame, cut from the top as magic is spent.
+      const cut = Math.round(fill.h * (1 - f));
+      this.magicFill.setTexture(skin.magicFill).setVisible(f > 0).setScale((r.w * k) / fill.w, (r.h * k) / fill.h).setPosition(r.x * k, r.y * k).setCrop(0, cut, fill.w, fill.h - cut);
+      return;
+    }
+    this.magicFill?.setVisible(false);
+    const inner = (r.h - 4) * f;
     g.fillStyle(0x3ad16b, 1).fillRect((r.x + 2) * k, (r.y + r.h - 2 - inner) * k, (r.w - 4) * k, inner * k);
   }
 
   private drawItemBox(r: Rect, k: number, model: HudModel): void {
-    const g = this.g;
-    g.fillStyle(0x000000, 0.8).fillRect(r.x * k, r.y * k, r.w * k, r.h * k);
-    g.lineStyle(k, 0xf0f0e0, 1).strokeRect(r.x * k + k / 2, r.y * k + k / 2, r.w * k - k, r.h * k - k);
-    g.lineStyle(k, 0x6070c0, 1).strokeRect((r.x + 1) * k + k / 2, (r.y + 1) * k + k / 2, (r.w - 2) * k - k, (r.h - 2) * k - k);
-    if (model.activeItem) this.pixelImage(model.activeItem.icon, r.x + 3, r.y + 3, k, 16);
+    if (!this.fitPic(model.skin.itemBox, r, k)) {
+      const g = this.g;
+      g.fillStyle(0x000000, 0.8).fillRect(r.x * k, r.y * k, r.w * k, r.h * k);
+      g.lineStyle(k, 0xf0f0e0, 1).strokeRect(r.x * k + k / 2, r.y * k + k / 2, r.w * k - k, r.h * k - k);
+      g.lineStyle(k, 0x6070c0, 1).strokeRect((r.x + 1) * k + k / 2, (r.y + 1) * k + k / 2, (r.w - 2) * k - k, (r.h - 2) * k - k);
+    }
+    if (!model.activeItem) return;
+    const size = Math.max(8, Math.min(r.w, r.h) - 6);
+    this.pixelImage(model.activeItem.icon, r.x + (r.w - size) / 2, r.y + (r.h - size) / 2, k, size);
   }
 
   /** Classic dialogue-style boxes in the free area, newest at the bottom. */
@@ -262,7 +369,7 @@ export class PhaserHud implements HudSink {
     const g = this.g;
     g.fillStyle(MSG_FILL, 0.95).fillRect(px, py, pw, ph);
     g.lineStyle(k, MSG_BORDER, 1).strokeRect(px + k / 2, py + k / 2, pw - k, ph - k);
-    this.text(model.inventoryTitle, px + 6 * k, py + 4 * k, 8 * k, LIFE_COLOR);
+    this.text(model.inventoryTitle, px + 6 * k, py + 4 * k, 8 * k, model.textColor);
     const cell = 22;
     const perRow = Math.max(1, Math.floor((pw / k - 12) / cell));
     let desc = model.inventory.length === 0 ? "" : " ";

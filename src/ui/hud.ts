@@ -106,6 +106,10 @@ export class HudSystem {
       scale: ui.scale,
       safeArea: { ...ui.safeArea },
       fontFamily: ui.fontFamily,
+      skin: { ...ui.skin },
+      barSlice: ui.barSlice,
+      showLifeLabel: ui.showLifeLabel,
+      textColor: ui.textColor,
     };
   }
 

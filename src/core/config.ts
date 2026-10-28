@@ -233,6 +233,17 @@ export interface ToolkitConfig {
     inventoryPanel: boolean;
     pauseWhileInventoryOpen: boolean;
     fontFamily: string;
+    /**
+     * Own HUD pictures (Zelda: HUD Style), slot → texture key (a PS Maker image id). Slots:
+     * heartFull, heartHalf, heartEmpty, rupees, bombs, arrows, keys, magic, digits (0-9 in one
+     * row), itemBox, magicFrame, magicFill, bar. Missing = the built-in picture.
+     */
+    skin: Record<string, string>;
+    /** Border of the bar picture that is not stretched (9-slice), in picture pixels. */
+    barSlice: number;
+    showLifeLabel: boolean;
+    /** Colour of the HUD texts ("LIFE", inventory title). */
+    textColor: string;
   };
   save: {
     enabled: boolean;
@@ -430,6 +441,10 @@ export function createDefaultConfig(): ToolkitConfig {
       inventoryPanel: true,
       pauseWhileInventoryOpen: true,
       fontFamily: "monospace",
+      skin: {},
+      barSlice: 4,
+      showLifeLabel: true,
+      textColor: "#f8e0a0",
     },
     save: { enabled: true, storageKey: "zelda-maker-toolkit", slot: "default", autoSave: true, autoLoadOnStart: false },
     publicApi: true,
@@ -485,7 +500,7 @@ export function mergeConfig(target: object, patch: unknown, path = "", issues: C
   return issues;
 }
 
-const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
+const OPEN_RECORDS = new Set(["ui.skin", "inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
 
 /** Ready-made balance presets selectable from the editor. */
 export const CONFIG_PRESETS: Record<string, unknown> = {

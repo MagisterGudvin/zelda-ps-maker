@@ -166,6 +166,11 @@ export interface HudModel {
   scale: number;
   safeArea: { top: number; right: number; bottom: number; left: number };
   fontFamily: string;
+  /** Own pictures by slot (config.ui.skin). */
+  skin: Record<string, string>;
+  barSlice: number;
+  showLifeLabel: boolean;
+  textColor: string;
 }
 
 /** Sheet shown full-screen with frame numbers (Zelda: Preview Sprite Sheet). */

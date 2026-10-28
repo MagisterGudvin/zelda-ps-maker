@@ -277,15 +277,32 @@ export const mapObjectField = (label: string, description: string) =>
 
 /** Refills MAP_OBJECT_OPTIONS in place; true when it changed. */
 export function fillMapObjectOptions(objects: readonly { id: string; name: string }[] | undefined): boolean {
+  return fillOptions(MAP_OBJECT_OPTIONS, objects);
+}
+
+/** Fonts of the project (gameUI.fonts); "" = the toolkit's default font. */
+export const FONT_OPTIONS: { label: string; value: string }[] = [{ label: "Default", value: "" }];
+export const fontField = (label: string, description: string) =>
+  ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: FONT_OPTIONS }) as unknown as ReturnType<typeof str>;
+export function fillFontOptions(fonts: readonly { id: string; name: string }[] | undefined): boolean {
+  return fillOptions(FONT_OPTIONS, fonts);
+}
+
+/**
+ * PS Maker 1.2.1 has no parameter type for these project lists, so the dropdown's options are
+ * filled in place from the open project (the registry keeps the action definitions by reference).
+ * Duplicate names get a number. True when the list changed.
+ */
+function fillOptions(target: { label: string; value: string }[], items: readonly { id: string; name: string }[] | undefined): boolean {
   const seen = new Map<string, number>();
-  const next = [{ label: "Built-in", value: "" }];
-  for (const o of objects ?? []) {
+  const next = [target[0]];
+  for (const o of items ?? []) {
     if (!o?.id) continue;
     const n = (seen.get(o.name) ?? 0) + 1;
     seen.set(o.name, n);
     next.push({ label: n > 1 ? `${o.name} (${n})` : o.name || o.id, value: o.id });
   }
-  if (next.length === MAP_OBJECT_OPTIONS.length && next.every((o, i) => o.value === MAP_OBJECT_OPTIONS[i].value && o.label === MAP_OBJECT_OPTIONS[i].label)) return false;
-  MAP_OBJECT_OPTIONS.splice(0, MAP_OBJECT_OPTIONS.length, ...next);
+  if (next.length === target.length && next.every((o, i) => o.value === target[i].value && o.label === target[i].label)) return false;
+  target.splice(0, target.length, ...next);
   return true;
 }
