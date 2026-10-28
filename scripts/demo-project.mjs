@@ -9,16 +9,27 @@
  * { type: "plugin:<plugin>:<action>", pluginName, actionName, pluginParams }.
  */
 
+import { UI_ASSETS } from "./ui-assets.mjs";
+
 const TILE = 16;
 const PACK = "Tiles 'N Such Assets";
 
-/** Library assets the demo uses, by their names in the pack. */
-/** Text variable that carries the toolkit's progress in PS Maker saves (Start Toolkit → Progress variable). */
+/** UI pictures of the demo (scripts/ui-assets.mjs) in the project's Images: id = file name without .png. */
+export const UI_IMAGES = UI_ASSETS.map((a) => ({ id: a.key.replace(/\.png$/, ""), name: a.name, url: a.key }));
+
+/** PS Maker UI backgrounds: a picture as a 9-slice, its border drawn at 4× (the game's zoom). */
+const nineSlice = (imageId, slice, opacity = 100) => ({ type: "image", imageId, backgroundOpacity: opacity, scalingMode: "nine-slice", borderWidth: slice * 4, slice: { top: slice, right: slice, bottom: slice, left: slice }, repeat: "stretch" });
+const CREAM = "#F2E4BB";
+export const DIALOG_LAYOUT_ID = "zelda-dialogue-layout";
+export const BUTTON_STYLE_ID = "zelda-button-style";
+
 /** The main menu map (the game starts on it). */
 export const TITLE_MAP_ID = "zelda-demo-title";
 
+/** Text variable that carries the toolkit's progress in PS Maker saves (Start Toolkit → Progress variable). */
 export const PROGRESS_VARIABLE = { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" };
 
+/** Library assets the demo uses, by their names in the pack. */
 export const DEMO_ASSETS = {
   terrains: { grass: "Flat Grass", dirt: "Flat Dirt", fence: "Fence", stone: "Path", floor: "Patio Tiles", wall: "Interior Border" },
   characters: { slime: "Slime", sentry: "Bone Slime", spitter: "Magma Slime", soldier: "New Male", guard: "New Female", ogre: "Bull" },
@@ -103,27 +114,49 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     return { type: `plugin:${pluginType}:${sanitizeName(actionName)}`, name: actionName, id: makeId(), pluginName: plugin.name, actionName, pluginParams: { ...defaults, ...structuredClone(params) } };
   };
   const ownedStoryEvents = [];
+  const uiFont = source.gameUI?.fonts?.[0];
+  // The toolkit HUD and message box in the demo's own UI pictures and dialogue layout.
+  const hudStyle = {
+    heartFull: "zelda-ui-heart-full",
+    heartHalf: "zelda-ui-heart-half",
+    heartEmpty: "zelda-ui-heart-empty",
+    rupees: "zelda-ui-rupee",
+    bombs: "zelda-ui-bomb",
+    arrows: "zelda-ui-arrow",
+    keys: "zelda-ui-key",
+    digits: "zelda-ui-digits",
+    itemBox: "zelda-ui-item-box",
+    magicFrame: "zelda-ui-magic-frame",
+    magicFill: "zelda-ui-magic-fill",
+    bar: "zelda-ui-hud-bar",
+    barSlice: 4,
+    font: uiFont?.id ?? "",
+    textColor: "#f8e0a0",
+  };
   const mapIds = Object.fromEntries(Object.keys(maps).map((key) => [key, `zelda-demo-${key}`]));
   /** A "Player touch" event trigger on an area (top-left rect) that changes the map. */
-  const transferTrigger = (rect, to) => {
+  const transferTrigger = (rect, to) =>
+    eventTrigger(rect, "touch", `To ${to.map}`, [
+      {
+        id: makeId(),
+        name: "Change map",
+        type: "changeActiveMapAction",
+        destination: { mapId: mapIds[to.map], position: { x: to.x, y: to.y } },
+        faceDirection: "none",
+        fadeOutDuration: 350,
+        fadeInDuration: 350,
+        fadeInTiming: "beforeMapStart",
+        skipFadeIn: false,
+      },
+    ]);
+  /** An event trigger ("touch" or "interact") on an area (top-left rect) running its own event. */
+  const eventTrigger = (rect, triggerType, instanceName, actions) => {
     const actionId = makeId();
     const eventId = makeId();
     ownedStoryEvents.push({
       name: "Trigger event",
       id: eventId,
-      actions: [
-        {
-          id: makeId(),
-          name: "Change map",
-          type: "changeActiveMapAction",
-          destination: { mapId: mapIds[to.map], position: { x: to.x, y: to.y } },
-          faceDirection: "none",
-          fadeOutDuration: 350,
-          fadeInDuration: 350,
-          fadeInTiming: "beforeMapStart",
-          skipFadeIn: false,
-        },
-      ],
+      actions,
       hidden: true,
       owner: { type: "action", actionId, actionType: "addStoryEventAction", relation: "local-trigger" },
     });
@@ -131,7 +164,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       id: actionId,
       type: "addStoryEventAction",
       name: "Add event trigger",
-      triggerType: "touch",
+      triggerType,
       positionType: "static",
       // PS Maker areas are saved by their centre (AreaEditor/areaGeometry.ts).
       staticArea: { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, width: rect.w, height: rect.h },
@@ -141,7 +174,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       overrideTriggerLabel: false,
       triggerLabelText: "",
       waitForCompletion: true,
-      instanceName: `To ${to.map}`,
+      instanceName,
       instanceId: makeId(),
       localStoryEventId: eventId,
       storyEventId: eventId,
@@ -205,6 +238,12 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     const setupActions = [];
     if (key === Object.keys(maps)[0])
       setupActions.push({ id: makeId(), name: "Move player", type: "movePlayerAction", moveType: "absolute-position", position: { ...m.spawn }, instant: true, waitForCompletion: true, speedMultiplier: 1, faceDirection: "down" });
+    const extra = [];
+    if (key === Object.keys(maps)[0]) {
+      // A villager who talks with PS Maker's own Dialogue (an "interact" trigger around him).
+      setupActions.push({ id: makeId(), name: "Spawn NPC", type: "spawnNPCAction", characterId: character.guard, inGameCharacterId: `in-game-character-${makeId()}`, position: { ...VILLAGER }, faceDirection: "down", fadeInEnabled: false, fadeInDurationMs: 750, waitForCompletion: true, instanceName: "Villager" });
+      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [{ id: makeId(), name: "Dialogue", type: "dialogueAction", dialogueSource: VILLAGER_TEXT }]));
+    }
     for (const n of m.npcs ?? []) {
       npcIds[n.name] = `in-game-character-${makeId()}`;
       setupActions.push({ id: makeId(), name: "Spawn NPC", type: "spawnNPCAction", characterId: character.guard, inGameCharacterId: npcIds[n.name], position: { x: n.x, y: n.y }, faceDirection: "down", fadeInEnabled: false, fadeInDurationMs: 750, waitForCompletion: true, instanceName: "Guard" });
@@ -225,6 +264,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
+        zelda.push(pluginAction("Zelda: HUD Style", hudStyle));
+        zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }
@@ -242,7 +283,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       mapCollisions,
       setupActions,
       // "When map first starts": the Toolkit, objects and enemies, and the transfer triggers.
-      initialActions: [...zelda, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
+      initialActions: [...zelda, ...extra, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
       enterActions: [],
       leaveActions: [],
       storyEvents: [],
@@ -255,8 +296,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
   // by the button (relation "button-click"), like the editor saves them.
   const first = Object.keys(maps)[0];
   const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
-  const font = source.gameUI?.fonts?.[0];
-  const textStyles = (size, color, align = "center") => ({
+  const font = uiFont;
+  const textStyles = (size, color, align = "center", stroke = 0) => ({
     fontFamily: font?.name ?? "sans-serif",
     fontAssetId: font?.id ?? null,
     fontSize: size,
@@ -264,8 +305,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     lineHeightPercent: 120,
     letterSpacingPercent: 0,
     color,
-    strokeWidth: 0,
-    strokeColor: "#000000",
+    strokeWidth: stroke,
+    strokeColor: "#1F1A24",
     outlineOrder: "below-text",
     textAlign: align,
   });
@@ -282,13 +323,13 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     ["Settings", [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: false }]],
     ["Exit", [{ id: makeId(), name: "Exit game", type: "exitGameAction" }]],
   ];
-  const text = (label, y, size, color, height) => ({ type: "text", componentId: `ui-component-${makeId()}`, label, opacity: 100, backgroundEnabled: false, background: { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 }, textStyles: textStyles(size, color), position: { x: ui.w / 2, y }, size: { width: ui.w - 160, height }, rotation: 0, zIndex: 0, sizeAnchor: "center" });
+  const text = (label, y, size, color, height, stroke) => ({ type: "text", componentId: `ui-component-${makeId()}`, label, opacity: 100, backgroundEnabled: false, background: { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 }, textStyles: textStyles(size, color, "center", stroke), position: { x: ui.w / 2, y }, size: { width: ui.w - 160, height }, rotation: 0, zIndex: 0, sizeAnchor: "center" });
   const components = [
-    text(name, ui.h * 0.2, 96, "#f8e0a0", 130),
-    text("Zelda Maker Toolkit · PS Maker", ui.h * 0.2 + 90, 36, "#e8e8e8", 50),
+    text(name, ui.h * 0.2, 96, "#F8E0A0", 130, 8),
+    text("Zelda Maker Toolkit · PS Maker", ui.h * 0.2 + 90, 36, CREAM, 50, 5),
     ...MENU.map(([label, actions], i) => {
       const { componentId, eventId } = buttonEvent(label, actions);
-      return { type: "button", componentId, styleId: source.gameUI?.buttonStyles?.[0]?.id ?? "", label, opacity: 100, disabled: false, storyEventId: eventId, position: { x: ui.w / 2, y: ui.h * 0.47 + i * 90 }, size: { width: 400, height: 76 }, rotation: 0, zIndex: 0, sizeAnchor: "center" };
+      return { type: "button", componentId, styleId: BUTTON_STYLE_ID, label, opacity: 100, disabled: false, storyEventId: eventId, position: { x: ui.w / 2, y: ui.h * 0.47 + i * 90 }, size: { width: 400, height: 76 }, rotation: 0, zIndex: 0, sizeAnchor: "center" };
     }),
   ];
   const TW = 20;
@@ -331,7 +372,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       storyId: makeId(12),
       lastUpdated: now,
     },
-    gameUI: structuredClone(source.gameUI),
+    gameUI: demoGameUi(source.gameUI),
     storyName: name,
     storyDescription: "Zelda Maker Toolkit demo: field and dungeon with the built-in Tiles 'N Such assets.",
     exportConfig: { customIconEnabled: false },
@@ -351,11 +392,48 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     terrains: structuredClone(source.terrains ?? []),
     mapObjects: structuredClone(source.mapObjects ?? []),
     ...(source.audio ? { audio: structuredClone(source.audio) } : {}),
-    ...(source.images ? { images: structuredClone(source.images) } : {}),
+    images: [...structuredClone(source.images ?? []).filter((i) => !UI_IMAGES.some((u) => u.id === i.id)), ...structuredClone(UI_IMAGES)],
   };
   for (const k of Object.keys(story.metadata)) if (story.metadata[k] === undefined) delete story.metadata[k];
   return { story, warnings };
 }
+
+/**
+ * The project's Game UI in the demo's pictures: a dialogue layout (also the toolkit's message box
+ * and the default for PS Maker's Dialogue), a button style for the main menu, and the options,
+ * load and choice menus on the same panel. The source's own styles stay in the lists.
+ */
+export function demoGameUi(source) {
+  const g = structuredClone(source ?? {});
+  const base = g.dialogLayouts?.find((l) => l.id === g.defaultDialogLayoutId) ?? g.dialogLayouts?.[0];
+  if (base) {
+    const layout = structuredClone(base);
+    Object.assign(layout, { id: DIALOG_LAYOUT_ID, key: "zelda_dialogue_layout", name: "Zelda dialogue" });
+    layout.textBox.background = nineSlice("zelda-ui-panel", 7);
+    layout.textBox.padding = { top: 40, right: 44, bottom: 40, left: 44 };
+    layout.textBox.textStyles = { ...layout.textBox.textStyles, color: CREAM, fontSize: 48 };
+    if (layout.nameBox) layout.nameBox.background = nineSlice("zelda-ui-panel", 7);
+    g.dialogLayouts = [...g.dialogLayouts.filter((l) => l.id !== DIALOG_LAYOUT_ID), layout];
+    g.defaultDialogLayoutId = DIALOG_LAYOUT_ID;
+  }
+  const button = structuredClone(g.buttonStyles?.[0] ?? {});
+  Object.assign(button, { id: BUTTON_STYLE_ID, name: "Zelda button", backgroundEnabled: true, background: nineSlice("zelda-ui-button", 6) });
+  button.textStyles = { ...(button.textStyles ?? {}), color: CREAM, fontSize: 48 };
+  g.buttonStyles = [...(g.buttonStyles ?? []).filter((b) => b.id !== BUTTON_STYLE_ID), button];
+  for (const menu of [g.optionsMenu, g.loadGameMenu]) if (menu) menu.background = nineSlice("zelda-ui-panel", 7);
+  for (const c of g.choiceLayouts ?? []) c.background = nineSlice("zelda-ui-panel", 7);
+  return g;
+}
+
+/**
+ * The villager by the start, and what he says. PS Maker dialogue source: a blank line starts a new
+ * page, and a line "Name: text" sets the speaker, so the text itself has no ": ".
+ */
+const VILLAGER = { x: 80, y: 118 };
+const VILLAGER_TEXT = `@name "Villager"
+It's dangerous out there. Slimes in the grass, and a knight by the gate.
+
+Read the sign for the controls. The chests hold what you need.`;
 
 /** File names the story refers to (asset keys are plain file names in <project>/assets). */
 export function assetKeysOf(story) {

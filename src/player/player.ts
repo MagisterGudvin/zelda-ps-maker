@@ -534,6 +534,16 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.unlock("knockback");
   }
 
+  /** A pause (message box, inventory) caught mid-blink must not leave the player invisible. */
+  showForPause(): void {
+    if (this.blinkHidden) this.setBlinkVisible(true);
+    if (this.tinted) {
+      this.tinted = false;
+      this.flashMs = 0;
+      this.s.host.setPlayerTint(null);
+    }
+  }
+
   private setBlinkVisible(visible: boolean): void {
     this.blinkHidden = !visible;
     this.s.host.setPlayerBlink(visible);

@@ -12,6 +12,7 @@
  * Toolkit build (run `npm run build` first). Nothing is overwritten or deleted.
  */
 import { existsSync } from "node:fs";
+import { writeUiAssets } from "./ui-assets.mjs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -74,11 +75,13 @@ async function main() {
   await mkdir(path.join(dest, "assets"), { recursive: true });
   await mkdir(path.join(dest, "plugins"), { recursive: true });
   for (const f of files) await copyFile(path.join(assetsFrom, f), path.join(dest, "assets", f));
+  // The demo's own UI pictures (drawn by scripts/ui-assets.mjs), referenced by story.images.
+  const ui = writeUiAssets(path.join(dest, "assets"));
   await copyFile(pluginPath, path.join(dest, "plugins", PLUGIN_FILE));
   await writeFile(path.join(dest, "story.json"), JSON.stringify(story), "utf8");
 
   for (const w of warnings) console.warn(`Note: ${w}`);
-  console.log(`Created ${dest}\n  maps: ${story.maps.map((m) => m.name).join(", ")}; ${files.length} asset files copied; plugin ${plugin.version ?? ""} in plugins/.`);
+  console.log(`Created ${dest}\n  maps: ${story.maps.map((m) => m.name).join(", ")}; ${files.length} asset files copied, ${ui.length} UI pictures written; plugin ${plugin.version ?? ""} in plugins/.`);
   console.log(`Open PS Maker: the project "${name}" is in the project list.`);
 }
 

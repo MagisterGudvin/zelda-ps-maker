@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRig } from "../helpers/fakeHost.ts";
 import { CLASSIC_STYLE, styleFromLayout } from "../../src/ui/messageBox.ts";
+import { createObject } from "../../src/interactions/spawnObject.ts";
 
 const settings = (over: Record<string, unknown> = {}) => ({ kinds: ["sign", "item"] as any[], typing: true, waitForKey: true, pause: true, position: "bottom" as const, style: { ...CLASSIC_STYLE, typingSpeed: 60 }, ...over });
 
@@ -87,4 +88,31 @@ test("the box looks like a PS Maker dialogue layout (colour or 9-slice picture, 
   assert.deepEqual(wood.background, { type: "image", imageId: "IMG_PANEL", opacity: 90, mode: "nine-slice", slice: { top: 6, right: 6, bottom: 6, left: 6 }, borderWidth: 24 });
   assert.deepEqual([wood.text.fontFamily, wood.text.align, wood.text.color], ["serif", "center", "#3a2a1a"]);
   assert.deepEqual(styleFromLayout(null, ""), CLASSIC_STYLE, "no project data: the classic toolkit box");
+});
+
+test("the press that closes a sign's box does not read the sign again (real sign, action key)", () => {
+  const r = createRig();
+  r.tk.messageBox = settings({ typing: false });
+  r.step();
+  r.host.walk(0, -1); // face up
+  r.step();
+  const p = r.host.player!;
+  createObject(r.session, "sign", p.x, p.y - 16, { id: "s1", overrides: { message: "Welcome" } });
+  r.host.input.tap("action");
+  r.step(2);
+  assert.equal(r.host.hud.last!.box?.text, "Welcome", "read");
+  r.host.input.tap("action");
+  r.step(3);
+  assert.equal(r.host.hud.last!.box, null, "closed and not opened again by the same press");
+  assert.equal(r.session.isPaused("message"), false);
+});
+
+test("a pause caught mid-blink (after a hit) shows the player", () => {
+  const r = createRig();
+  r.tk.messageBox = settings();
+  r.host.blinkVisible = false; // as the invulnerability blink leaves it
+  (r.session.player as any).blinkHidden = true;
+  r.tk.bus.emit("zelda:message", { text: "Hi", durationMs: 1000, kind: "sign" });
+  r.step(1);
+  assert.equal(r.host.blinkVisible, true);
 });

@@ -91,7 +91,7 @@ export function styleFromLayout(story: (PsStory & Raw) | null, layoutId: string)
 export class MessageBoxSystem {
   private readonly s: Session;
   private readonly queue: string[] = [];
-  private current: { text: string; shown: number; readMs: number; fresh: boolean } | null = null;
+  private current: { text: string; shown: number; readMs: number } | null = null;
   private readonly off: () => void;
 
   constructor(session: Session) {
@@ -122,15 +122,14 @@ export class MessageBoxSystem {
     if (!this.current) {
       const text = this.queue.shift();
       if (text === undefined) return;
-      this.current = { text, shown: st?.typing === false ? text.length : 0, readMs: 0, fresh: true };
+      // Opening takes this tick: a press in it (or the one that read the sign) does not count.
+      this.current = { text, shown: st?.typing === false ? text.length : 0, readMs: 0 };
       this.setHold(true);
       return;
     }
     const c = this.current;
     const all = c.shown >= c.text.length;
-    // The press that opened the box (reading a sign) does not close it.
-    const press = !c.fresh && this.s.host.input.pressed("action");
-    c.fresh = false;
+    const press = this.s.host.input.pressed("action");
     if (!all) {
       c.shown = press ? c.text.length : Math.min(c.text.length, c.shown + ((st?.style.typingSpeed ?? DEFAULT_CPS) * dtMs) / 1000);
       return;
@@ -142,6 +141,8 @@ export class MessageBoxSystem {
 
   private close(): void {
     this.current = null;
+    // The press that closed the box must not read the sign again in this same tick.
+    this.s.host.input.reset();
     if (this.queue.length === 0) this.setHold(false);
   }
 

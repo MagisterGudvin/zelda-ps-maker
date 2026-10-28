@@ -12,7 +12,16 @@ function sourceStory(): Any {
   return {
     controls: { clickToMove: false, bindings: {}, custom: [] },
     metadata: { psMakerVersion: "1.2.1", schemaVersion: 32, storyId: "SOURCEID", lastUpdated: 1 },
-    gameUI: { fonts: [{ id: "font-pixel-operator", name: "PixelOperator", key: "PixelOperator.ttf" }] },
+    // As a new PS Maker 1.2.1 project saves it (shortened).
+    gameUI: {
+      fonts: [{ id: "font-pixel-operator", name: "PixelOperator", key: "PixelOperator.ttf" }],
+      dialogLayouts: [{ id: "dialogue-layout-1", key: "dialogue_layout", name: "Dialogue layout", zIndex: 100, bottomGap: 14, textBox: { width: 896, height: 252, padding: { top: 27, right: 27, bottom: 27, left: 27 }, background: { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 3, borderRadius: 18 }, textStyles: { fontFamily: "PixelOperator", fontAssetId: "font-pixel-operator", fontSize: 53, color: "#FFFFFF" } }, nameBox: { enabled: true, background: { type: "plain" } }, typingSpeed: 42 }],
+      defaultDialogLayoutId: "dialogue-layout-1",
+      choiceLayouts: [{ id: "choice-layout-1", name: "Choices layout", background: { type: "plain" } }],
+      buttonStyles: [{ id: "button-style-1", name: "Button style", backgroundEnabled: true, background: { type: "plain" }, textStyles: { fontFamily: "PixelOperator", fontAssetId: "font-pixel-operator", fontSize: 59, color: "#FFFFFF" } }],
+      optionsMenu: { id: "options-menu", name: "Options menu", background: { type: "plain" } },
+      loadGameMenu: { id: "load-game-menu", name: "Load game menu", background: { type: "plain" } },
+    },
     storyName: "Source",
     characters: named(DEMO_ASSETS.characters),
     spritesheetAnimations: [
@@ -59,14 +68,14 @@ test("demo story: NPC, triggers, collisions and terrain follow the PS Maker 1.2.
   const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
   const [field, dungeon] = story.maps;
   // The guard is spawned in "Map setup" and the same in-map id is picked in Enemy From NPC.
-  const spawn = field.setupActions.find((a: Any) => a.type === "spawnNPCAction");
+  const spawn = field.setupActions.find((a: Any) => a.type === "spawnNPCAction" && a.instanceName === "Guard");
   const adopt = field.initialActions.find((a: Any) => a.actionName === "Zelda: Enemy From NPC");
   assert.equal(adopt.pluginParams.npc, spawn.inGameCharacterId);
   assert.deepEqual(spawn.position, { x: 120, y: 184 });
   assert.equal(story.player.startingMap, "zelda-demo-title", "the game starts on the main menu");
   assert.deepEqual(field.setupActions[0].position, MAPS.field.spawn);
   // Transfer: a touch trigger whose area is saved by its centre, running a Change map event.
-  const trigger = field.initialActions.find((a: Any) => a.type === "addStoryEventAction");
+  const trigger = field.initialActions.find((a: Any) => a.type === "addStoryEventAction" && a.triggerType === "touch");
   const r = MAPS.field.triggers[0].rect;
   assert.deepEqual(trigger.staticArea, { x: r.x + r.w / 2, y: r.y + r.h / 2, width: r.w, height: r.h });
   assert.equal(trigger.triggerType, "touch");
@@ -134,6 +143,51 @@ test("demo story: the main menu (PS Maker Add UI buttons) and the progress varia
   // Toolkit progress in PS Maker saves.
   assert.deepEqual(story.variables, [{ id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" }]);
   for (const m of story.maps.filter((x: Any) => x !== title)) assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Start Toolkit").pluginParams.progressVariable, "zelda-progress");
+});
+
+test("demo story: own UI pictures in Images; dialogue layout, button style and menus on them; HUD and Message Style; a talking villager", async () => {
+  const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
+  const ids = new Set(story.images.map((i: Any) => i.id));
+  for (const id of ["zelda-ui-panel", "zelda-ui-button", "zelda-ui-hud-bar", "zelda-ui-heart-full", "zelda-ui-digits"]) assert.ok(ids.has(id), id);
+  assert.equal(story.images.find((i: Any) => i.id === "zelda-ui-panel").url, "zelda-ui-panel.png");
+  const ui = story.gameUI;
+  const layout = ui.dialogLayouts.find((l: Any) => l.id === ui.defaultDialogLayoutId);
+  assert.equal(layout.id, "zelda-dialogue-layout");
+  assert.deepEqual(layout.textBox.background, { type: "image", imageId: "zelda-ui-panel", backgroundOpacity: 100, scalingMode: "nine-slice", borderWidth: 28, slice: { top: 7, right: 7, bottom: 7, left: 7 }, repeat: "stretch" });
+  assert.ok(ui.dialogLayouts.length >= 2, "the project's own layout stays");
+  const title = story.maps.find((m: Any) => m.id === story.player.startingMap);
+  const buttons = title.initialActions[0].components.filter((c: Any) => c.type === "button");
+  const style = ui.buttonStyles.find((b: Any) => b.id === buttons[0].styleId);
+  assert.equal(style.background.imageId, "zelda-ui-button");
+  assert.equal(ui.optionsMenu.background.imageId, "zelda-ui-panel");
+  assert.equal(ui.loadGameMenu.background.imageId, "zelda-ui-panel");
+  for (const m of story.maps.filter((x: Any) => x !== title)) {
+    const names = m.initialActions.map((a: Any) => a.actionName).filter(Boolean);
+    assert.ok(names.indexOf("Zelda: HUD Style") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: HUD Style after Start Toolkit`);
+    const hud = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
+    for (const k of ["heartFull", "rupees", "digits", "itemBox", "bar"]) assert.ok(ids.has(hud[k]), `${k} = ${hud[k]}`);
+    assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.layout, "zelda-dialogue-layout");
+  }
+  const field = story.maps[0];
+  const villager = field.setupActions.find((a: Any) => a.instanceName === "Villager");
+  const talk = field.initialActions.find((a: Any) => a.triggerType === "interact");
+  assert.deepEqual(talk.staticArea, { x: villager.position.x, y: villager.position.y, width: 48, height: 48 }, "the trigger is around him (saved by its centre)");
+  const ev = story.ownedStoryEvents.find((e: Any) => e.id === talk.storyEventId);
+  assert.equal(ev.actions[0].type, "dialogueAction");
+  assert.match(ev.actions[0].dialogueSource, /^@name "Villager"\n/);
+  assert.ok(!/^[^@\n]*: /m.test(ev.actions[0].dialogueSource), "no text line reads as \"Name: text\"");
+});
+
+test("demo UI pictures: valid PNGs of the drawn size", async () => {
+  const { UI_ASSETS, pngOf } = await import("../../scripts/ui-assets.mjs");
+  for (const a of UI_ASSETS) {
+    const png = pngOf(a.grid);
+    assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], a.key);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [a.grid[0].length, a.grid.length], a.key);
+  }
+  assert.equal(UI_ASSETS.find((a: Any) => a.key === "zelda-ui-digits.png")!.grid[0].length, 50, "ten 5 px digits");
+  assert.throws(() => pngOf(["kk", "k"]), /row 1/);
+  assert.throws(() => pngOf(["kZ"]), /unknown colour "Z"/);
 });
 
 test("demo story: decoration keeps clear of doors, chests, puzzles, the start and NPCs", async () => {

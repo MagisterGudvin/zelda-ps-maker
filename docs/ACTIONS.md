@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.16.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.17.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **37**. Все имена начинаются с `Zelda: `.
+Всего действий: **39**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -33,6 +33,8 @@
 - [Zelda: Change Player Stats](#zelda-change-player-stats)
 - [Zelda: Set Ability](#zelda-set-ability)
 - [Zelda: Show Message](#zelda-show-message)
+- [Zelda: Message Style](#zelda-message-style)
+- [Zelda: HUD Style](#zelda-hud-style)
 - [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
 - [Zelda: Set Respawn Point](#zelda-set-respawn-point)
 - [Zelda: Respawn Player](#zelda-respawn-player)
@@ -58,6 +60,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `shieldButton` (Shield on a button) | boolean | `false` | Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке. |
 | `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
 | `autosave` (Autosave) | boolean | `true` | Save after chests, doors, new items and dungeons. / Автосохранение. |
+| `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
@@ -384,12 +387,50 @@ Enables or disables an ability/item (sword, shield, bow, bomb...). / Включ�
 
 ## Zelda: Show Message
 
-Shows a short HUD message (not a PS Maker dialogue box). / Короткое сообщение в HUD.
+Shows a toolkit message: a short HUD note, or the toolkit's dialogue box (see Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `text` (Text) | string | `""` | Message to show. / Текст сообщения. |
-| `durationMs` (Duration (ms)) | number | `2200` | How long it stays: 1000 = one second. / Сколько показывать. |
+| `durationMs` (Duration (ms)) | number | `2200` | How long a short note stays: 1000 = one second. / Сколько показывать. |
+| `box` (In a dialogue box) | boolean | `false` | Show it in the toolkit's dialogue box (typed out, closed with the action key), styled by Message Style. / В окне диалога. |
+
+## Zelda: Message Style
+
+Shows toolkit messages (signs, "You got...") in a dialogue box drawn like a dialogue layout of your project (Game UI → Dialogue layouts: background colour or picture, font, size), typed letter by letter and closed with the action key. Put it after Start Toolkit. / Окно сообщений Toolkit в стиле диалога PS Maker.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the box looks like. / Макет диалога PS Maker. Варианты: Default layout. |
+| `kinds` (Messages in the box) | string-enum-multi | `["sign","item"]` | Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
+| `typing` (Type letter by letter) | boolean | `true` | At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам. |
+| `waitForKey` (Wait for the action key) | boolean | `true` | The box stays until the player presses the action key; off: it closes by itself. / Ждать клавишу. |
+| `pause` (Pause the game) | boolean | `true` | Enemies and the player wait while the box is open. / Пауза, пока открыто окно. |
+| `position` (Position) | string-enum | `"bottom"` | Where the box is shown. / Где показывать. Варианты: Bottom, Top. |
+
+## Zelda: HUD Style
+
+Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `heartFull` (Heart: full) | image | — | Picture of a full heart (its size sets the size of all hearts). / Полное сердце. |
+| `heartHalf` (Heart: half) | image | — | Half a heart. Empty = the full heart. / Половина сердца. |
+| `heartEmpty` (Heart: empty) | image | — | An empty heart container. / Пустое сердце. |
+| `rupees` (Icon: rupees) | image | — | Icon above the rupee counter. / Значок рупий. |
+| `bombs` (Icon: bombs) | image | — | Icon above the bomb counter. / Значок бомб. |
+| `arrows` (Icon: arrows) | image | — | Icon above the arrow counter. / Значок стрел. |
+| `keys` (Icon: keys) | image | — | Icon above the small key counter. / Значок ключей. |
+| `digits` (Digits 0-9) | image | — | One picture with the ten digits 0 1 2 3 4 5 6 7 8 9 in a row, all the same width. / Цифры 0–9 в одну строку. |
+| `itemBox` (Item box) | image | — | Frame around the selected item. / Рамка предмета. |
+| `magicFrame` (Magic meter: frame) | image | — | The empty magic meter. / Рамка шкалы магии. |
+| `magicFill` (Magic meter: fill) | image | — | Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии. |
+| `bar` (Bar background) | image | — | Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса. |
+| `barSlice` (Bar border (px)) | number | `4` | How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается. |
+| `lifeLabel` (LIFE label) | boolean | `true` | Show the LIFE label above the hearts. / Надпись над сердцами. |
+| `font` (Font) | string-enum | `""` | A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта. Варианты: Default. |
+| `textColor` (Text color) | string-enum | `"#f8e0a0"` | Colour of the HUD texts. / Цвет текста. Варианты: Cream, White, Gold, Dark. |
+| `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = automatic (largest that fits), 4 = four screen pixels. / Масштаб. |
 
 ## Zelda: Show Stat In Variable
 

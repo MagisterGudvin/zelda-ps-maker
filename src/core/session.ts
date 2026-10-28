@@ -128,7 +128,10 @@ export class Session {
   setPaused(reason: string, paused: boolean): void {
     if (paused) this.pauseReasons.add(reason);
     else this.pauseReasons.delete(reason);
-    if (this.pauseReasons.size > 0) this.host.input.reset();
+    if (this.pauseReasons.size > 0) {
+      this.host.input.reset();
+      this.player?.showForPause();
+    }
   }
 
   isPaused(reason?: string): boolean {

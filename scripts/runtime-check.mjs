@@ -75,6 +75,7 @@ function buildWebExport(project, runtime, out) {
   for (const s of [...(story.spritesheetAnimations ?? []), ...(story.animationStrips ?? []), ...(story.terrainTilesets ?? []), ...(story.mapObjects ?? [])]) s.src = at(s.src);
   for (const t of story.terrains ?? []) Object.assign(t, { terrainSrc: at(t.terrainSrc), autoTilesetSrc: at(t.autoTilesetSrc) });
   for (const f of story.gameUI?.fonts ?? []) f.key = at(f.key);
+  for (const i of story.images ?? []) i.url = at(i.url);
   writeFileSync(path.join(out, "game.dat"), bson(story));
 }
 
@@ -153,6 +154,61 @@ await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start
   await page.screenshot({ path: path.join(OUT, "field.png") });
   return `${s.enemies} enemies`;
 });
+// The checks spend a while near the start (sign, villager) while the field's enemies roam: a
+// larger health reserve keeps the player from dying and respawning in the middle of a check.
+await ev(() => {
+  const tk = window.ZeldaMakerToolkit.toolkit;
+  tk.state.player.maxHp = tk.state.player.hp = 40;
+  window.ZeldaMakerToolkit.session.hud?.markDirty();
+});
+await check("HUD Style: the toolkit HUD drawn with the project's UI pictures (Images)", async () => {
+  const keys = await ev(() => {
+    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+    return [...new Set(hud.children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort();
+  });
+  for (const k of ["zelda-ui-heart-full", "zelda-ui-rupee", "zelda-ui-digits", "zelda-ui-item-box", "zelda-ui-hud-bar"]) expect(keys.includes(k), `${k} not drawn: ${keys.join(", ")}`);
+  return `${keys.length} pictures`;
+});
+await check("Message Style: reading the sign opens the toolkit box in the project's dialogue layout (9-slice panel); Z closes it", async () => {
+  await tp(32, 142);
+  await hold("ArrowUp", 200);
+  await page.keyboard.press("z");
+  await wait(700);
+  const open = await ev(() => {
+    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+    return {
+      pieces: hud.children.list.filter((o) => o.visible && o.texture?.key === "zelda-ui-panel").length,
+      text: hud.children.list.find((o) => o.type === "Text" && o.visible && o.depth === 16)?.text ?? "",
+      paused: window.ZeldaMakerToolkit.session.isPaused("message"),
+    };
+  });
+  await page.screenshot({ path: path.join(OUT, "sign-box.png") });
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press("z");
+    await wait(300);
+  }
+  const closed = await ev(() => !window.ZeldaMakerToolkit.session.isPaused("message"));
+  expect(open.pieces === 9 && open.paused && open.text.startsWith("Arrows"), JSON.stringify(open));
+  expect(closed, "box still open after Z");
+  return `"${open.text.slice(0, 24)}…"`;
+});
+await check("the villager talks with PS Maker's own Dialogue (styled panel); the toolkit waits meanwhile", async () => {
+  await tp(80, 140);
+  await hold("ArrowUp", 150);
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => document.body.innerText.includes("dangerous"), null, { timeout: 5000 }).catch(() => {});
+  const during = await ev(() => ({ dialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true, paused: window.ZeldaMakerToolkit.session.isPaused("dialogue"), text: document.body.innerText.includes("dangerous"), name: document.body.innerText.includes("Villager") }));
+  await page.screenshot({ path: path.join(OUT, "villager-dialogue.png") });
+  // Z finishes a page, then turns it; stop once it closes (one more Z would talk to him again).
+  let after = true;
+  for (let i = 0; i < 10 && after; i++) {
+    await page.keyboard.press("z");
+    await wait(500);
+    after = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true);
+  }
+  expect(during.text && during.name && during.dialogue && during.paused, JSON.stringify(during));
+  expect(!after, "dialogue still open");
+});
 await check("a chest opens with Z", async () => {
   await tp(140, 218);
   await hold("ArrowUp", 250);
@@ -184,26 +240,45 @@ await check("Escape opens the PS Maker options menu (game paused); Save game kee
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
   await ev(() => (window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 15));
-  // Lean on the rock at (120, 128) from the right, the body centred on it (12 px tall body at
-  // y 122-134): off-centre, PS Maker slides the player around the rock.
-  await tp(144, 122);
+  // Lean from below on the cracked wall at (56, 88): it closes a row of map walls, so PS Maker
+  // cannot steer the player around it (it does around a free-standing rock). Without toolkit solid
+  // bodies the player is drawn inside it and pushed out again on every frame (the shake of 0.13):
+  // 14 of 35 frames inside, 27 back-and-forth moves of the player and the camera.
+  await tp(56, 100);
   await ev(() => {
     const s = window.game.scene.getScenes(true).find((m) => m.map);
     window.__shake = [];
-    window.__shakeOn = () => window.__shake.push([Math.round(s.player.x * 100), Math.round(s.cameras.main.scrollX * 100)]);
+    window.__shakeOn = () => {
+      const b = s.player.body;
+      window.__shake.push([b.x, b.y, b.width, b.height, Math.round(s.cameras.main.scrollX * 100), Math.round(s.cameras.main.scrollY * 100)]);
+    };
     s.events.on("render", window.__shakeOn);
   });
-  await hold("ArrowLeft", 1200);
+  await hold("ArrowUp", 1200);
   const f = await ev(() => {
     const s = window.game.scene.getScenes(true).find((m) => m.map);
     s.events.off("render", window.__shakeOn);
     window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 60;
-    return window.__shake.slice(-30);
+    return window.__shake;
   });
-  const ys = new Set(f.map((x) => x[0]));
-  const cams = new Set(f.map((x) => x[1]));
-  expect(ys.size === 1 && cams.size === 1, `player x ${[...ys].join(",")} camera ${[...cams].join(",")}`);
-  return `${f.length} frames still`;
+  const rock = { x: 48, y: 80, w: 16, h: 16 };
+  const inside = f.filter(([x, y, w, h]) => x < rock.x + rock.w - 0.5 && x + w > rock.x + 0.5 && y < rock.y + rock.h - 0.5 && y + h > rock.y + 0.5);
+  // Back and forth: a coordinate that moves one way and then the other on the next frame.
+  const flips = (k) => {
+    let n = 0;
+    let last = 0;
+    for (let a = 1; a < f.length; a++) {
+      const d = Math.sign(Math.round((f[a][k] - f[a - 1][k]) * 100));
+      if (d && last && d !== last) n++;
+      if (d) last = d;
+    }
+    return n;
+  };
+  const back = { x: flips(0), y: flips(1), camX: flips(4), camY: flips(5) };
+  expect(f.length >= 20, `only ${f.length} frames`);
+  expect(inside.length === 0, `player inside the wall in ${inside.length} frames`);
+  expect(Object.values(back).every((n) => n === 0), `back and forth ${JSON.stringify(back)}`);
+  return `${f.length} frames, never inside, no back and forth`;
 });
 await check("PS Maker Change map trigger takes the player to the dungeon", async () => {
   await ev(() => window.ZeldaMakerToolkit.session.world.get("button@340,40").setState("on"));
