@@ -13,7 +13,7 @@ test("toolkit sounds follow the Sound Volume of PS Maker's options menu", () => 
   // PlayerAudioSettings.scaleSoundVolume: volume × slider percent.
   let percent = 40;
   f.game.audioSettings = { scaleSoundVolume: (v: number) => (v * percent) / 100 };
-  const host = new PhaserHost({ game: f.game, scene: f.scene, player: f.player } as any, createDefaultConfig(), new Logger("[t]", () => {}));
+  const host = new PhaserHost({ game: f.game, scene: f.scene, player: f.player } as any, createDefaultConfig(), new Logger("[t]", { debug() {}, info() {}, warn() {}, error() {} }));
   host.playSound("chime", 0.5);
   percent = 0;
   host.playSound("chime", 0.5);
