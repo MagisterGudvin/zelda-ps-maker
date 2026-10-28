@@ -159,6 +159,29 @@ test("math helpers", () => {
   assert.equal(res.length, 1, "multi-cell items are returned once");
 });
 
+test("keys pressed while PS Maker pauses the game (options menu) do nothing after it resumes", () => {
+  const kb = new FakeEmitter();
+  const game = new FakeEmitter();
+  const cfg = createDefaultConfig();
+  cfg.controls.sword = ["x"];
+  const input = new KeyboardInput(cfg, kb, game, () => null);
+  const t0 = performance.now();
+  game.emit("pause");
+  const inMenu = performance.now();
+  game.emit("resume");
+  // Phaser delivers the queued event after the resume; its time says it was pressed in the menu.
+  kb.emit("keydown", { code: "KeyX", timeStamp: inMenu });
+  input.latch();
+  assert.equal(input.pressed("sword"), false);
+  kb.emit("keyup", { code: "KeyX", timeStamp: inMenu });
+  kb.emit("keydown", { code: "KeyX", timeStamp: performance.now() + 1 });
+  input.latch();
+  assert.equal(input.pressed("sword"), true, "a press after the menu counts");
+  assert.ok(t0 <= inMenu);
+  input.dispose();
+  assert.equal(game.count(), 0);
+});
+
 test("held movement keys give a facing hint (facing a wall without moving)", () => {
   const kb = new FakeEmitter();
   const input = new KeyboardInput(createDefaultConfig(), kb, null, () => null);

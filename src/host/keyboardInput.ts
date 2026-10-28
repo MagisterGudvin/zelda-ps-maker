@@ -66,8 +66,15 @@ export class KeyboardInput implements InputSource {
   private readonly getPad: () => GamepadLike | null;
   private readonly config: ToolkitConfig;
 
+  /** While PS Maker pauses the game (options or load menu), Phaser queues key events and delivers them after. */
+  private pausedAt: number | null = null;
+  private pausedUntil = -1;
+
   private readonly onDown = (event: KeyboardEvent) => {
     if (!event || typeof event.code !== "string") return;
+    // A key pressed in the menu does not swing the sword once the menu closes.
+    const t = typeof event.timeStamp === "number" ? event.timeStamp : -1;
+    if (t >= 0 && (this.pausedAt !== null ? t >= this.pausedAt : t <= this.pausedUntil)) return;
     const code = normalizeKey(event.code);
     if (!this.down.has(code)) {
       this.pendingPress.add(code);
@@ -96,6 +103,14 @@ export class KeyboardInput implements InputSource {
   }
 
   private readonly onBlur = () => this.reset();
+  private readonly onPause = () => {
+    this.pausedAt = now();
+    this.reset();
+  };
+  private readonly onResume = () => {
+    this.pausedAt = null;
+    this.pausedUntil = now();
+  };
 
   constructor(config: ToolkitConfig, keyboard: EmitterLike | null, blurSource: EmitterLike | null, getPad: () => GamepadLike | null) {
     this.config = config;
@@ -106,6 +121,8 @@ export class KeyboardInput implements InputSource {
     keyboard?.on("keydown", this.onDown);
     keyboard?.on("keyup", this.onUp);
     blurSource?.on("blur", this.onBlur);
+    blurSource?.on("pause", this.onPause);
+    blurSource?.on("resume", this.onResume);
   }
 
   /** Rebuilds the key map from configuration (called on Configure). */
@@ -210,6 +227,13 @@ export class KeyboardInput implements InputSource {
     this.keyboard?.off("keydown", this.onDown);
     this.keyboard?.off("keyup", this.onUp);
     this.blurSource?.off("blur", this.onBlur);
+    this.blurSource?.off("pause", this.onPause);
+    this.blurSource?.off("resume", this.onResume);
     this.reset();
   }
+}
+
+/** Same clock as KeyboardEvent.timeStamp in the browser. */
+function now(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
 }

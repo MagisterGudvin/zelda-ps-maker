@@ -63,7 +63,7 @@ test("demo story: NPC, triggers, collisions and terrain follow the PS Maker 1.2.
   const adopt = field.initialActions.find((a: Any) => a.actionName === "Zelda: Enemy From NPC");
   assert.equal(adopt.pluginParams.npc, spawn.inGameCharacterId);
   assert.deepEqual(spawn.position, { x: 120, y: 184 });
-  assert.equal(story.player.startingMap, field.id);
+  assert.equal(story.player.startingMap, "zelda-demo-title", "the game starts on the main menu");
   assert.deepEqual(field.setupActions[0].position, MAPS.field.spawn);
   // Transfer: a touch trigger whose area is saved by its centre, running a Change map event.
   const trigger = field.initialActions.find((a: Any) => a.type === "addStoryEventAction");
@@ -106,6 +106,34 @@ test("demo story: a new project id, library kept, old maps and events dropped, u
   for (const f of ["PixelOperator.ttf", "animation-a-Sword_attack_full.png", "autotile-gen-0", "map-object-0.png"]) assert.ok(keys.includes(f), f);
   // The source is not changed.
   assert.deepEqual(source, sourceStory());
+});
+
+test("demo story: the main menu (PS Maker Add UI buttons) and the progress variable", async () => {
+  const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
+  const title = story.maps.find((m: Any) => m.id === story.player.startingMap);
+  const field = story.maps[0];
+  assert.deepEqual(title.setupActions.map((a: Any) => [a.type, a.mode ?? ""]), [["movePlayerAction", ""], ["setPlayerVisibilityAction", "hide"], ["togglePlayerMovementAction", "disable"]]);
+  const menu = title.initialActions.find((a: Any) => a.type === "addUiComponentsAction");
+  const buttons = menu.components.filter((c: Any) => c.type === "button");
+  assert.deepEqual(buttons.map((b: Any) => b.label), ["New game", "Continue", "Settings", "Exit"]);
+  // Each button runs a hidden event owned by it, as the editor saves "Add UI" button events.
+  const run = (label: string) => {
+    const b = buttons.find((x: Any) => x.label === label);
+    const ev = story.ownedStoryEvents.find((e: Any) => e.id === b.storyEventId);
+    assert.deepEqual(ev.owner, { type: "action", actionId: menu.id, actionType: "addUiComponentsAction", relation: "button-click", componentId: b.componentId });
+    assert.equal(ev.hidden, true);
+    return ev.actions.map((a: Any) => a.type);
+  };
+  assert.deepEqual(run("New game"), ["changeActiveMapAction"]);
+  assert.deepEqual(run("Continue"), ["openLoadGameMenuAction"]);
+  assert.deepEqual(run("Settings"), ["openOptionsMenuAction"]);
+  assert.deepEqual(run("Exit"), ["exitGameAction"]);
+  const newGame = story.ownedStoryEvents.find((e: Any) => e.id === buttons[0].storyEventId).actions[0];
+  assert.deepEqual(newGame.destination, { mapId: field.id, position: MAPS.field.spawn });
+  assert.ok(title.initialActions.every((a: Any) => !a.pluginName), "no Toolkit (and no HUD) on the menu");
+  // Toolkit progress in PS Maker saves.
+  assert.deepEqual(story.variables, [{ id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" }]);
+  for (const m of story.maps.filter((x: Any) => x !== title)) assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Start Toolkit").pluginParams.progressVariable, "zelda-progress");
 });
 
 test("demo story: decoration keeps clear of doors, chests, puzzles, the start and NPCs", async () => {

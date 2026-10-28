@@ -81,11 +81,12 @@ export class SaveManager {
     return !!this.storage?.getItem(this.key(slot));
   }
 
-  serialize(): string {
+  /** `stamp: false` leaves the time out, so unchanged progress gives the same text. */
+  serialize(options: { stamp?: boolean } = {}): string {
     const env: SaveEnvelope = {
       format: SAVE_FORMAT,
       version: SAVE_VERSION,
-      savedAt: new Date().toISOString(),
+      savedAt: options.stamp === false ? "" : new Date().toISOString(),
       toolkitVersion: TOOLKIT_VERSION,
       state: this.tk.state,
     };
@@ -124,14 +125,21 @@ export class SaveManager {
     const name = options.slot ?? tk.config.save.slot;
     const raw = this.storage.getItem(this.key(name));
     if (!raw) return false;
+    if (!this.restore(raw)) return false;
+    tk.bus.emit("zelda:save:loaded", { slot: name });
+    if (!options.silent) tk.bus.emit("zelda:message", { text: tk.i18n.t("msg.loaded"), durationMs: 1200 });
+    return true;
+  }
+
+  /** Replaces the progress with saved text (from storage or the progress variable). */
+  restore(raw: string): boolean {
+    const tk = this.tk;
     const state = this.parse(raw);
     if (!state) return false;
     tk.state = state;
     tk.markGameInitialized();
     tk.session?.onStateReplaced();
-    tk.bus.emit("zelda:save:loaded", { slot: name });
     tk.bus.emit("zelda:player:healthChanged", { hp: state.player.hp, maxHp: state.player.maxHp, delta: 0 });
-    if (!options.silent) tk.bus.emit("zelda:message", { text: tk.i18n.t("msg.loaded"), durationMs: 1200 });
     return true;
   }
 

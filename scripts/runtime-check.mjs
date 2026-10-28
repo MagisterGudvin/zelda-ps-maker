@@ -136,8 +136,17 @@ const expect = (ok, what) => {
   if (!ok) throw new Error(what);
 };
 
-await page.waitForFunction(() => window.ZeldaMakerToolkit?.session && window.game?.scene?.getScenes(true).some((m) => m.map), null, { timeout: 30000 });
-await wait(1500);
+const button = (label) => page.locator("button", { hasText: label }).first();
+await check("the game opens on the main menu (PS Maker Add UI buttons); New game goes to the field", async () => {
+  await button("New game").waitFor({ state: "visible", timeout: 30000 });
+  await wait(800);
+  const onTitle = await ev(() => ({ map: window.game.scene.getScenes(true).find((m) => m.map)?.map.id, toolkit: !!window.ZeldaMakerToolkit?.session }));
+  expect(onTitle.map === "zelda-demo-title" && !onTitle.toolkit, JSON.stringify(onTitle));
+  await page.screenshot({ path: path.join(OUT, "title.png") });
+  await button("New game").click();
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-field", null, { timeout: 15000 });
+  await wait(1500);
+});
 await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start", async () => {
   const s = await state();
   expect(s.map === "zelda-demo-field" && s.toolkitMap === "zelda-demo-field" && s.enemies === 6, JSON.stringify(s));
@@ -152,6 +161,25 @@ await check("a chest opens with Z", async () => {
   await page.keyboard.press("z");
   const s = await state();
   expect(s.chest === "opened", JSON.stringify(s));
+});
+await check("Escape opens the PS Maker options menu (game paused); Save game keeps the Toolkit's progress in the save", async () => {
+  await page.keyboard.press("Escape");
+  await button("Save game").waitFor({ state: "visible", timeout: 5000 });
+  const t0 = await ev(() => window.ZeldaMakerToolkit.session.tick);
+  await wait(500);
+  const t1 = await ev(() => window.ZeldaMakerToolkit.session.tick);
+  await page.screenshot({ path: path.join(OUT, "options.png") });
+  await button("Save game").click();
+  await wait(1500);
+  const progress = await ev(() => JSON.parse(window.game.variables.get("zelda-progress").value || "{}"));
+  // Toolkit sounds are scaled by the menu's Sound Volume (PlayerAudioSettings.scaleSoundVolume).
+  const volume = await ev(() => window.game.audioSettings?.scaleSoundVolume?.(0.5));
+  await page.keyboard.press("Escape");
+  await wait(500);
+  expect(t1 === t0, `toolkit ran while the menu was open (${t0} → ${t1})`);
+  expect(typeof volume === "number", "game.audioSettings.scaleSoundVolume is missing");
+  expect(progress.state?.objects?.["zelda-demo-field/chest@140,200"] === "opened", `progress variable: ${JSON.stringify(progress.state?.objects)}`);
+  return "chest opened in the progress variable";
 });
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
@@ -229,6 +257,23 @@ await check("back on the field (the map wakes up): enemies again, opened chest a
   const s = await state();
   expect(s.enemies === 6 && s.chest === "opened" && s.gate === "opened", JSON.stringify(s));
   await page.screenshot({ path: path.join(OUT, "field-again.png") });
+});
+await check("reload, Continue, load the save: the Toolkit starts on the restored map with its progress", async () => {
+  await page.reload();
+  await button("Continue").waitFor({ state: "visible", timeout: 30000 });
+  await wait(800);
+  const fresh = await ev(() => !!window.ZeldaMakerToolkit?.session);
+  expect(!fresh, "toolkit running on the menu after reload");
+  await button("Continue").click();
+  await wait(1000);
+  await page.screenshot({ path: path.join(OUT, "load-menu.png") });
+  await page.locator("button", { hasText: /Save 1/ }).first().click({ timeout: 5000 });
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-field", null, { timeout: 15000 });
+  await wait(2000);
+  const s = await state();
+  await page.screenshot({ path: path.join(OUT, "loaded.png") });
+  expect(s.map === "zelda-demo-field" && s.enemies === 6 && s.chest === "opened", JSON.stringify(s));
+  return "chest opened, 6 enemies";
 });
 const errors = logs.filter((l) => l.startsWith("[pageerror]") || (l.startsWith("[error]") && !/Failed to load resource/.test(l)));
 await check("no page errors", async () => expect(errors.length === 0, errors.slice(0, 3).join(" | ")));

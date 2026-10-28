@@ -36,6 +36,13 @@ export class Toolkit {
   session: Session | null = null;
   /** Project variable id → toolkit stat mirrored into it (Zelda: Show Stat In Variable). */
   readonly variableLinks = new Map<string, string>();
+  /**
+   * Text variable of the project that always holds the toolkit's progress (Start Toolkit →
+   * Progress variable). PS Maker keeps variables in its saves, so its save and load menus carry
+   * the toolkit's progress too.
+   */
+  progressVariable: string | null = null;
+  private progressWritten: string | null = null;
   /** Executed editor actions by name (shown by the diagnostics panel). */
   readonly actionCounts = new Map<string, number>();
   /** True once a game has been started or loaded (start items granted). */
@@ -116,6 +123,39 @@ export class Toolkit {
     session.player.captureStartPosition();
     this.bus.emit("zelda:toolkit:started", { mapId });
     return session;
+  }
+
+  /**
+   * Keeps the progress variable and the toolkit state in step (a few times a second). A value the
+   * toolkit did not write came from PS Maker: a loaded save (restore it) or, when it is empty again,
+   * a new game (start over). On the first sync of a page a filled variable counts as loaded.
+   */
+  syncProgressVariable(host: HostAdapter): void {
+    const id = this.progressVariable;
+    if (!id || !host.getVariable || !host.setVariable) return;
+    const value = host.getVariable(id);
+    if (value === undefined) {
+      this.logger.warnOnce(`progress-var-${id}`, `Progress variable "${id}" not found in the project.`);
+      return;
+    }
+    if (typeof value !== "string") {
+      this.logger.warnOnce(`progress-var-type-${id}`, `Progress variable "${id}" must be a Text variable.`);
+      return;
+    }
+    // The first time, a filled variable is progress the toolkit has not seen yet (a loaded save).
+    if (value !== this.progressWritten && (this.progressWritten !== null || value !== "")) {
+      if (value === "") {
+        this.logger.info("The progress variable was cleared (PS Maker started a new game): toolkit progress starts over.");
+        this.newGame();
+        this.session?.onStateReplaced();
+        this.bus.emit("zelda:player:healthChanged", { hp: this.state.player.hp, maxHp: this.state.player.maxHp, delta: 0 });
+      } else if (this.saves.restore(value)) {
+        this.logger.info("Toolkit progress restored from the progress variable (PS Maker loaded a save).");
+      }
+    }
+    const now = this.saves.serialize({ stamp: false });
+    if (now !== value) host.setVariable(id, now);
+    this.progressWritten = now;
   }
 
   noteAction(name: string): void {

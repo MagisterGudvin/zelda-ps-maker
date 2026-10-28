@@ -13,6 +13,12 @@ const TILE = 16;
 const PACK = "Tiles 'N Such Assets";
 
 /** Library assets the demo uses, by their names in the pack. */
+/** Text variable that carries the toolkit's progress in PS Maker saves (Start Toolkit → Progress variable). */
+/** The main menu map (the game starts on it). */
+export const TITLE_MAP_ID = "zelda-demo-title";
+
+export const PROGRESS_VARIABLE = { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" };
+
 export const DEMO_ASSETS = {
   terrains: { grass: "Flat Grass", dirt: "Flat Dirt", fence: "Fence", stone: "Path", floor: "Patio Tiles", wall: "Interior Border" },
   characters: { slime: "Slime", sentry: "Bone Slime", spitter: "Magma Slime", soldier: "New Male", guard: "New Female", ogre: "Bull" },
@@ -214,6 +220,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Create Enemy" && character[p.template]) p.character = character[p.template];
       if (actionName === "Zelda: Enemy From NPC") p.npc = npcIds[p.npc] ?? p.npc;
       if (actionName === "Zelda: Add Wave Enemy" && slotOf[p.template]) p.template = slotOf[p.template];
+      if (actionName === "Zelda: Start Toolkit") p.progressVariable = PROGRESS_VARIABLE.id;
       if (actionName === "Zelda: Create Wave Room" && slotOf[p.spawnEnemy]) p.spawnEnemy = slotOf[p.spawnEnemy];
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
@@ -243,6 +250,79 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     };
   });
 
+  // ---- title map: the main menu, built with PS Maker's own UI ---------------------------------
+  // PS Maker has no title screen: the starting map is one. "Add UI" buttons run hidden events owned
+  // by the button (relation "button-click"), like the editor saves them.
+  const first = Object.keys(maps)[0];
+  const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
+  const font = source.gameUI?.fonts?.[0];
+  const textStyles = (size, color, align = "center") => ({
+    fontFamily: font?.name ?? "sans-serif",
+    fontAssetId: font?.id ?? null,
+    fontSize: size,
+    fontWeight: 400,
+    lineHeightPercent: 120,
+    letterSpacingPercent: 0,
+    color,
+    strokeWidth: 0,
+    strokeColor: "#000000",
+    outlineOrder: "below-text",
+    textAlign: align,
+  });
+  const menuActionId = makeId();
+  const buttonEvent = (label, actions) => {
+    const componentId = `ui-component-${makeId()}`;
+    const eventId = makeId();
+    ownedStoryEvents.push({ name: `${label} button`, id: eventId, actions, hidden: true, owner: { type: "action", actionId: menuActionId, actionType: "addUiComponentsAction", relation: "button-click", componentId } });
+    return { componentId, eventId };
+  };
+  const MENU = [
+    ["New game", [{ id: makeId(), name: "Change map", type: "changeActiveMapAction", destination: { mapId: mapIds[first], position: { ...maps[first].spawn } }, faceDirection: "down", fadeOutDuration: 500, fadeInDuration: 500, fadeInTiming: "beforeMapStart", skipFadeIn: false }]],
+    ["Continue", [{ id: makeId(), name: "Open load game menu", type: "openLoadGameMenuAction" }]],
+    ["Settings", [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: false }]],
+    ["Exit", [{ id: makeId(), name: "Exit game", type: "exitGameAction" }]],
+  ];
+  const text = (label, y, size, color, height) => ({ type: "text", componentId: `ui-component-${makeId()}`, label, opacity: 100, backgroundEnabled: false, background: { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 }, textStyles: textStyles(size, color), position: { x: ui.w / 2, y }, size: { width: ui.w - 160, height }, rotation: 0, zIndex: 0, sizeAnchor: "center" });
+  const components = [
+    text(name, ui.h * 0.2, 96, "#f8e0a0", 130),
+    text("Zelda Maker Toolkit · PS Maker", ui.h * 0.2 + 90, 36, "#e8e8e8", 50),
+    ...MENU.map(([label, actions], i) => {
+      const { componentId, eventId } = buttonEvent(label, actions);
+      return { type: "button", componentId, styleId: source.gameUI?.buttonStyles?.[0]?.id ?? "", label, opacity: 100, disabled: false, storyEventId: eventId, position: { x: ui.w / 2, y: ui.h * 0.47 + i * 90 }, size: { width: 400, height: 76 }, rotation: 0, zIndex: 0, sizeAnchor: "center" };
+    }),
+  ];
+  const TW = 20;
+  const TH = 12;
+  const titleGround = {};
+  const titleDetails = {};
+  const put = (grid, x, y, id) => ((grid[x] ??= {})[y] = id);
+  for (let x = -12; x < TW + 12; x++) for (let y = -12; y < TH + 12; y++) put(titleGround, x, y, terrain.grass);
+  for (let x = 0; x < TW; x++) for (const y of [TH - 3, TH - 2]) put(titleDetails, x, y, terrain.dirt);
+  const titleObjects = [];
+  for (let x = -8; x < TW * TILE + 40; x += 48) titleObjects.push({ id: makeId(), mapObjectId: object.tree, position: { x, y: 10 } });
+  for (const [x, y] of [[40, 120], [280, 120], [24, 150], [300, 150]]) titleObjects.push({ id: makeId(), mapObjectId: object.bush, position: { x, y } });
+  builtMaps.push({
+    name: "Title",
+    id: TITLE_MAP_ID,
+    mapObjects: titleObjects,
+    terrainLayers: [
+      { id: "default-terrain-layer-1", name: "Details layer", terrainGrid: titleDetails },
+      { id: "default-terrain-layer-2", name: "Ground layer", terrainGrid: titleGround },
+    ],
+    mapCollisions: [],
+    // The menu is not played: no player, no walking.
+    setupActions: [
+      { id: makeId(), name: "Move player", type: "movePlayerAction", moveType: "absolute-position", position: { x: (TW * TILE) / 2, y: (TH * TILE) / 2 }, instant: true, waitForCompletion: true, speedMultiplier: 1, faceDirection: "down" },
+      { id: makeId(), name: "Set player visibility", type: "setPlayerVisibilityAction", mode: "hide", opacity: 1, fadeEnabled: false, fadeDurationMs: 750, waitForCompletion: true },
+      { id: makeId(), name: "Toggle player movement", type: "togglePlayerMovementAction", mode: "disable", applyToSpecificDirections: false, up: true, down: true, left: true, right: true },
+    ],
+    initialActions: [{ id: menuActionId, name: "Add UI", type: "addUiComponentsAction", uiName: "Main menu", inGameUiId: `in-game-ui-${makeId()}`, fadeEnabled: true, fadeDurationMs: 400, waitForCompletion: false, components }],
+    enterActions: [],
+    leaveActions: [],
+    storyEvents: [],
+    tileSize: TILE,
+  });
+
   const story = {
     controls: structuredClone(source.controls),
     metadata: {
@@ -260,12 +340,12 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     characters: structuredClone(source.characters ?? []),
     animationStrips: structuredClone(source.animationStrips ?? []),
     spritesheetAnimations: structuredClone(source.spritesheetAnimations ?? []),
-    variables: [],
+    variables: [structuredClone(PROGRESS_VARIABLE)],
     videos: [],
     globalStoryEvents: [],
     ownedStoryEvents,
     maps: builtMaps,
-    player: { ...structuredClone(source.player), startingMap: mapIds[Object.keys(maps)[0]] },
+    player: { ...structuredClone(source.player), startingMap: TITLE_MAP_ID },
     gameConfig: structuredClone(source.gameConfig),
     terrainTilesets: structuredClone(source.terrainTilesets ?? []),
     terrains: structuredClone(source.terrains ?? []),

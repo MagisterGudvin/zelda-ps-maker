@@ -134,6 +134,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
       language: { group: "Interface", ui: "radio" },
       shieldButton: { group: "Game" },
       autosave: { group: "Game" },
+      progressVariable: { group: "Game" },
       tileUnits: { group: "Debug" },
       debugHitboxes: { group: "Debug" },
       diagnostics: { group: "Debug" },

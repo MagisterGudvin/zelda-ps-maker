@@ -287,6 +287,7 @@ const startToolkit = defineEvent({
     shieldButton: bool("Shield on a button", "Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке.", false),
     hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
     autosave: bool("Autosave", "Save after chests, doors, new items and dungeons. / Автосохранение.", true),
+    progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
     tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
     debugHitboxes: bool("Show hitboxes", "Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы.", false),
@@ -335,6 +336,7 @@ const startToolkit = defineEvent({
         if (value) tk.configure(value, "Start Toolkit");
       }
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
+      if (has("progressVariable")) tk.progressVariable = textOf(old.progressVariable) || null;
       // The map is remembered by its PS Maker map id (scene key); a Map ID typed in older versions still wins.
       const mapId = textOf(old.mapId) || undefined;
       // A session re-created when PS Maker woke the map up gives way to a Start Toolkit in "Map enter".

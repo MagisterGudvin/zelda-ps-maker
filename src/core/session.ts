@@ -204,6 +204,7 @@ export class Session {
 
     this.syncViews();
     this.syncLinkedVariables();
+    if (this.tick % 15 === 0) this.toolkit.syncProgressVariable(this.host);
     this.hud?.tick(dtMs);
     this.debug?.tick(dtMs);
   }

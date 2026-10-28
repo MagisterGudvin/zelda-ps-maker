@@ -698,10 +698,13 @@ export class PhaserHost implements HostAdapter, DepthSource {
    * Plays an audio key already in Phaser's cache (PS Maker assets) or loads a
    * URL once and plays it when ready. Unknown sources are reported once.
    */
-  playSound(src: string, volume: number): void {
+  playSound(src: string, raw: number): void {
     const sound = this.scene?.sound;
     const cache = this.scene?.cache?.audio;
     if (!sound || !src) return;
+    // The "Sound Volume" slider of PS Maker's options menu (PlayerAudioSettings), as PS Maker's own sounds.
+    const scaled = this.game?.audioSettings?.scaleSoundVolume?.(raw);
+    const volume = typeof scaled === "number" && Number.isFinite(scaled) ? scaled : raw;
     try {
       if (cache?.exists?.(src)) {
         sound.play(src, { volume });
