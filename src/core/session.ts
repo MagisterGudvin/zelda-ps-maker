@@ -155,21 +155,49 @@ export class Session {
     }
   }
 
-  private readonly linkedLast = new Map<string, number>();
+  private readonly linkedLast = new Map<string, number | string>();
 
-  /** Current value of a stat mirrored into a project variable. */
-  statValue(stat: string): number {
+  /**
+   * Current value of a stat mirrored into a project variable (Show Stat In Variable, HUD
+   * Variables). Whole numbers where a HUD built with Add UI needs them: PS Maker expressions have
+   * only + - * / (variableValue.ts), so the toolkit hands out full hearts, the half heart as 0/1, a
+   * selected or owned item as 0/1.
+   */
+  statValue(stat: string): number | string {
     const st = this.state.player;
+    const inv = this.toolkit.inventory;
     const heart = Math.max(1, this.config.player.heartValue);
-    switch (stat) {
+    const [kind, item] = stat.split(":");
+    switch (kind) {
       case "hearts":
         return st.hp / heart;
       case "maxHearts":
         return st.maxHp / heart;
+      case "fullHearts":
+        return Math.floor(Math.max(0, st.hp) / heart);
+      case "halfHeart":
+        return st.hp > 0 && st.hp % heart !== 0 ? 1 : 0;
+      case "health":
+        return st.hp;
+      case "maxHealth":
+        return st.maxHp;
+      case "magicPercent":
+        return st.maxMagic > 0 ? Math.round((100 * st.magic) / st.maxMagic) : 0;
+      case "itemName":
+        return this.state.inventory.activeItem ? inv.displayName(this.state.inventory.activeItem) : "";
+      case "itemCount": {
+        const def = this.state.inventory.activeItem ? this.toolkit.items.get(this.state.inventory.activeItem) : undefined;
+        const counter = def?.counter ?? def?.resource;
+        return counter && counter !== "magic" ? inv.count(counter) : 0;
+      }
+      case "selected":
+        return this.state.inventory.activeItem === item ? 1 : 0;
+      case "owned":
+        return item && inv.has(item) ? 1 : 0;
       case "enemies":
         return this.world.list("enemy").filter((e) => e.alive && !e.removed).length;
       default:
-        return this.toolkit.inventory.count(stat);
+        return inv.count(stat);
     }
   }
 
@@ -194,7 +222,11 @@ export class Session {
     this.world.reindex();
 
     const dialogue = this.config.combat.pauseDuringDialogue && this.host.isDialogueOpen?.() === true;
-    if (dialogue !== this.isPaused("dialogue")) this.setPaused("dialogue", dialogue);
+    if (dialogue !== this.isPaused("dialogue")) {
+      this.setPaused("dialogue", dialogue);
+      // The key that closed PS Maker's dialogue must not also open the chest or sign in front.
+      if (!dialogue) this.host.input.reset();
+    }
 
     this.debug?.handleInput();
     this.inventoryUi?.tick(dtMs);

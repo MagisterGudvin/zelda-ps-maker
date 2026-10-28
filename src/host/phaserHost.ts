@@ -5,6 +5,7 @@ import { SpatialHash } from "../core/spatialHash.ts";
 import type { DebugDraw, EntityView, HostAdapter, HudSink, OverlayLayer, Renderer, ViewSpec } from "./types.ts";
 import { KeyboardInput, type GamepadLike } from "./keyboardInput.ts";
 import { resolveTexture } from "./textures.ts";
+import { ensureProjectFont } from "./projectFonts.ts";
 import { getHud } from "./phaserHud.ts";
 import { SheetLibrary } from "./sheets.ts";
 import { findStory, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
@@ -742,6 +743,35 @@ export class PhaserHost implements HostAdapter, DepthSource {
    * PS Maker project data (characters and their sprite-sheet animations), if the
    * game keeps it somewhere reachable. Found once per map; null when absent.
    */
+  private dialogueSeq = 0;
+
+  /**
+   * Runs a PS Maker "Dialogue" action on this map's story runner (GameMap.storyRunner.playActions,
+   * as the map runs its own events; StoryRunner.ts). The promise resolves when the dialogue ends.
+   */
+  playDialogue(source: string): Promise<void> | null {
+    const runner = this.scene?.storyRunner;
+    if (!runner || typeof runner.playActions !== "function") return null;
+    const action = { id: `zmt-message-${++this.dialogueSeq}`, name: "Dialogue", type: "dialogueAction", dialogueSource: source };
+    try {
+      return Promise.resolve(runner.playActions([action])).then(
+        () => undefined,
+        (err: unknown) => this.logger.warn("PS Maker Dialogue for a toolkit message failed:", err),
+      );
+    } catch (err) {
+      this.logger.warn("PS Maker Dialogue for a toolkit message failed:", err);
+      return null;
+    }
+  }
+
+  loadProjectFont(fontId: string): void {
+    if (!fontId || !this.scene?.textures) return;
+    const story = this.psMakerStory()?.story ?? null;
+    void ensureProjectFont(story, this.scene.textures, fontId).then((family) => {
+      if (!family) this.logger.warnOnce(`font-${fontId}`, `Font "${fontId}" could not be loaded by the toolkit; PS Maker loads it when it first shows its own text with it.`);
+    });
+  }
+
   psMakerStory(): { story: PsStory; where: string } | null {
     // A miss is retried at most once a second: the data may appear after the first look.
     if (this.story || (this.story === null && Date.now() - this.storyMissAt < 1000)) return this.story;

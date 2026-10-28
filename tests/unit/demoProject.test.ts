@@ -141,7 +141,7 @@ test("demo story: the main menu (PS Maker Add UI buttons) and the progress varia
   assert.deepEqual(newGame.destination, { mapId: field.id, position: MAPS.field.spawn });
   assert.ok(title.initialActions.every((a: Any) => !a.pluginName), "no Toolkit (and no HUD) on the menu");
   // Toolkit progress in PS Maker saves.
-  assert.deepEqual(story.variables, [{ id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" }]);
+  assert.deepEqual(story.variables[0], { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" });
   for (const m of story.maps.filter((x: Any) => x !== title)) assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Start Toolkit").pluginParams.progressVariable, "zelda-progress");
 });
 
@@ -176,6 +176,32 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   assert.equal(ev.actions[0].type, "dialogueAction");
   assert.match(ev.actions[0].dialogueSource, /^@name "Villager"\n/);
   assert.ok(!/^[^@\n]*: /m.test(ev.actions[0].dialogueSource), "no text line reads as \"Name: text\"");
+});
+
+test("demo HUD built with Add UI: components bound to the variables HUD Variables keeps up to date", async () => {
+  const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
+  const varIds = new Set(story.variables.map((v: Any) => v.id));
+  const images = new Set(story.images.map((i: Any) => i.id));
+  for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
+    const hud = m.initialActions.find((a: Any) => a.type === "addUiComponentsAction" && a.uiName === "HUD");
+    assert.ok(hud, `${m.name}: Add UI HUD`);
+    const linked = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Variables").pluginParams;
+    // Every variable a component refers to exists and is filled by HUD Variables.
+    const refs = JSON.stringify(hud.components).match(/@\{([^}]+)\}|"variableId":"([^"]+)"/g) ?? [];
+    assert.ok(refs.length >= 8);
+    for (const r of refs) {
+      const id = r.startsWith("@") ? r.slice(2, -1) : r.split('"')[3];
+      assert.ok(varIds.has(id), `${id} is a project variable`);
+      assert.ok(Object.values(linked).includes(id), `${id} is kept up to date by HUD Variables`);
+    }
+    for (const c of hud.components) {
+      const img = c.imageId ?? c.background?.imageId;
+      if (img) assert.ok(images.has(img), `${img} in Images`);
+    }
+    const style = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
+    assert.deepEqual(style.parts, ["item", "magic"], "the toolkit draws only the item box and magic");
+    assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.display, "dialogue");
+  }
 });
 
 test("demo UI pictures: valid PNGs of the drawn size", async () => {

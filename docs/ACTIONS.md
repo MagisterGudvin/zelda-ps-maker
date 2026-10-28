@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.17.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.18.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **39**. Все имена начинаются с `Zelda: `.
+Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -35,6 +35,7 @@
 - [Zelda: Show Message](#zelda-show-message)
 - [Zelda: Message Style](#zelda-message-style)
 - [Zelda: HUD Style](#zelda-hud-style)
+- [Zelda: HUD Variables](#zelda-hud-variables)
 - [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
 - [Zelda: Set Respawn Point](#zelda-set-respawn-point)
 - [Zelda: Respawn Player](#zelda-respawn-player)
@@ -397,10 +398,11 @@ Shows a toolkit message: a short HUD note, or the toolkit's dialogue box (see Me
 
 ## Zelda: Message Style
 
-Shows toolkit messages (signs, "You got...") in a dialogue box drawn like a dialogue layout of your project (Game UI → Dialogue layouts: background colour or picture, font, size), typed letter by letter and closed with the action key. Put it after Start Toolkit. / Окно сообщений Toolkit в стиле диалога PS Maker.
+Shows toolkit messages (signs, "You got...") as PS Maker dialogues (or a toolkit box drawn like one): set them up in Game UI → Dialogue layouts like any dialogue. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
+| `display` (Show with) | string-enum | `"dialogue"` | PS Maker Dialogue: the message is a real PS Maker dialogue, with everything its dialogue layout has (Game UI: background, font, name box, portrait, typing sound, animations). Toolkit box: the toolkit draws a box like the layout. / Чем показывать. Варианты: PS Maker Dialogue, Toolkit box. |
 | `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the box looks like. / Макет диалога PS Maker. Варианты: Default layout. |
 | `kinds` (Messages in the box) | string-enum-multi | `["sign","item"]` | Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
 | `typing` (Type letter by letter) | boolean | `true` | At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам. |
@@ -414,6 +416,7 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
+| `parts` (Toolkit HUD parts) | string-enum-multi | `["hearts","counters","item","magic"]` | What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit. Варианты: Hearts, Counters (rupees, bombs, arrows, keys), Item box, Magic meter. |
 | `heartFull` (Heart: full) | image | — | Picture of a full heart (its size sets the size of all hearts). / Полное сердце. |
 | `heartHalf` (Heart: half) | image | — | Half a heart. Empty = the full heart. / Половина сердца. |
 | `heartEmpty` (Heart: empty) | image | — | An empty heart container. / Пустое сердце. |
@@ -432,14 +435,32 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | `textColor` (Text color) | string-enum | `"#f8e0a0"` | Colour of the HUD texts. / Цвет текста. Варианты: Cream, White, Gold, Dark. |
 | `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = automatic (largest that fits), 4 = four screen pixels. / Масштаб. |
 
+## Zelda: HUD Variables
+
+Build your own HUD with PS Maker's Add UI: the toolkit keeps these project variables up to date (hearts, magic, counters, selected item), and Add UI components show them (a text's value, or a size, position or opacity as an expression like @{Full hearts} * 36). Turn the toolkit's own HUD parts off in HUD Style. / Значения Toolkit в переменных для своего HUD на Add UI.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `fullHearts` (Full hearts) | variable | `""` | Whole hearts (bind a row's width: @{var} * heart width). Empty = not needed. / Переменная проекта. |
+| `halfHeart` (Half heart) | variable | `""` | 1 while there is a half heart, else 0 (bind its opacity: @{var} * 100). Empty = not needed. / Переменная проекта. |
+| `maxHearts` (Heart containers) | variable | `""` | All hearts, full or empty (the row of empty hearts behind). Empty = not needed. / Переменная проекта. |
+| `magicPercent` (Magic %) | variable | `""` | 0-100 (bind the meter's height or width). Empty = not needed. / Переменная проекта. |
+| `rupees` (Rupees) | variable | `""` | Rupee count (a text's value). Empty = not needed. / Переменная проекта. |
+| `bombs` (Bombs) | variable | `""` | Bomb count. Empty = not needed. / Переменная проекта. |
+| `arrows` (Arrows) | variable | `""` | Arrow count. Empty = not needed. / Переменная проекта. |
+| `key` (Small keys) | variable | `""` | Small keys of this dungeon. Empty = not needed. / Переменная проекта. |
+| `itemName` (Selected item name) | variable | `""` | A Text variable: the selected item's name. Empty = not needed. / Переменная проекта. |
+| `itemCount` (Selected item ammo) | variable | `""` | Bombs or arrows of the selected item (0 for others). Empty = not needed. / Переменная проекта. |
+
 ## Zelda: Show Stat In Variable
 
 Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use it in PS Maker conditions (a shop: if Rupees ≥ 50) or in UI components. Stays on for the whole game. / Значение Toolkit в переменной проекта.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `stat` (Value) | string-enum | `"rupees"` | What to copy. / Что показывать. Варианты: Rupees, Bombs, Arrows, Small keys (this dungeon), Hearts, Max hearts, Magic, Enemies left on the map. |
-| `variableId` (Variable) | variable | `""` | A number variable of the project (true/false for 0 / not 0). / Переменная проекта. |
+| `stat` (Value) | string-enum | `"rupees"` | What to copy. / Что показывать. Варианты: Rupees, Bombs, Arrows, Small keys (this dungeon), Hearts, Max hearts (heart containers), Full hearts (whole number), Half heart (1 or 0), Health points, Max health points, Magic, Magic in % (0-100), Selected item: name (Text variable), Selected item: ammo (bombs, arrows), Item is selected (1 or 0), Item is owned (1 or 0), Enemies left on the map. |
+| `item` (Item) | string-enum | `"bow"` | For "Item is selected / owned". / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `variableId` (Variable) | variable | `""` | A number variable of the project (true/false for 0 / not 0; a Text variable for the item name). / Переменная проекта. |
 
 ## Zelda: Set Respawn Point
 

@@ -25,12 +25,17 @@ interface MapScene {
   inEditorMode?: boolean;
   mapStartSnapshot?: unknown;
   hasSavedMapStartup?: boolean;
+  /** PS Maker's MapStartup: needsStart = !hasSnapshot || savedSetup.length > 0 (MapStartup.ts). */
+  mapStartup?: { needsStart?: boolean; hasSavedStartup?: boolean } | null;
   player?: unknown;
   sys?: { isActive?(): boolean };
 }
 
 /** True for a map scene that PS Maker restored from a save and will not start itself. */
 export function isRestoredMap(scene: MapScene): boolean {
+  // PS Maker's own decision whether "Map start" will run, when the scene exposes it.
+  const startup = scene.mapStartup;
+  if (startup && typeof startup.needsStart === "boolean") return !startup.needsStart && startup.hasSavedStartup !== true;
   return !!scene.mapStartSnapshot && scene.hasSavedMapStartup !== true;
 }
 

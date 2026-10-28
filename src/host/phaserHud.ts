@@ -258,7 +258,7 @@ export class PhaserHud implements HudSink {
       position: model.position,
       safeArea: model.safeArea,
       showMagic: model.showMagic,
-      showItem: true,
+      showItem: model.showItem,
       showHearts: model.showHearts,
       counters: model.counters.map((c) => c.digits),
       hearts: Math.ceil(model.maxHp / Math.max(1, model.heartValue)),
@@ -272,7 +272,8 @@ export class PhaserHud implements HudSink {
     this.images.begin();
     this.texts.begin();
 
-    this.drawBar(skin.bar, model.barSlice, L.bar, k);
+    const anyPart = !!(L.magic || L.item || L.counters.length || L.hearts.length);
+    this.drawBar(anyPart ? skin.bar : undefined, model.barSlice, L.bar, k);
     if (L.magic) this.drawMagic(L.magic, k, model.maxMagic > 0 ? model.magic / model.maxMagic : 0, skin);
     else this.magicFill?.setVisible(false);
     if (L.item) this.drawItemBox(L.item, k, model);

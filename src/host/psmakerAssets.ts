@@ -422,5 +422,7 @@ export function fontFamilyCss(story: PsStory | null, fontId: string, fallback = 
   const font = story?.gameUI?.fonts?.find((f) => f.id === fontId);
   const safe = fontId.replace(/[^a-zA-Z0-9_-]/g, "-");
   const quote = (v: string) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  return [quote(`ps-maker-font-${safe}`), ...(font?.name ? [quote(font.name)] : []), fallback].join(", ");
+  // End on a generic family: a font name alone would fall back to the browser's serif default.
+  const generic = /(^|,)\s*(serif|sans-serif|monospace|cursive|fantasy|system-ui)\s*$/.test(fallback) ? fallback : `${fallback}, sans-serif`;
+  return [quote(`ps-maker-font-${safe}`), ...(font?.name ? [quote(font.name)] : []), generic].join(", ");
 }

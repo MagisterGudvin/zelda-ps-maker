@@ -63,6 +63,8 @@ test("a map restored from a PS Maker save: its Zelda map actions run (no effects
   assert.equal(isRestoredMap({ mapStartSnapshot: { executions: [] }, hasSavedMapStartup: false }), true);
   assert.equal(isRestoredMap({ mapStartSnapshot: { executions: [{}] }, hasSavedMapStartup: true }), false, "PS Maker resumes a startup that was running");
   assert.equal(isRestoredMap({ mapStartSnapshot: null }), false);
+  assert.equal(isRestoredMap({ mapStartSnapshot: {}, mapStartup: { needsStart: true, hasSavedStartup: false } }), false, "PS Maker will run Map start");
+  assert.equal(isRestoredMap({ mapStartSnapshot: null, mapStartup: { needsStart: false, hasSavedStartup: false } }), true);
 
   const fresh = Object.assign(createFakeScene().scene, { map, sceneCreated: true, mapStartSnapshot: null });
   const restored = Object.assign(f.scene, { map, sceneCreated: true, mapStartSnapshot: { executions: [] }, hasSavedMapStartup: false, player: f.player });

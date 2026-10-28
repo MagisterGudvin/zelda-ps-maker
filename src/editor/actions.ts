@@ -1105,6 +1105,9 @@ const setAbility = defineEvent({
   },
 });
 
+const HUD_PARTS = [["hearts", "Hearts"], ["counters", "Counters (rupees, bombs, arrows, keys)"], ["item", "Item box"], ["magic", "Magic meter"]] as const;
+const DEFAULT_COUNTERS = ["rupees", "bombs", "arrows", "keys"];
+
 /** Slots of Zelda: HUD Style, in form order (config.ui.skin). */
 export const HUD_SKIN_SLOTS = ["heartFull", "heartHalf", "heartEmpty", "rupees", "bombs", "arrows", "keys", "digits", "itemBox", "magicFrame", "magicFill", "bar"] as const;
 
@@ -1112,6 +1115,7 @@ const hudStyle = defineEvent({
   name: "Zelda: HUD Style",
   description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
   parameterDefs: {
+    parts: { ...multi("Toolkit HUD parts", "What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit.", HUD_PARTS), defaultValue: HUD_PARTS.map(([v]) => v) },
     heartFull: img("Heart: full", "Picture of a full heart (its size sets the size of all hearts). / Полное сердце."),
     heartHalf: img("Heart: half", "Half a heart. Empty = the full heart. / Половина сердца."),
     heartEmpty: img("Heart: empty", "An empty heart container. / Пустое сердце."),
@@ -1140,9 +1144,16 @@ const hudStyle = defineEvent({
         if (key && s.host.textureSize && !s.host.textureSize(key)) s.logger.warn(`HUD Style: picture "${key}" (${slot}) is not loaded; the built-in one is shown.`);
       }
       const font = textOf(p.font);
+      if (font) s.host.loadProjectFont?.(font);
+      // An action saved before 0.18 has no parts: everything stays on.
+      const parts = new Set(Array.isArray(p.parts) ? (p.parts as string[]) : HUD_PARTS.map(([v]) => v));
       tk.configure(
         {
           ui: {
+            showHearts: parts.has("hearts"),
+            counters: parts.has("counters") ? DEFAULT_COUNTERS : [],
+            showActiveItem: parts.has("item"),
+            showMagic: parts.has("magic"),
             skin,
             barSlice: Math.max(0, Math.round(numOr(p.barSlice, 4))),
             showLifeLabel: boolOr(p.lifeLabel, true),
@@ -1161,8 +1172,9 @@ const MESSAGE_KINDS = [["sign", "Signs and object texts"], ["item", "Item receiv
 
 const messageStyle = defineEvent({
   name: "Zelda: Message Style",
-  description: "Shows toolkit messages (signs, \"You got...\") in a dialogue box drawn like a dialogue layout of your project (Game UI → Dialogue layouts: background colour or picture, font, size), typed letter by letter and closed with the action key. Put it after Start Toolkit. / Окно сообщений Toolkit в стиле диалога PS Maker.",
+  description: "Shows toolkit messages (signs, \"You got...\") as PS Maker dialogues (or a toolkit box drawn like one): set them up in Game UI → Dialogue layouts like any dialogue. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.",
   parameterDefs: {
+    display: choice("Show with", "PS Maker Dialogue: the message is a real PS Maker dialogue, with everything its dialogue layout has (Game UI: background, font, name box, portrait, typing sound, animations). Toolkit box: the toolkit draws a box like the layout. / Чем показывать.", [["dialogue", "PS Maker Dialogue"], ["toolkit", "Toolkit box"]], "dialogue"),
     layout: dialogLayoutField("Dialogue layout", "Which dialogue layout of the project the box looks like. / Макет диалога PS Maker."),
     kinds: { ...multi("Messages in the box", "Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне.", MESSAGE_KINDS), defaultValue: ["sign", "item"] },
     typing: bool("Type letter by letter", "At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам.", true),
@@ -1179,13 +1191,17 @@ const messageStyle = defineEvent({
       const layout = textOf(p.layout);
       const layouts = (story?.gameUI?.dialogLayouts ?? []) as { id?: string }[];
       if (layout && !layouts.some((l) => l?.id === layout)) s.logger.warn(`Message Style: dialogue layout "${layout}" is not in the project; the default one is used.`);
+      const style = styleFromLayout(story, layout);
+      if (style.text.fontId) s.host.loadProjectFont?.(style.text.fontId);
       tk.messageBox = {
+        display: textOf(p.display) === "toolkit" ? "toolkit" : "dialogue",
+        layoutId: layout,
         kinds,
         typing: boolOr(p.typing, true),
         waitForKey: boolOr(p.waitForKey, true),
         pause: boolOr(p.pause, true),
         position: textOf(p.position) === "top" ? "top" : "bottom",
-        style: styleFromLayout(story, layout),
+        style,
       };
     });
   },
@@ -1204,14 +1220,47 @@ const showMessage = defineEvent({
   },
 });
 
-const STAT_OPTIONS = [["rupees", "Rupees"], ["bombs", "Bombs"], ["arrows", "Arrows"], ["key", "Small keys (this dungeon)"], ["hearts", "Hearts"], ["maxHearts", "Max hearts"], ["magic", "Magic"], ["enemies", "Enemies left on the map"]] as const;
+const STAT_OPTIONS = [
+  ["rupees", "Rupees"],
+  ["bombs", "Bombs"],
+  ["arrows", "Arrows"],
+  ["key", "Small keys (this dungeon)"],
+  ["hearts", "Hearts"],
+  ["maxHearts", "Max hearts (heart containers)"],
+  ["fullHearts", "Full hearts (whole number)"],
+  ["halfHeart", "Half heart (1 or 0)"],
+  ["health", "Health points"],
+  ["maxHealth", "Max health points"],
+  ["magic", "Magic"],
+  ["magicPercent", "Magic in % (0-100)"],
+  ["itemName", "Selected item: name (Text variable)"],
+  ["itemCount", "Selected item: ammo (bombs, arrows)"],
+  ["selected", "Item is selected (1 or 0)"],
+  ["owned", "Item is owned (1 or 0)"],
+  ["enemies", "Enemies left on the map"],
+] as const;
+
+/** Values of Zelda: HUD Variables, in form order: field → stat. */
+const HUD_VARIABLES = [
+  ["fullHearts", "Full hearts", "Whole hearts (bind a row's width: @{var} * heart width)."],
+  ["halfHeart", "Half heart", "1 while there is a half heart, else 0 (bind its opacity: @{var} * 100)."],
+  ["maxHearts", "Heart containers", "All hearts, full or empty (the row of empty hearts behind)."],
+  ["magicPercent", "Magic %", "0-100 (bind the meter's height or width)."],
+  ["rupees", "Rupees", "Rupee count (a text's value)."],
+  ["bombs", "Bombs", "Bomb count."],
+  ["arrows", "Arrows", "Arrow count."],
+  ["key", "Small keys", "Small keys of this dungeon."],
+  ["itemName", "Selected item name", "A Text variable: the selected item's name."],
+  ["itemCount", "Selected item ammo", "Bombs or arrows of the selected item (0 for others)."],
+] as const;
 
 const linkVariable = defineEvent({
   name: "Zelda: Show Stat In Variable",
   description: "Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use it in PS Maker conditions (a shop: if Rupees ≥ 50) or in UI components. Stays on for the whole game. / Значение Toolkit в переменной проекта.",
   parameterDefs: {
     stat: choice("Value", "What to copy. / Что показывать.", STAT_OPTIONS, "rupees"),
-    variableId: variable("Variable", "A number variable of the project (true/false for 0 / not 0). / Переменная проекта."),
+    item: choice("Item", "For \"Item is selected / owned\". / Предмет.", ITEM_OPTIONS, "bow"),
+    variableId: variable("Variable", "A number variable of the project (true/false for 0 / not 0; a Text variable for the item name). / Переменная проекта."),
   },
   execute(params, ctx) {
     run("Zelda: Show Stat In Variable", ctx, params, (s, tk) => {
@@ -1221,7 +1270,28 @@ const linkVariable = defineEvent({
         return;
       }
       if (s.host.getVariable && s.host.getVariable(id) === undefined) s.logger.warn(`Show Stat In Variable: project variable "${id}" not found.`);
-      tk.variableLinks.set(id, textOf(params.stat) || "rupees");
+      const stat = textOf(params.stat) || "rupees";
+      tk.variableLinks.set(id, stat === "selected" || stat === "owned" ? `${stat}:${textOf((params as Record<string, unknown>).item) || "bow"}` : stat);
+    });
+  },
+});
+
+const hudVariables = defineEvent({
+  name: "Zelda: HUD Variables",
+  description: "Build your own HUD with PS Maker's Add UI: the toolkit keeps these project variables up to date (hearts, magic, counters, selected item), and Add UI components show them (a text's value, or a size, position or opacity as an expression like @{Full hearts} * 36). Turn the toolkit's own HUD parts off in HUD Style. / Значения Toolkit в переменных для своего HUD на Add UI.",
+  parameterDefs: Object.fromEntries(HUD_VARIABLES.map(([key, label, hint]) => [key, variable(label, `${hint} Empty = not needed. / Переменная проекта.`)])) as Record<(typeof HUD_VARIABLES)[number][0], ReturnType<typeof variable>>,
+  execute(params, ctx) {
+    run("Zelda: HUD Variables", ctx, params, (s, tk) => {
+      const p = params as Record<string, unknown>;
+      let n = 0;
+      for (const [key] of HUD_VARIABLES) {
+        const id = textOf(p[key]);
+        if (!id) continue;
+        if (s.host.getVariable && s.host.getVariable(id) === undefined) s.logger.warn(`HUD Variables: project variable "${id}" not found.`);
+        tk.variableLinks.set(id, key);
+        n++;
+      }
+      if (n === 0) s.logger.warn("HUD Variables: choose at least one variable.");
     });
   },
 });
@@ -1421,6 +1491,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   showMessage,
   messageStyle,
   hudStyle,
+  hudVariables,
   linkVariable,
   setRespawn,
   respawnPlayer,

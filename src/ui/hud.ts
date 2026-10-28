@@ -96,6 +96,7 @@ export class HudSystem {
       maxMagic: st.player.maxMagic,
       showHearts: ui.showHearts,
       showMagic: ui.showMagic && st.player.maxMagic > 0,
+      showItem: ui.showActiveItem && s.feature("inventory"),
       activeItem: ui.showActiveItem && activeId && s.feature("inventory") ? slot(activeId) : null,
       counters,
       messages: this.messages.map((m) => ({ text: m.text, remainingMs: m.remainingMs })),

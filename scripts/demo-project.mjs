@@ -26,6 +26,9 @@ export const BUTTON_STYLE_ID = "zelda-button-style";
 /** The main menu map (the game starts on it). */
 export const TITLE_MAP_ID = "zelda-demo-title";
 
+/** Number variables of the demo's Add UI HUD, kept up to date by Zelda: HUD Variables. */
+export const HUD_VARIABLES_IDS = { full: "zelda-hud-full", half: "zelda-hud-half", max: "zelda-hud-max", rupees: "zelda-hud-rupees", bombs: "zelda-hud-bombs", arrows: "zelda-hud-arrows", keys: "zelda-hud-keys" };
+
 /** Text variable that carries the toolkit's progress in PS Maker saves (Start Toolkit → Progress variable). */
 export const PROGRESS_VARIABLE = { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" };
 
@@ -115,6 +118,61 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
   };
   const ownedStoryEvents = [];
   const uiFont = source.gameUI?.fonts?.[0];
+  const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
+  const textStyles = (size, color, align = "center", stroke = 0) => ({
+    fontFamily: uiFont?.name ?? "sans-serif",
+    fontAssetId: uiFont?.id ?? null,
+    fontSize: size,
+    fontWeight: 400,
+    lineHeightPercent: 120,
+    letterSpacingPercent: 0,
+    color,
+    strokeWidth: stroke,
+    strokeColor: "#1F1A24",
+    outlineOrder: "below-text",
+    textAlign: align,
+  });
+  const noBackground = { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 };
+  const picture = (imageId, scalingMode, opacity = 100) => ({ type: "image", imageId, backgroundOpacity: opacity, scalingMode, borderWidth: 0, slice: { top: 0, right: 0, bottom: 0, left: 0 }, repeat: "repeat" });
+  const at = (x, y, width, height) => ({ position: { x, y }, size: { width, height }, rotation: 0, zIndex: 0, sizeAnchor: "top-left" });
+  const v = (id) => `@{${id}}`;
+  /**
+   * The demo's HUD built with PS Maker's Add UI (HUD Variables keeps the variables up to date): a
+   * row of empty hearts as wide as the heart containers, full hearts over it as wide as the full
+   * hearts (pictures tiled), the half heart after them shown by its opacity; counter icons with
+   * their numbers. The toolkit itself draws the bar behind, the item box and the magic meter.
+   */
+  const hudUi = () => {
+    const H = HUD_VARIABLES_IDS;
+    const heartX = ui.w - 40 - 10 * 36;
+    const comp = (c) => ({ componentId: `ui-component-${makeId()}`, ...c });
+    const counters = [
+      ["rupee", H.rupees],
+      ["bomb", H.bombs],
+      ["arrow", H.arrows],
+      ["key", H.keys],
+    ].flatMap(([icon, id], i) => [
+      comp({ type: "image", imageId: `zelda-ui-${icon}-4x`, scalingMode: "fit", opacity: 100, ...at(160 + i * 110, 10, 40, 40) }),
+      comp({ type: "text", label: { type: "variable", variableId: id }, opacity: 100, backgroundEnabled: false, background: noBackground, textStyles: textStyles(36, "#F8E0A0", "center", 4), ...at(140 + i * 110, 54, 80, 44) }),
+    ]);
+    return {
+      id: makeId(),
+      name: "Add UI",
+      type: "addUiComponentsAction",
+      uiName: "HUD",
+      inGameUiId: `in-game-ui-${makeId()}`,
+      fadeEnabled: false,
+      fadeDurationMs: 750,
+      waitForCompletion: true,
+      components: [
+        comp({ type: "text", label: "- LIFE -", opacity: 100, backgroundEnabled: false, background: noBackground, textStyles: textStyles(28, "#F8E0A0", "left", 4), ...at(heartX + 120, 6, 160, 34) }),
+        comp({ type: "rectangle", background: picture("zelda-ui-heart-empty-4x", "tile"), ...at(heartX, 44, { type: "expression", source: `${v(H.max)} * 36` }, 32) }),
+        comp({ type: "rectangle", background: picture("zelda-ui-heart-full-4x", "tile"), ...at(heartX, 44, { type: "expression", source: `${v(H.full)} * 36` }, 32), zIndex: 1 }),
+        comp({ type: "rectangle", background: picture("zelda-ui-heart-half-4x", "stretch", { type: "expression", source: `${v(H.half)} * 100` }), ...at({ type: "expression", source: `${heartX} + ${v(H.full)} * 36` }, 44, 36, 32), zIndex: 1 }),
+        ...counters,
+      ],
+    };
+  };
   // The toolkit HUD and message box in the demo's own UI pictures and dialogue layout.
   const hudStyle = {
     heartFull: "zelda-ui-heart-full",
@@ -129,6 +187,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     magicFrame: "zelda-ui-magic-frame",
     magicFill: "zelda-ui-magic-fill",
     bar: "zelda-ui-hud-bar",
+    // Hearts and counters are Add UI components (hudUi); the toolkit draws the item box and magic.
+    parts: ["item", "magic"],
     barSlice: 4,
     font: uiFont?.id ?? "",
     textColor: "#f8e0a0",
@@ -265,7 +325,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         zelda.push(pluginAction("Zelda: HUD Style", hudStyle));
-        zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
+        zelda.push(pluginAction("Zelda: HUD Variables", { fullHearts: HUD_VARIABLES_IDS.full, halfHeart: HUD_VARIABLES_IDS.half, maxHearts: HUD_VARIABLES_IDS.max, rupees: HUD_VARIABLES_IDS.rupees, bombs: HUD_VARIABLES_IDS.bombs, arrows: HUD_VARIABLES_IDS.arrows, key: HUD_VARIABLES_IDS.keys }));
+        zelda.push(pluginAction("Zelda: Message Style", { display: "dialogue", layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }
@@ -283,7 +344,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       mapCollisions,
       setupActions,
       // "When map first starts": the Toolkit, objects and enemies, and the transfer triggers.
-      initialActions: [...zelda, ...extra, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
+      initialActions: [...zelda, hudUi(), ...extra, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
       enterActions: [],
       leaveActions: [],
       storyEvents: [],
@@ -295,21 +356,6 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
   // PS Maker has no title screen: the starting map is one. "Add UI" buttons run hidden events owned
   // by the button (relation "button-click"), like the editor saves them.
   const first = Object.keys(maps)[0];
-  const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
-  const font = uiFont;
-  const textStyles = (size, color, align = "center", stroke = 0) => ({
-    fontFamily: font?.name ?? "sans-serif",
-    fontAssetId: font?.id ?? null,
-    fontSize: size,
-    fontWeight: 400,
-    lineHeightPercent: 120,
-    letterSpacingPercent: 0,
-    color,
-    strokeWidth: stroke,
-    strokeColor: "#1F1A24",
-    outlineOrder: "below-text",
-    textAlign: align,
-  });
   const menuActionId = makeId();
   const buttonEvent = (label, actions) => {
     const componentId = `ui-component-${makeId()}`;
@@ -381,7 +427,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     characters: structuredClone(source.characters ?? []),
     animationStrips: structuredClone(source.animationStrips ?? []),
     spritesheetAnimations: structuredClone(source.spritesheetAnimations ?? []),
-    variables: [structuredClone(PROGRESS_VARIABLE)],
+    variables: [structuredClone(PROGRESS_VARIABLE), ...Object.entries(HUD_VARIABLES_IDS).map(([k, id]) => ({ id, name: `HUD ${k}`, type: "number", defaultValue: 0 }))],
     videos: [],
     globalStoryEvents: [],
     ownedStoryEvents,

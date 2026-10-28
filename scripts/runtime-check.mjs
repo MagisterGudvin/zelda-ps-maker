@@ -137,6 +137,15 @@ const expect = (ok, what) => {
   if (!ok) throw new Error(what);
 };
 
+/** Presses Z until neither a PS Maker dialogue nor the toolkit's message is open (item received...). */
+const dismiss = async () => {
+  for (let i = 0; i < 12; i++) {
+    await wait(400);
+    const open = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true || window.ZeldaMakerToolkit?.session?.isPaused("message") === true);
+    if (!open) return;
+    await page.keyboard.press("z");
+  }
+};
 const button = (label) => page.locator("button", { hasText: label }).first();
 await check("the game opens on the main menu (PS Maker Add UI buttons); New game goes to the field", async () => {
   await button("New game").waitFor({ state: "visible", timeout: 30000 });
@@ -154,43 +163,74 @@ await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start
   await page.screenshot({ path: path.join(OUT, "field.png") });
   return `${s.enemies} enemies`;
 });
-// The checks spend a while near the start (sign, villager) while the field's enemies roam: a
-// larger health reserve keeps the player from dying and respawning in the middle of a check.
-await ev(() => {
-  const tk = window.ZeldaMakerToolkit.toolkit;
-  tk.state.player.maxHp = tk.state.player.hp = 40;
-  window.ZeldaMakerToolkit.session.hud?.markDirty();
-});
-await check("HUD Style: the toolkit HUD drawn with the project's UI pictures (Images)", async () => {
-  const keys = await ev(() => {
+await check("HUD: hearts and counters are PS Maker Add UI bound to HUD Variables; the toolkit draws the item box, magic and bar", async () => {
+  const toolkit = await ev(() => {
     const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
     return [...new Set(hud.children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort();
   });
-  for (const k of ["zelda-ui-heart-full", "zelda-ui-rupee", "zelda-ui-digits", "zelda-ui-item-box", "zelda-ui-hud-bar"]) expect(keys.includes(k), `${k} not drawn: ${keys.join(", ")}`);
-  return `${keys.length} pictures`;
+  // Width of the Add UI rectangles tiled with a heart picture (CSS pixels of the UI layer).
+  const hearts = () =>
+    ev(() => {
+      const width = (pic) => Math.max(0, ...[...document.querySelectorAll(".in-game-ui-layer *")].filter((e) => getComputedStyle(e).backgroundImage.includes(pic)).map((e) => e.offsetWidth));
+      const vars = Object.fromEntries(["full", "half", "max", "rupees"].map((k) => [k, window.game.variables.get(`zelda-hud-${k}`)?.value]));
+      return { full: width("zelda-ui-heart-full-4x"), empty: width("zelda-ui-heart-empty-4x"), vars, rupeeText: document.querySelector(".in-game-ui-layer")?.innerText.includes(String(vars.rupees)) };
+    });
+  const before = await hearts();
+  await ev(() => {
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    window.ZeldaMakerToolkit.session.setPaused("check", true); // no enemy hit while measuring
+    tk.state.player.hp = 3; // one and a half hearts
+    tk.inventory.give("rupees", 37, { silent: true });
+  });
+  await wait(600);
+  const after = await hearts();
+  await ev(() => {
+    // The checks spend a while near the start (sign, villager) while the field's enemies roam: a
+    // larger health reserve keeps the player from dying and respawning in the middle of a check.
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    tk.state.player.maxHp = tk.state.player.hp = 40;
+    window.ZeldaMakerToolkit.session.setPaused("check", false);
+  });
+  await page.screenshot({ path: path.join(OUT, "hud.png") });
+  for (const k of ["zelda-ui-item-box", "zelda-ui-hud-bar"]) expect(toolkit.includes(k), `toolkit: ${k} not drawn (${toolkit.join(", ")})`);
+  expect(!toolkit.includes("zelda-ui-heart-full"), "the toolkit still draws hearts");
+  expect(before.full === 3 * 36 && before.empty === 3 * 36, `start: ${JSON.stringify(before)}`);
+  expect(after.vars.full === 1 && after.vars.half === 1 && after.full === 36 && after.vars.rupees === 37 && after.rupeeText, `after: ${JSON.stringify(after)}`);
+  return `hearts ${before.full}px → ${after.full}px + half, rupees ${after.vars.rupees}`;
 });
-await check("Message Style: reading the sign opens the toolkit box in the project's dialogue layout (9-slice panel); Z closes it", async () => {
+await check("the toolkit loads the project font itself when PS Maker has not (a playtest started on a game map)", async () => {
+  const r = await ev(async () => {
+    const family = "ps-maker-font-font-pixel-operator";
+    for (const f of [...document.fonts]) if (f.family.replace(/["']/g, "") === family) document.fonts.delete(f);
+    window.ZeldaMakerToolkit.session.host.loadProjectFont("font-pixel-operator");
+    for (let i = 0; i < 20 && ![...document.fonts].some((f) => f.family.replace(/["']/g, "") === family && f.status === "loaded"); i++) await new Promise((ok) => setTimeout(ok, 100));
+    return [...document.fonts].filter((f) => f.family.replace(/["']/g, "") === family).map((f) => f.status);
+  });
+  expect(r.includes("loaded"), `font faces: ${JSON.stringify(r)}`);
+  return "PixelOperator loaded from game-assets";
+});
+await check("Message Style: reading the sign shows its text as a PS Maker Dialogue (the project's layout); Z closes it, and the sign is not read again", async () => {
   await tp(32, 142);
   await hold("ArrowUp", 200);
   await page.keyboard.press("z");
-  await wait(700);
-  const open = await ev(() => {
-    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
-    return {
-      pieces: hud.children.list.filter((o) => o.visible && o.texture?.key === "zelda-ui-panel").length,
-      text: hud.children.list.find((o) => o.type === "Text" && o.visible && o.depth === 16)?.text ?? "",
-      paused: window.ZeldaMakerToolkit.session.isPaused("message"),
-    };
-  });
-  await page.screenshot({ path: path.join(OUT, "sign-box.png") });
-  for (let i = 0; i < 2; i++) {
+  await page.waitForFunction(() => document.body.innerText.includes("Arrows: move"), null, { timeout: 6000 }).catch(() => {});
+  const open = await ev(() => ({
+    dialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
+    text: document.body.innerText.includes("Arrows: move"),
+    paused: window.ZeldaMakerToolkit.session.isPaused("message"),
+  }));
+  await page.screenshot({ path: path.join(OUT, "sign-dialogue.png") });
+  let still = true;
+  for (let i = 0; i < 8 && still; i++) {
     await page.keyboard.press("z");
-    await wait(300);
+    await wait(500);
+    still = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true);
   }
-  const closed = await ev(() => !window.ZeldaMakerToolkit.session.isPaused("message"));
-  expect(open.pieces === 9 && open.paused && open.text.startsWith("Arrows"), JSON.stringify(open));
-  expect(closed, "box still open after Z");
-  return `"${open.text.slice(0, 24)}…"`;
+  await wait(600);
+  const again = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true || window.ZeldaMakerToolkit.session.isPaused("message"));
+  expect(open.dialogue && open.text && open.paused, JSON.stringify(open));
+  expect(!still && !again, `still open ${still}, opened again ${again}`);
+  return "shown as written (\"Arrows: move…\"), closed";
 });
 await check("the villager talks with PS Maker's own Dialogue (styled panel); the toolkit waits meanwhile", async () => {
   await tp(80, 140);
@@ -214,7 +254,7 @@ await check("a chest opens with Z", async () => {
   await hold("ArrowUp", 250);
   await page.keyboard.press("z");
   await wait(1500);
-  await page.keyboard.press("z");
+  await dismiss();
   const s = await state();
   expect(s.chest === "opened", JSON.stringify(s));
 });
@@ -301,7 +341,7 @@ await check("the key from the chest opens the locked door", async () => {
   await hold("ArrowUp", 250);
   await page.keyboard.press("z");
   await wait(1500);
-  await page.keyboard.press("z");
+  await dismiss();
   // Walk to the door from the middle of the room: decor must not block the way.
   await tp(130, 152);
   await hold("ArrowRight", 1200);

@@ -5,6 +5,13 @@ import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
 
 /** Zelda: Message Style. Without it every toolkit message is a short note in the HUD. */
 export interface MessageBoxSettings {
+  /**
+   * "dialogue": PS Maker's own Dialogue shows the message (every setting of the dialogue layout:
+   * name box, portrait, typing sound, opening animation); "toolkit": the toolkit draws the box.
+   */
+  display?: "dialogue" | "toolkit";
+  /** Dialogue layout id for "dialogue" ("" = the project's default layout). */
+  layoutId?: string;
   /** Message kinds shown in the box ("box" = Show Message with "In a dialogue box" is always). */
   kinds: MessageKind[];
   typing: boolean;
@@ -72,6 +79,7 @@ export function styleFromLayout(story: (PsStory & Raw) | null, layoutId: string)
     background,
     text: {
       fontFamily: fontFamilyCss(story, typeof t.fontAssetId === "string" ? t.fontAssetId : "", str(t.fontFamily, "sans-serif")),
+      ...(typeof t.fontAssetId === "string" && t.fontAssetId ? { fontId: t.fontAssetId } : {}),
       size: num(t.fontSize, 41),
       color: str(t.color, "#ffffff"),
       lineHeight: num(t.lineHeightPercent, 120),
@@ -91,7 +99,7 @@ export function styleFromLayout(story: (PsStory & Raw) | null, layoutId: string)
 export class MessageBoxSystem {
   private readonly s: Session;
   private readonly queue: string[] = [];
-  private current: { text: string; shown: number; readMs: number } | null = null;
+  private current: { text: string; shown: number; readMs: number; dialogue?: { done: boolean } } | null = null;
   private readonly off: () => void;
 
   constructor(session: Session) {
@@ -124,10 +132,23 @@ export class MessageBoxSystem {
       if (text === undefined) return;
       // Opening takes this tick: a press in it (or the one that read the sign) does not count.
       this.current = { text, shown: st?.typing === false ? text.length : 0, readMs: 0 };
+      if (st?.display === "dialogue") {
+        const shown = this.s.host.playDialogue?.(dialogueSourceOf(text, st.layoutId ?? ""));
+        if (shown) {
+          const state = { done: false };
+          this.current.dialogue = state;
+          shown.then(() => (state.done = true));
+        }
+      }
       this.setHold(true);
       return;
     }
     const c = this.current;
+    // PS Maker's Dialogue handles typing and keys; the box closes when it ends.
+    if (c.dialogue) {
+      if (c.dialogue.done) this.close();
+      return;
+    }
     const all = c.shown >= c.text.length;
     const press = this.s.host.input.pressed("action");
     if (!all) {
@@ -155,7 +176,7 @@ export class MessageBoxSystem {
 
   model(): MessageBoxModel | null {
     const c = this.current;
-    if (!c) return null;
+    if (!c || c.dialogue) return null;
     const st = this.settings;
     const shown = Math.floor(c.shown);
     return {
@@ -173,4 +194,19 @@ export class MessageBoxSystem {
     this.current = null;
     this.queue.length = 0;
   }
+}
+
+/**
+ * A toolkit message as PS Maker dialogue source (dialogueSourceParser.ts): the chosen layout as a
+ * command, then the text with PS Maker's syntax escaped — "Name: text" lines and "@" commands get a
+ * leading backslash, markup characters (* _ { } and the backslash itself) one each — so the text
+ * shows as written. A blank line still starts a new page.
+ */
+export function dialogueSourceOf(text: string, layoutId = ""): string {
+  const lines = text.split("\n").map((line) => {
+    const escaped = line.replace(/[\\*_{}]/g, (c) => `\\${c}`);
+    const t = escaped.trimStart();
+    return t.startsWith("@") || t.indexOf(": ") > 0 ? `\\${escaped}` : escaped;
+  });
+  return [...(layoutId ? [`@dialogue_layout ${layoutId}`] : []), ...lines].join("\n");
 }

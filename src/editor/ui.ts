@@ -305,11 +305,17 @@ export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Show Stat In Variable": {
     keywords: ["variable", "stat", "hud", "rupees", "counter", "sync"],
     fields: { variableId: { required: true } },
+    visible: { item: (p) => p.stat === "selected" || p.stat === "owned" },
     preview: (_p, show) => join([show("stat"), show("variableId")], " → "),
   },
   "Zelda: Set Ability": {
     keywords: ["ability", "disable", "enable"],
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
+  },
+  "Zelda: HUD Variables": {
+    keywords: ["hud", "ui", "variables", "add ui", "hearts", "rupees", "interface", "custom"],
+    fields: { itemName: { group: "Item" }, itemCount: { group: "Item" } },
+    preview: (p) => `${["fullHearts", "halfHeart", "maxHearts", "magicPercent", "rupees", "bombs", "arrows", "key", "itemName", "itemCount"].filter((k) => set(p[k])).length} variables`,
   },
   "Zelda: HUD Style": {
     keywords: ["hud", "ui", "interface", "hearts", "icons", "skin", "style", "digits", "font"],
@@ -338,8 +344,9 @@ export const ACTION_UI: Record<string, ActionUi> = {
   },
   "Zelda: Message Style": {
     keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign", "typewriter"],
-    fields: { position: { ui: "radio" } },
-    preview: (p, show) => join([set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
+    fields: { display: { ui: "radio" }, position: { ui: "radio" } },
+    visible: { typing: (p) => p.display === "toolkit", waitForKey: (p) => p.display === "toolkit", position: (p) => p.display === "toolkit" },
+    preview: (p, show) => join([p.display === "toolkit" ? "toolkit box" : "PS Maker dialogue", set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
   },
   "Zelda: Show Message": {
     keywords: ["message", "text", "toast", "notification", "say"],

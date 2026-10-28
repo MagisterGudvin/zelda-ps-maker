@@ -19,6 +19,13 @@ export interface HostAdapter {
   readPlayerTop?(): number | null;
   /** Optional: pixel size of a loaded texture ("key" or "key#frame"), null when not loaded. */
   textureSize?(sprite: string): { w: number; h: number } | null;
+  /**
+   * Optional: shows text with PS Maker's own Dialogue (dialogue source syntax); resolves when the
+   * player closed it. Null when the engine cannot.
+   */
+  playDialogue?(source: string): Promise<void> | null;
+  /** Optional: registers a project font (Game UI → Fonts) if PS Maker has not loaded it yet. */
+  loadProjectFont?(fontId: string): void;
   /** Optional: makes these toolkit solids stop the player in the engine's physics (called every tick). */
   syncSolids?(boxes: readonly AABB[]): void;
   /** Optional: sides on which the engine's physics stopped the player this frame. */
@@ -156,7 +163,7 @@ export interface MessageBoxStyle {
   background:
     | { type: "plain"; color: string; opacity: number; borderColor: string; borderWidth: number; borderRadius: number }
     | { type: "image"; imageId: string; opacity: number; mode: "nine-slice" | "stretch" | "fit"; slice: { top: number; right: number; bottom: number; left: number }; borderWidth: number };
-  text: { fontFamily: string; size: number; color: string; lineHeight: number; strokeWidth: number; strokeColor: string; align: "left" | "center" | "right" };
+  text: { fontFamily: string; fontId?: string; size: number; color: string; lineHeight: number; strokeWidth: number; strokeColor: string; align: "left" | "center" | "right" };
   /** Characters per second. */
   typingSpeed: number;
   caretColor: string;
@@ -181,6 +188,8 @@ export interface HudModel {
   maxMagic: number;
   showHearts: boolean;
   showMagic: boolean;
+  /** The item box is drawn (HUD Style parts), even while no item is selected. */
+  showItem: boolean;
   activeItem: HudItemSlot | null;
   counters: { id: string; label: string; icon: string; value: number; digits: number }[];
   messages: { text: string; remainingMs: number }[];

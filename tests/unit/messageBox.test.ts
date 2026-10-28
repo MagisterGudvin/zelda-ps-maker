@@ -82,7 +82,7 @@ test("the box looks like a PS Maker dialogue layout (colour or 9-slice picture, 
   const plain = styleFromLayout(story, "");
   assert.deepEqual([plain.width, plain.height, plain.gap, plain.typingSpeed, plain.caretColor], [896, 252, 14, 42, "#ffd23a"]);
   assert.deepEqual(plain.background, { type: "plain", color: "#000000", opacity: 100, borderColor: "#FFFFFF", borderWidth: 3, borderRadius: 18 });
-  assert.equal(plain.text.fontFamily, '"ps-maker-font-font-pixel-operator", "PixelOperator", PixelOperator');
+  assert.equal(plain.text.fontFamily, '"ps-maker-font-font-pixel-operator", "PixelOperator", PixelOperator, sans-serif');
   assert.deepEqual([plain.text.size, plain.text.lineHeight], [53, 120]);
   const wood = styleFromLayout(story, "dl-2");
   assert.deepEqual(wood.background, { type: "image", imageId: "IMG_PANEL", opacity: 90, mode: "nine-slice", slice: { top: 6, right: 6, bottom: 6, left: 6 }, borderWidth: 24 });
@@ -115,4 +115,36 @@ test("a pause caught mid-blink (after a hit) shows the player", () => {
   r.tk.bus.emit("zelda:message", { text: "Hi", durationMs: 1000, kind: "sign" });
   r.step(1);
   assert.equal(r.host.blinkVisible, true);
+});
+
+test("Show with PS Maker Dialogue: the message is played as a Dialogue action; the game waits until it closes", async () => {
+  const r = createRig();
+  const played: string[] = [];
+  let close: () => void = () => {};
+  (r.host as any).playDialogue = (source: string) => {
+    played.push(source);
+    return new Promise<void>((ok) => (close = ok));
+  };
+  r.tk.messageBox = settings({ display: "dialogue", layoutId: "zelda-dialogue-layout" });
+  r.tk.bus.emit("zelda:message", { text: "Arrows: move", durationMs: 1000, kind: "sign" });
+  r.step(2);
+  assert.deepEqual(played, ["@dialogue_layout zelda-dialogue-layout\n\\Arrows: move"]);
+  assert.equal(r.host.hud.last!.box, null, "the toolkit draws no box");
+  assert.ok(r.session.isPaused("message"));
+  r.host.input.tap("action");
+  r.step(3);
+  assert.ok(r.session.isPaused("message"), "keys belong to the dialogue");
+  close();
+  await new Promise((ok) => setTimeout(ok, 0));
+  r.step(1);
+  assert.ok(!r.session.isPaused("message"));
+});
+
+test("dialogue source: PS Maker syntax in the text is escaped", async () => {
+  const { dialogueSourceOf } = await import("../../src/ui/messageBox.ts");
+  assert.equal(dialogueSourceOf("Hello"), "Hello");
+  assert.equal(dialogueSourceOf("Z: open"), "\\Z: open", "not a speaker name");
+  assert.equal(dialogueSourceOf("@wait 100"), "\\@wait 100", "not a command");
+  assert.equal(dialogueSourceOf("a *b* _c_ {d} \\e"), "a \\*b\\* \\_c\\_ \\{d\\} \\\\e", "no markup");
+  assert.equal(dialogueSourceOf("one\n\ntwo", "L"), "@dialogue_layout L\none\n\ntwo", "a blank line is a new page");
 });
