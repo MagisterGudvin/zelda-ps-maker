@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { characterFromParam, characterPlan, directionRows, findCharacter, findStory, playerAutoAnims, playerSheetAnim, sheetColumns, sheetForState, sheetImage, type PsSheet, type PsStory } from "../../src/host/psmakerAssets.ts";
+import { characterFromParam, characterPlan, directionRows, storyOfScene, sheetColumns, sheetForState, sheetImage, type PsSheet, type PsStory } from "../../src/host/psmakerAssets.ts";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
 
 // Synthetic project data in the format of a PS Maker 1.2.1 story.json
@@ -36,20 +36,15 @@ const story: PsStory = {
   player: { defaultAnimationSetId: "p", animationSets: [{ id: "p", animations: { movementDirections: 8, down: "pw0", left: "pw1", right: "pw2", up: "pw3" } }] },
 };
 
-test("PS Maker data is found in the Phaser JSON cache or registry, bounded", () => {
-  const cache = new Map<string, unknown>([["fonts", { a: 1 }], ["story", story]]);
-  const found = findStory([{ label: "cache.json", value: cache }]);
-  assert.equal(found?.story, story);
-  assert.equal(found?.where, "cache.json.story");
-  const nested = findStory([{ label: "game", value: { registry: { list: { data: { project: story } } } } }]);
-  assert.equal(nested?.where, "game.registry.list.data.project");
-  const circular: Record<string, unknown> = {};
-  circular.self = circular;
-  assert.equal(findStory([{ label: "x", value: circular }]), null);
+test("PS Maker data is the map scene's story (GameMap.init), in the game and the editor", () => {
+  assert.equal(storyOfScene({ story }), story);
+  assert.equal(storyOfScene({ sys: { settings: { data: { story } } } }), story);
+  assert.equal(storyOfScene({ story: { characters: "no" } }), null);
+  assert.equal(storyOfScene(null), null);
 });
 
 test("a PS Maker character becomes enemy animations with its row order and collision box", () => {
-  const ch = findCharacter(story, "slime")!;
+  const ch = characterFromParam(story, "SLIME")!;
   assert.equal(ch.name, "Slime");
   assert.deepEqual(directionRows(story, ch.animationSets[0]), { down: 0, left: 1, right: 2, up: 3 });
   const plan = characterPlan(story, ch);
@@ -66,7 +61,7 @@ test("a PS Maker character becomes enemy animations with its row order and colli
 });
 
 test("frame numbers follow the texture width when it is known (PS Maker numbering)", () => {
-  const ch = findCharacter(story, "Slime")!;
+  const ch = characterFromParam(story, "SLIME")!;
   // Run sheet: rows of 8 frames, but the image is 10 frames wide.
   const plan = characterPlan(story, ch, (sh) => (sh.id === "run" ? 10 : null));
   assert.deepEqual((plan.animations[plan.states.walk!].frames as Record<string, number[]>).right, [20, 21, 22, 23, 24, 25, 26, 27]);
@@ -79,42 +74,18 @@ test("sheet names map to states; plain names win over compound ones", () => {
   assert.equal(sheetColumns(playerSheets.find((s) => s.name === "Sword Idle")!), 12, "longest row");
 });
 
-test("a player sheet by name becomes a directional attack animation", () => {
-  const found = playerSheetAnim(story, "sword attack")!;
-  assert.equal(found.sheet.name, "Sword Attack");
-  assert.deepEqual((found.anim.frames as Record<string, number[]>).up, [24, 25, 26, 27, 28, 29, 30, 31]);
-  assert.equal(playerSheetAnim(story, "Kick"), null);
-});
-
-test("the character chosen in an NPC dropdown is matched whatever PS Maker passes", () => {
-  for (const v of ["SLIME", "Slime", "slime", { id: "SLIME" }, { characterId: "SLIME" }, { assetId: "SLIME", name: "x" }, { texture: { key: "slime" } }, { npc: { id: "SLIME" } }]) {
-    assert.equal(characterFromParam(story, v)?.id, "SLIME", JSON.stringify(v));
-  }
+test("the character chosen in an NPC dropdown is its library id", () => {
+  assert.equal(characterFromParam(story, "SLIME")?.name, "Slime");
+  assert.equal(characterFromParam(story, "Slime"), null, "a name is not an id");
   assert.equal(characterFromParam(story, ""), null);
-  assert.equal(characterFromParam(story, { id: "nobody" }), null);
+  assert.equal(characterFromParam(story, { id: "SLIME" }), null);
 });
 
-test("the player's attack and hurt sheets are found by name", () => {
-  const auto = playerAutoAnims(story);
-  assert.equal(auto.attack?.sheet.name, "Sword Attack");
-  assert.equal(auto.hurt?.sheet.name, "Sword Hurt", "same set as the attack");
-});
-
-test("sheet textures are matched by id, file name or image URL", () => {
+test("a sheet's texture is the one PS Maker loads for its animations: <animationId>frames", () => {
   const s = story.spritesheetAnimations[1];
-  const tex = (keys: Record<string, string>) => ({
-    exists: (k: string) => k in keys,
-    getTextureKeys: () => Object.keys(keys),
-    get: (k: string) => ({ source: [{ image: { src: keys[k] } }] }),
-  });
-  assert.equal(sheetImage(tex({ run2frames: "", [s.src]: "" }), s, story), "run2frames", "PS Maker 1.2.1 key: <animationId>frames");
-  assert.equal(sheetImage(tex({ [s.src]: "" }), s, story), s.src);
-  assert.equal(sheetImage(tex({ [`sheet:${s.id}`]: "" }), s, story), `sheet:${s.id}`);
-  assert.equal(sheetImage(tex({ k1: `https://game/assets/${s.src}` }), s, story), "k1");
-  // Another project image is loaded: build the URL from its folder.
-  const other = story.spritesheetAnimations[0];
-  assert.equal(sheetImage(tex({ k2: `https://game/assets/${other.src}` }), s, story), `https://game/assets/${s.src}`);
-  assert.equal(sheetImage(tex({ unrelated: "https://x/y.png" }), s, story), null);
+  const tex = (keys: string[]) => ({ exists: (k: string) => keys.includes(k) });
+  assert.equal(sheetImage(tex(["run2frames", s.src]), s), "run2frames");
+  assert.equal(sheetImage(tex([s.src]), s), null, "a file name is not a PS Maker texture key");
 });
 
 test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Maker sheet", async () => {
@@ -122,29 +93,28 @@ test("Create Enemy with a PS Maker character and Set Player Sprites with a PS Ma
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   resetToolkitForTests();
   const f = createFakeScene();
-  // PS Maker keeps its project JSON in the Phaser cache (assumption under test) and the sheet textures by file name.
-  f.game.cache = { json: { entries: { entries: { story } } } };
-  for (const sh of story.spritesheetAnimations) f.scene.textures.createCanvas(sh.src);
+  // GameMap keeps the project data as scene.story; PS Maker loads each animation as "<animationId>frames".
+  f.scene.story = story;
+  for (const sh of story.spritesheetAnimations) for (const a of sh.animations) f.scene.textures.createCanvas(`${a.id}frames`);
   const ctx = { game: f.game, scene: f.scene, player: f.player };
   type AnyAction = { name: string; execute(params: Record<string, unknown>, ctx: unknown): void };
   const run = (name: string, params: Record<string, unknown>) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!.execute(params, ctx);
   run("Zelda: Start Toolkit", { mapId: "ps", language: "en" });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: Create Enemy", { template: "slime", position: { x: 150, y: 100 }, id: "s1", character: { id: "SLIME" }, hp: 4 });
+  run("Zelda: Create Enemy", { template: "slime", position: { x: 150, y: 100 }, id: "s1", character: "SLIME", hp: 4 });
   const e = tk.session!.world.get("s1") as unknown as { hp: number; cfg: { width: number; height: number; spriteOffsetX: number; animations: Record<string, string> } };
   assert.equal(e.hp, 4);
   assert.equal(e.cfg.width, 14);
   assert.equal(e.cfg.height, 15);
   assert.equal(e.cfg.animations.walk, "ps_SLIME_walk");
-  assert.equal(tk.config.sprites.sheets.ps_run?.image, story.spritesheetAnimations[1].src);
+  assert.equal(tk.config.sprites.sheets.ps_run?.image, `${story.spritesheetAnimations[1].animations[0].id}frames`);
 
   // Picked in the editor's player-animation picker: one row (Sword Attack facing left) → all directions.
-  run("Zelda: Set Player Sprites", { attackAnimation: "sa1", hurtAnimation: "sh0" });
+  run("Zelda: Set Player Sprites", { attack: "sa1", hurt: "sh0" });
   assert.equal(tk.config.player.sprites.attack, "ps_anim_sa1");
   assert.equal(tk.config.sprites.animations.ps_anim_sa1?.sheet, "ps_sa");
   assert.equal(tk.config.sprites.animations.ps_anim_sh0?.sheet, "ps_sh");
-  // The same through the new picker field.
   run("Zelda: Set Player Sprites", { attack: "sa2", hurt: "", spin: "" });
   assert.equal(tk.config.player.sprites.attack, "ps_anim_sa2");
 

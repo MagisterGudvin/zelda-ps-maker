@@ -42,8 +42,6 @@ export interface ToolkitConfig {
      * PS Maker player, so it never walks into them and gets pushed back (screen shake).
      */
     solidBodies: boolean;
-    /** Treat colliding tiles of Phaser tilemap layers as walls. */
-    useTilemapLayers: boolean;
     /** PS Maker NPCs (moving Arcade bodies, colliding since PS Maker 1.1) block enemies and projectiles. */
     npcsBlock: boolean;
     /**
@@ -311,7 +309,6 @@ export function createDefaultConfig(): ToolkitConfig {
       tileSize: 16,
       useArcadeStaticBodies: true,
       solidBodies: true,
-      useTilemapLayers: true,
       npcsBlock: true,
       depthMode: "auto",
       depthBase: 0,
@@ -524,17 +521,3 @@ export const CONFIG_PRESETS: Record<string, unknown> = {
     enemies: { defaultDrops: { chance: 0.15 } },
   },
 };
-
-export function parseJsonObject(text: string, what: string): { value: Record<string, unknown> | null; error: string | null } {
-  const trimmed = (text ?? "").trim();
-  if (trimmed === "") return { value: null, error: null };
-  try {
-    const value = JSON.parse(trimmed) as unknown;
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-      return { value: null, error: `${what}: JSON must be an object` };
-    }
-    return { value: value as Record<string, unknown>, error: null };
-  } catch (err) {
-    return { value: null, error: `${what}: invalid JSON (${(err as Error).message})` };
-  }
-}

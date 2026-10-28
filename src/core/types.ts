@@ -1,4 +1,4 @@
-import type { AABB, Facing } from "./math.ts";
+import type { AABB } from "./math.ts";
 
 /** Damage classes. Enemies and objects declare multipliers/permissions per class. */
 export type DamageType =
@@ -81,10 +81,6 @@ export interface DropEntry {
 export interface DropTable {
   chance: number;
   entries: DropEntry[];
-}
-
-export interface FacingProvider {
-  readonly facing: Facing;
 }
 
 /** Text that is either a localization key or a literal per-language map. */

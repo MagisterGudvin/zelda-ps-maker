@@ -12,6 +12,12 @@ const COUNTER_ICONS: Record<string, string> = {
   magic: "hud_magic",
 };
 
+/** A HUD counter (config.ui.counters id) with its value; capacity sets the digits ("keys" holds 9). */
+export function hudCounter(id: string, label: string, value: number, capacity: number): HudModel["counters"][number] {
+  const max = id === "keys" ? 9 : capacity;
+  return { id, label, icon: COUNTER_ICONS[id] ?? `icon_${id}`, value, digits: Math.min(4, digitsFor(max === 9999 ? 99 : max)) };
+}
+
 /**
  * Builds a render-agnostic HUD model from game state and hands it to the
  * host's HUD sink. Re-renders only when an event changed something or a
@@ -79,14 +85,7 @@ export class HudSystem {
     };
     const counters = ui.counters.map((id) => {
       const key = id === "keys" ? "key" : id;
-      const max = id === "keys" ? 9 : inv.capacity(key);
-      return {
-        id,
-        label: s.i18n.t(`resource.${id}`),
-        icon: COUNTER_ICONS[id] ?? `icon_${id}`,
-        value: inv.count(key),
-        digits: Math.min(4, digitsFor(max === 9999 ? 99 : max)),
-      };
+      return hudCounter(id, s.i18n.t(`resource.${id}`), inv.count(key), inv.capacity(key));
     });
     return {
       visible: true,

@@ -24,10 +24,6 @@ export const FACING_VECTORS: Readonly<Record<Facing, Readonly<Vec2>>> = {
   right: { x: 1, y: 0 },
 };
 
-export function isFacing(value: unknown): value is Facing {
-  return value === "up" || value === "down" || value === "left" || value === "right";
-}
-
 export function makeBox(x = 0, y = 0, hw = 0, hh = 0): AABB {
   return { x, y, hw, hh };
 }
@@ -77,12 +73,6 @@ export function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
 }
 
-export function distSq(ax: number, ay: number, bx: number, by: number): number {
-  const dx = ax - bx;
-  const dy = ay - by;
-  return dx * dx + dy * dy;
-}
-
 /** Normalizes (x, y) into `out`; a zero vector stays zero. */
 export function normalize(out: Vec2, x: number, y: number): Vec2 {
   const len = Math.sqrt(x * x + y * y);
@@ -113,19 +103,6 @@ export function facingFromVector(dx: number, dy: number, current: Facing): Facin
   return dy < 0 ? "up" : "down";
 }
 
-export function oppositeFacing(f: Facing): Facing {
-  switch (f) {
-    case "up":
-      return "down";
-    case "down":
-      return "up";
-    case "left":
-      return "right";
-    case "right":
-      return "left";
-  }
-}
-
 /**
  * True when something located at (srcX, srcY) is in front of an actor at
  * (x, y) facing `facing`. `minDot` is the cosine of the half-angle of the cone.
@@ -137,11 +114,4 @@ export function isInFront(facing: Facing, x: number, y: number, srcX: number, sr
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1e-6) return true;
   return (v.x * dx + v.y * dy) / len >= minDot;
-}
-
-/** Moves `value` toward `target` by at most `step`. */
-export function approach(value: number, target: number, step: number): number {
-  if (value < target) return Math.min(value + step, target);
-  if (value > target) return Math.max(value - step, target);
-  return value;
 }

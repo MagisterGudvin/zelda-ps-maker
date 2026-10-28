@@ -417,10 +417,6 @@ export function builtinSpriteIds(): string[] {
   return Object.keys(DEFS);
 }
 
-export function hasBuiltinSprite(id: string): boolean {
-  return id in DEFS;
-}
-
 /** Minimal surface of Phaser's TextureManager that we rely on. */
 export interface TextureManagerLike {
   exists(key: string): boolean;

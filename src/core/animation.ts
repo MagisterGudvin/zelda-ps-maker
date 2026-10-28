@@ -67,15 +67,3 @@ export function animFrame(def: AnimDef, facing: Facing, elapsedMs: number, durat
   return { sheet: def.sheet, frame: f.frames[Math.max(0, idx)], flipX: f.flipX };
 }
 
-/** Validates author JSON; returns a list of problems (empty when fine). */
-export function validateAnim(def: unknown, sheets: Record<string, SheetDef>): string[] {
-  const problems: string[] = [];
-  const d = def as Partial<AnimDef>;
-  if (!d || typeof d !== "object") return ["animation must be an object"];
-  if (!d.sheet || typeof d.sheet !== "string") problems.push('"sheet" is required');
-  else if (!sheets[d.sheet]) problems.push(`sheet "${d.sheet}" is not defined (use Zelda: Define Sprite Sheet first)`);
-  const lists = Array.isArray(d.frames) ? [d.frames] : d.frames && typeof d.frames === "object" ? Object.values(d.frames) : [];
-  if (lists.length === 0) problems.push('"frames" must be a list or {down,up,left,right} lists');
-  for (const l of lists) if (!Array.isArray(l) || l.some((n) => typeof n !== "number" || n < 0 || !Number.isInteger(n))) problems.push("frame numbers must be whole numbers ≥ 0");
-  return problems;
-}

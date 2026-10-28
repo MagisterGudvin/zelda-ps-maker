@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createDefaultConfig, mergeConfig } from "../../src/core/config.ts";
 import { createRig } from "../helpers/fakeHost.ts";
-import { resolveNpc, resolvePosition, parseFlagValue } from "../../src/editor/paramResolvers.ts";
+import { assetId, resolveNpc, resolvePosition } from "../../src/editor/paramResolvers.ts";
 import { KeyboardInput, normalizeKey } from "../../src/host/keyboardInput.ts";
 import { FakeEmitter } from "../helpers/fakePhaser.ts";
 import { builtinSpriteIds, resolveTexture } from "../../src/host/textures.ts";
@@ -84,25 +84,21 @@ test("HUD model reflects hearts, magic, counters and the active item", () => {
   assert.equal(rig.host.hud.renders, renders, "no re-render when nothing changed");
 });
 
-test("param resolvers accept the plausible PS Maker shapes", () => {
+test("param resolvers read the values PS Maker 1.2.1 saves: { x, y }, an in-map NPC id, an asset id", () => {
   const cfg = createDefaultConfig();
   assert.deepEqual(resolvePosition({ x: 10, y: 20 }, cfg), { x: 10, y: 20 });
-  assert.deepEqual(resolvePosition([1, 2], cfg), { x: 1, y: 2 });
-  assert.deepEqual(resolvePosition("3, 4", cfg), { x: 3, y: 4 });
   assert.equal(resolvePosition(undefined, cfg), null);
-  assert.deepEqual(resolvePosition({ X: "60", Y: "64" }, cfg), { x: 60, y: 64 });
-  assert.deepEqual(resolvePosition({ value: { x: 5, y: 6 } }, cfg), { x: 5, y: 6 });
+  assert.equal(resolvePosition({ x: "1", y: 2 }, cfg), null, "not numbers");
   cfg.world.positionUnits = "tiles";
   assert.deepEqual(resolvePosition({ x: 2, y: 3 }, cfg), { x: 40, y: 56 });
-  const npc = { name: "guard_1", x: 5, y: 6, setVisible() {} };
-  const scene = { children: { list: [{ name: "other" }, npc] } };
-  assert.equal(resolveNpc("guard_1", scene), npc);
-  assert.equal(resolveNpc(npc, scene), npc);
-  assert.equal(resolveNpc({ id: "guard_1" }, scene), npc, "a reference object is resolved by any id-like key");
+  // GameMap.NPCs: the map's NPC sprites, each with its inGameCharacterId.
+  const npc = { inGameCharacterId: "in-game-character-1", x: 5, y: 6 };
+  const scene = { NPCs: [{ inGameCharacterId: "in-game-character-2" }, npc] };
+  assert.equal(resolveNpc("in-game-character-1", scene), npc);
   assert.equal(resolveNpc("missing", scene), null);
-  assert.equal(parseFlagValue("false"), false);
-  assert.equal(parseFlagValue("3"), 3);
-  assert.equal(parseFlagValue("open"), "open");
+  assert.equal(resolveNpc("in-game-character-1", {}), null, "no NPC list");
+  assert.equal(assetId("IMG1"), "IMG1");
+  assert.equal(assetId(undefined), "");
 });
 
 test("keyboard input latches taps between ticks and maps friendly key names", () => {

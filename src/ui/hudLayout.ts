@@ -88,10 +88,7 @@ export interface HudLayout {
   parts: Partial<Record<HudPart, Rect>>;
 }
 
-export const HEART_SIZE = 8;
 export const HEARTS_PER_ROW = 10;
-export const DIGIT_W = 6;
-export const DIGIT_H = 8;
 const PAD = 6;
 const COUNTER_GAP = 8;
 const LABEL_H = 7;
@@ -229,10 +226,6 @@ function metricsOf(m: Partial<HudMetrics> | undefined): HudMetrics {
     return v && v.w > 0 && v.h > 0 ? { w: Math.round(v.w), h: Math.round(v.h) } : DEFAULT_HUD_METRICS[k];
   };
   return { heart: pick("heart"), icon: pick("icon"), digit: pick("digit"), item: pick("item"), magic: pick("magic") };
-}
-
-export function intersects(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
 /** Digits a counter needs to show `max`. */

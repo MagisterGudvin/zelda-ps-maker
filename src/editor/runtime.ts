@@ -26,11 +26,10 @@ export function resetToolkitForTests(): void {
   instance = null;
 }
 
-/** Best-effort map id when the author did not set one (see docs: always set Map ID). */
+/** The map id when the author did not set one: the PS Maker map of the scene (GameMap.map.id). */
 export function deriveMapId(scene: any): string {
-  const candidates = [scene?.mapId, scene?.mapKey, scene?.currentMapId, scene?.map?.id, scene?.mapName, scene?.sys?.settings?.key];
-  for (const c of candidates) if (typeof c === "string" || typeof c === "number") return String(c);
-  return "map";
+  const id = scene?.map?.id;
+  return typeof id === "string" && id ? id : "map";
 }
 
 function hostOf(session: Session): PhaserHost | null {

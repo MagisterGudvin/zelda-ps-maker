@@ -81,6 +81,8 @@ export function createFakeScene() {
     },
     add: { image: make, graphics: make, text: make },
     children: { list: [] as any[] },
+    // GameMap.NPCs: the map's NPC sprites (each with its inGameCharacterId).
+    NPCs: [] as any[],
     physics: null,
   };
   const game: any = {

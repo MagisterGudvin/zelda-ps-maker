@@ -8,7 +8,7 @@ import { resolveTexture } from "./textures.ts";
 import { ensureProjectFont } from "./projectFonts.ts";
 import { getHud } from "./phaserHud.ts";
 import { SheetLibrary } from "./sheets.ts";
-import { findStory, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
+import { storyOfScene, sheetImage, type PsSheet, type PsStory } from "./psmakerAssets.ts";
 
 /**
  * The PS Maker plugin context, typed only as far as the toolkit uses it.
@@ -343,13 +343,10 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private readonly staticIndex = new SpatialHash<StaticBox>(64);
   private readonly staticPool: StaticBox[] = [];
   private staticCount = -1;
-  private tilemapLayers: any[] = [];
   private readonly candidates: StaticBox[] = [];
   /** Moving NPC bodies, refreshed every tick (they move). */
   private readonly npcBoxes: AABB[] = [];
   private npcCount = 0;
-  private story: { story: PsStory; where: string } | null | undefined;
-  private storyMissAt = 0;
   private frameListener: ((time: number, delta: number) => void) | null = null;
   private shutdownListener: (() => void) | null = null;
   private disposed = false;
@@ -768,28 +765,17 @@ export class PhaserHost implements HostAdapter, DepthSource {
 
   loadProjectFont(fontId: string): void {
     if (!fontId || !this.scene?.textures) return;
-    const story = this.psMakerStory()?.story ?? null;
+    const story = this.psMakerStory();
     void ensureProjectFont(story, this.scene.textures, fontId).then((family) => {
       if (!family) this.logger.warnOnce(`font-${fontId}`, `Font "${fontId}" could not be loaded by the toolkit; PS Maker loads it when it first shows its own text with it.`);
     });
   }
 
-  psMakerStory(): { story: PsStory; where: string } | null {
-    // A miss is retried at most once a second: the data may appear after the first look.
-    if (this.story || (this.story === null && Date.now() - this.storyMissAt < 1000)) return this.story;
-    const g = this.game;
-    const s = this.scene;
-    this.story = findStory([
-      { label: "cache.json", value: g?.cache?.json?.entries?.entries ?? g?.cache?.json?.entries },
-      { label: "registry", value: g?.registry?.list },
-      { label: "scene.data", value: s?.sys?.settings?.data },
-      { label: "scene", value: s },
-      { label: "game", value: g },
-    ]);
-    if (this.story) this.logger.info(`PS Maker project data found at ${this.story.where}.`);
-    else this.storyMissAt = Date.now();
-    return this.story;
+  /** The project data of the map scene (GameMap.story). */
+  psMakerStory(): PsStory | null {
+    return storyOfScene(this.scene);
   }
+
 
   /** PS Maker project variables (game.variables: get(id) → { type, value }, set(id, value)). */
   getVariable(id: string): string | number | boolean | undefined {
@@ -811,8 +797,8 @@ export class PhaserHost implements HostAdapter, DepthSource {
   }
 
   /** Columns of a PS Maker sheet's loaded texture (frame numbering follows the image width). */
-  psMakerSheetColumns(sheet: PsSheet, story: PsStory): number | null {
-    const key = this.psMakerSheetImage(sheet, story);
+  psMakerSheetColumns(sheet: PsSheet): number | null {
+    const key = this.psMakerSheetImage(sheet);
     const textures = this.scene?.textures;
     let width: unknown;
     try {
@@ -824,8 +810,8 @@ export class PhaserHost implements HostAdapter, DepthSource {
   }
 
   /** Texture key or URL of a PS Maker sheet (see psmakerAssets.sheetImage). */
-  psMakerSheetImage(sheet: PsSheet, story: PsStory): string | null {
-    return this.scene?.textures ? sheetImage(this.scene.textures, sheet, story) : null;
+  psMakerSheetImage(sheet: PsSheet): string | null {
+    return this.scene?.textures ? sheetImage(this.scene.textures, sheet) : null;
   }
 
   describe(): string[] {
@@ -836,8 +822,8 @@ export class PhaserHost implements HostAdapter, DepthSource {
     const lines = [
       `scene "${s?.sys?.settings?.key ?? "?"}"  camera scroll ${n(cam?.scrollX)},${n(cam?.scrollY)} zoom ${n(cam?.zoom)} view ${n(cam?.width)}x${n(cam?.height)}`,
       `player sprite ${n(p?.x)},${n(p?.y)} depth ${n(p?.depth)} size ${n(p?.displayWidth)}x${n(p?.displayHeight)} body ${p?.body ? `${n(p.body.x)},${n(p.body.y)} ${n(p.body.width)}x${n(p.body.height)}` : "none"}`,
-      ((ps) => (ps ? `PS Maker data: ${ps.where} (${ps.story.characters.length} characters, ${ps.story.spritesheetAnimations.length} sheets)` : "PS Maker data: not reachable (Character / PS Maker sheet fields unavailable)"))(this.psMakerStory()),
-      `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.tilemapLayers.length} tile layers, ${this.npcCount} NPC bodies`,
+      ((ps) => (ps ? `PS Maker data: scene.story (${ps.characters.length} characters, ${ps.spritesheetAnimations.length} sheets)` : "PS Maker data: none on the map scene (Character / PS Maker sheet fields unavailable)"))(this.psMakerStory()),
+      `depth mode ${this.cfg.world.depthMode}${this.cfg.world.depthMode === "auto" ? (this.ySorted ? " (y-sorted)" : " (player layer)") : ""}; map colliders: ${this.staticPool.length} static bodies, ${this.npcCount} NPC bodies`,
     ];
     return lines;
   }
@@ -899,13 +885,9 @@ export class PhaserHost implements HostAdapter, DepthSource {
       }
     }
     this.staticCount = statics ? (statics.size ?? statics.entries?.length ?? 0) : 0;
-    this.tilemapLayers = [];
-    if (this.cfg.world.useTilemapLayers) {
-      const children: any[] = this.scene?.children?.list ?? [];
-      for (const c of children) if (c && typeof c.getTilesWithinWorldXY === "function") this.tilemapLayers.push(c);
-    }
-    if (count === 0 && this.tilemapLayers.length === 0) {
-      this.logger.warnOnce("no-map-collision", "No Arcade static bodies or tilemap layers found: enemies and projectiles only collide with toolkit objects on this map.");
+    // PS Maker's map collisions are static Arcade bodies (GameMapCollision); its tiles never collide.
+    if (count === 0) {
+      this.logger.warnOnce("no-map-collision", "No Arcade static bodies found: enemies and projectiles only collide with toolkit objects on this map.");
     }
   }
 
@@ -923,11 +905,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
     c.length = 0;
     for (let i = 0; i < this.npcCount; i++) if (overlaps(this.npcBoxes[i], box)) return true;
-    for (const layer of this.tilemapLayers) {
-      if (!layer.active) continue;
-      const tiles = layer.getTilesWithinWorldXY(box.x - box.hw, box.y - box.hh, box.hw * 2, box.hh * 2, { isColliding: true });
-      if (tiles && tiles.length > 0) return true;
-    }
     return false;
   }
 
@@ -954,7 +931,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.hud?.setVisible(false);
     this.staticIndex.clear();
     this.staticPool.length = 0;
-    this.tilemapLayers = [];
     this.solidCollider?.destroy?.();
     for (const z of this.solidZones) z.destroy?.();
     this.solidZones.length = 0;

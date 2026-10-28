@@ -1,21 +1,18 @@
 import { defineEvent, type PluginContext, type PluginEvent } from "@ps-maker/plugin-api";
 import type { Session } from "../core/session.ts";
 import type { Toolkit } from "../core/toolkit.ts";
-import { parseJsonObject } from "../core/config.ts";
 import { DAMAGE_TYPES, type DamageType } from "../core/types.ts";
 import { makeDamage, isDamageable } from "../combat/combat.ts";
 import { spawnEnemy } from "../enemies/spawn.ts";
 import type { EnemyConfig } from "../enemies/templates.ts";
 import { Enemy } from "../enemies/enemy.ts";
-import { Interactable, type ObjectState } from "../interactions/interactable.ts";
+import { Interactable } from "../interactions/interactable.ts";
 import { createObject, placePickup } from "../interactions/spawnObject.ts";
 import type { ObjectConfig } from "../interactions/objectTypes.ts";
 import { createDataItem, type DataItemSpec } from "../items/builtinItems.ts";
 import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/health.ts";
-import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
-import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
-import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { HUD_ITEM_ICONS, HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
 import { styleFromLayout } from "../ui/messageBox.ts";
 import type { MessageKind } from "../core/events.ts";
@@ -23,9 +20,9 @@ import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
-import { animFromPick, characterFromParam, characterPlan, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
-import { type Facing, isFacing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import type { Facing } from "../core/math.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -64,44 +61,19 @@ function hashText(text: string): string {
   return (h >>> 0).toString(36);
 }
 
-function json<T>(s: Session, text: string, what: string): T | null {
-  const { value, error } = parseJsonValue(text);
-  if (error) {
-    s.logger.warn(`${what}: invalid JSON (${error}).`);
-    return null;
-  }
-  return (value ?? null) as T | null;
-}
-
-/**
- * Actions saved before 0.5.0 may still carry a JSON field that the form no longer
- * shows. It keeps working (so old projects do not silently change) and asks the
- * author to re-open the action.
- */
-function legacy<T>(s: Session, params: unknown, key: string, what: string): T | null {
-  const text = (params as Record<string, unknown>)[key];
-  if (typeof text !== "string" || !text.trim() || text.trim() === "[]") return null;
-  s.logger.warnOnce(`legacy-${what}-${key}`, `${what}: uses the old JSON field "${key}" — re-open the action in the editor and use the new fields.`);
-  return json<T>(s, text, `${what} ${key}`);
-}
-
-function asList<T>(v: T | T[] | null): T[] {
-  return v === null ? [] : Array.isArray(v) ? v : [v];
-}
-
 type PsHost = {
-  psMakerStory?(): { story: PsStory; where: string } | null;
-  psMakerSheetImage?(sheet: PsSheet, story: PsStory): string | null;
-  psMakerSheetColumns?(sheet: PsSheet, story: PsStory): number | null;
+  psMakerStory?(): PsStory | null;
+  psMakerSheetImage?(sheet: PsSheet): string | null;
+  psMakerSheetColumns?(sheet: PsSheet): number | null;
 };
 
-const columnsOf = (s: Session, story: PsStory) => (sheet: PsSheet) => (s.host as PsHost).psMakerSheetColumns?.(sheet, story) ?? null;
+const columnsOf = (s: Session) => (sheet: PsSheet) => (s.host as PsHost).psMakerSheetColumns?.(sheet) ?? null;
 
 /** PS Maker project data via the host, warning once when it is not reachable. */
 function psStory(s: Session, what: string): PsStory | null {
-  const found = (s.host as PsHost).psMakerStory?.() ?? null;
-  if (!found) s.logger.warnOnce("ps-story", `${what}: PS Maker project data is not reachable from the plugin, so PS Maker characters, animations and map objects cannot be used here; built-in sprites are shown.`);
-  return found?.story ?? null;
+  const story = (s.host as PsHost).psMakerStory?.() ?? null;
+  if (!story) s.logger.warnOnce("ps-story", `${what}: the map scene has no PS Maker project data (scene.story), so PS Maker characters, animations and map objects cannot be used here; built-in sprites are shown.`);
+  return story;
 }
 
 /**
@@ -138,12 +110,12 @@ function applyObjectLook(s: Session, overrides: Partial<ObjectConfig>, look: unk
   }
 }
 
-/** Registers PS Maker sheets as toolkit sheets (by texture key or URL). */
-function registerPsSheets(s: Session, tk: Toolkit, story: PsStory, sheets: Record<string, PsSheet>, what: string): void {
+/** Registers PS Maker sheets as toolkit sheets (by the texture PS Maker loaded). */
+function registerPsSheets(s: Session, tk: Toolkit, sheets: Record<string, PsSheet>, what: string): void {
   for (const [id, sheet] of Object.entries(sheets)) {
-    const image = (s.host as PsHost).psMakerSheetImage?.(sheet, story) ?? null;
+    const image = (s.host as PsHost).psMakerSheetImage?.(sheet) ?? null;
     if (!image) {
-      s.logger.warn(`${what}: the image of PS Maker sheet "${sheet.name}" (${sheet.src}) was not found among loaded textures.`);
+      s.logger.warn(`${what}: PS Maker sheet "${sheet.name}" (${sheet.src}) is not loaded (no texture "<animation id>frames").`);
       continue;
     }
     tk.configure({ sprites: { sheets: { [id]: toSheetDef(sheet, image) } } }, what);
@@ -177,8 +149,8 @@ function applyLook(s: Session, tk: Toolkit, value: unknown, overrides: Partial<E
     s.logger.warn(`${what}: could not match the chosen character (${describeParams(value)}) with the PS Maker library: ${story.characters.map((c) => c.name).join(", ")}.`);
     return;
   }
-  const plan = characterPlan(story, ch, columnsOf(s, story));
-  registerPsSheets(s, tk, story, plan.sheets, what);
+  const plan = characterPlan(story, ch, columnsOf(s));
+  registerPsSheets(s, tk, plan.sheets, what);
   tk.configure({ sprites: { animations: plan.animations } }, what);
   Object.assign(anims, plan.states);
   if (plan.hitbox) Object.assign(overrides, { width: plan.hitbox.width, height: plan.hitbox.height, spriteOffsetX: plan.hitbox.offsetX, spriteOffsetY: plan.hitbox.offsetY });
@@ -201,8 +173,8 @@ function idFor(s: Session, params: unknown, kind: string, x: number, y: number):
   return textOf((params as Record<string, unknown>).id) || autoId(s, kind, x, y);
 }
 
-/** The toolkit object at a point picked on the map (or saved by id in older versions). */
-function objectAtParam(s: Session, point: unknown, legacyId: unknown, what: string): Interactable | null {
+/** The toolkit object at a point picked on the map. */
+function objectAtParam(s: Session, point: unknown, what: string): Interactable | null {
   const p = pointOf(point);
   if (p) {
     const o = s.world.at("object", p.x, p.y);
@@ -210,7 +182,6 @@ function objectAtParam(s: Session, point: unknown, legacyId: unknown, what: stri
     s.logger.warn(`${what}: no toolkit object at ${Math.round(p.x)}, ${Math.round(p.y)}.`);
     return null;
   }
-  if (textOf(legacyId)) return objectById(s, textOf(legacyId), what);
   s.logger.warn(`${what}: pick the object on the map.`);
   return null;
 }
@@ -223,21 +194,21 @@ function psAnimation(s: Session, tk: Toolkit, picked: unknown, loop: boolean, wh
   const id = textOf(picked);
   if (!id || tk.config.sprites.animations[id]) return id;
   const story = psStory(s, what);
-  const found = story ? animFromPick(story, id, loop, columnsOf(s, story)) : null;
+  const found = story ? animFromPick(story, id, loop, columnsOf(s)) : null;
   if (!story || !found) {
     if (story) s.logger.warn(`${what}: PS Maker animation "${id}" not found.`);
     return "";
   }
-  registerPsSheets(s, tk, story, { [found.sheetKey]: found.sheet }, what);
+  registerPsSheets(s, tk, { [found.sheetKey]: found.sheet }, what);
   const animId = `ps_anim_${id}${loop ? "_loop" : ""}`;
   tk.configure({ sprites: { animations: { [animId]: found.anim } } }, what);
   return animId;
 }
 
-/** Keys from PS Maker's key picker ([{type:"key", key}] / project controls), or a legacy comma list. */
+/** Keys from PS Maker's key picker ([{type:"key", key}] / project controls). */
 function keysOf(s: Session, value: unknown): string[] {
-  if (!Array.isArray(value)) return listOf(value);
-  const story = (s.host as PsHost).psMakerStory?.()?.story as unknown as { controls?: { bindings?: Record<string, string[]>; custom?: { id: string; keys: string[] }[] } } | undefined;
+  if (!Array.isArray(value)) return [];
+  const story = (s.host as PsHost).psMakerStory?.() as unknown as { controls?: { bindings?: Record<string, string[]>; custom?: { id: string; keys: string[] }[] } } | undefined;
   const out: string[] = [];
   for (const b of value as { type?: string; key?: string; controlId?: string }[]) {
     if (b?.type === "key" && b.key) out.push(b.key);
@@ -246,31 +217,8 @@ function keysOf(s: Session, value: unknown): string[] {
   return out;
 }
 
-/** "walk=a, attack=b" or {"walk":"a"} → animation map; null when empty. */
-function parseAnimationMap(text: string): Record<string, string> | null {
-  const t = text.trim();
-  if (!t) return null;
-  if (t.startsWith("{")) {
-    const { value } = parseJsonValue(t);
-    return value && typeof value === "object" ? (value as Record<string, string>) : null;
-  }
-  const out: Record<string, string> = {};
-  for (const part of t.split(",")) {
-    const [k, v] = part.split("=").map((x) => x.trim());
-    if (k && v) out[k] = v;
-  }
-  return out;
-}
-
 function damageType(v: string): DamageType {
   return (DAMAGE_TYPES as readonly string[]).includes(v) ? (v as DamageType) : "script";
-}
-
-function objectById(s: Session, id: string, what: string): Interactable | null {
-  const e = s.world.get(id);
-  if (e instanceof Interactable) return e;
-  s.logger.warn(`${what}: object "${id}" not found on map "${s.mapId}".`);
-  return null;
 }
 
 // ---- lifecycle & configuration -------------------------------------------------------------
@@ -302,14 +250,9 @@ const startToolkit = defineEvent({
     tk.logger.info(`Start Toolkit ${describeParams(params)}`);
     try {
       const old = params as Record<string, unknown>;
-      // Before 0.5.0: a "preset" text field instead of the Difficulty number.
+      // 0.5.0–0.5.3 saved Difficulty as a number (projects still carry it).
       const d = old.difficulty;
-      const preset =
-        d === undefined
-          ? typeof old.preset === "string" && old.preset ? old.preset : "alttp"
-          : typeof d === "number"
-            ? (DIFFICULTY_PRESETS[Math.round(d)] ?? "alttp")
-            : textOf(d) || "alttp";
+      const preset = typeof d === "number" ? (DIFFICULTY_PRESETS[Math.round(d)] ?? "alttp") : textOf(d) || "alttp";
       tk.applyPreset(preset);
       // Only fields PS Maker actually passed: an action saved by an older version keeps
       // its difficulty preset values instead of being reset to these defaults.
@@ -332,12 +275,6 @@ const startToolkit = defineEvent({
         },
         "Start Toolkit",
       );
-      if (typeof old.config === "string" && old.config.trim()) {
-        tk.logger.warn('Start Toolkit: uses the old JSON field "config" — re-open the action in the editor and use the new fields.');
-        const { value, error } = parseJsonObject(old.config, "Start Toolkit config");
-        if (error) tk.logger.warn(error);
-        if (value) tk.configure(value, "Start Toolkit");
-      }
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
       if (has("progressVariable")) tk.progressVariable = textOf(old.progressVariable) || null;
       // The map is remembered by its PS Maker map id (scene key); a Map ID typed in older versions still wins.
@@ -427,9 +364,8 @@ const runActions = defineEvent({
         s.logger.warn('Run Actions: the "puzzles" feature is disabled.');
         return;
       }
-      const when = legacy<Record<string, unknown>>(s, params, "when", "Run Actions") ?? buildWhen(params);
-      const ok = s.rules.evaluate(when);
-      const actions = ok ? [...asList(legacy<RuleAction[]>(s, params, "then", "Run Actions")), ...buildThen(params)] : asList(legacy<RuleAction[]>(s, params, "else", "Run Actions"));
+      const ok = s.rules.evaluate(buildWhen(params));
+      const actions = ok ? buildThen(params) : [];
       if (ok && actions.length === 0) s.logger.warn("Run Actions: nothing to do — fill at least one action field (Open doors, Reveal, Set flag, Give item, Message, Spawn enemy).");
       if (actions.length) s.rules.execute(actions, "Run Actions");
     });
@@ -463,8 +399,7 @@ const changeObject = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Change Object", ctx, params, (s) => {
-      const old = params as Record<string, unknown>;
-      const o = objectAtParam(s, params.objectAt, old.id, "Change Object");
+      const o = objectAtParam(s, params.objectAt, "Change Object");
       if (!o) return;
       switch (textOf(params.operation).toLowerCase()) {
         case "open":
@@ -500,9 +435,6 @@ const changeObject = defineEvent({
         case "destroy":
           o.destroy();
           break;
-        case "state": // 0.5.x: any state name typed in a text field
-          if (textOf(old.state)) o.setState(textOf(old.state) as ObjectState);
-          break;
         default:
           s.logger.warn(`Change Object: unknown operation "${textOf(params.operation)}".`);
       }
@@ -520,13 +452,9 @@ const removeTarget = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Remove Target", ctx, params, (s) => {
-      const old = params as Record<string, unknown>;
       const group = textOf(params.group);
-      const targets = textOf(old.id)
-        ? [s.world.get(textOf(old.id))].filter(Boolean)
-        : group
-          ? s.world.list("enemy").filter((e) => e.group === group)
-          : [pointOf(params.objectAt) ? s.world.at("object", pointOf(params.objectAt)!.x, pointOf(params.objectAt)!.y) : null].filter(Boolean);
+      const at = pointOf(params.objectAt);
+      const targets = group ? s.world.list("enemy").filter((e) => e.group === group) : [at ? s.world.at("object", at.x, at.y) : null].filter(Boolean);
       if (targets.length === 0) s.logger.warn("Remove Target: nothing matches (choose a group or pick an object on the map).");
       for (const e of targets) {
         if (boolOr(params.defeat, true) && e instanceof Enemy) e.die();
@@ -547,18 +475,6 @@ const changePlayerStats = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Change Player Stats", ctx, params, (s, tk) => {
-      const old = params as Record<string, unknown>;
-      if (params.health === undefined && typeof old.stat === "string") {
-        // Before 0.5.0: Stat / Mode / Amount.
-        const stat = old.stat.trim().toLowerCase().replace(/[\s_-]/g, "");
-        const set = String(old.mode ?? "").trim().toLowerCase() === "set";
-        const amount = numOr(old.amount, 0);
-        if (stat === "maxhealth") setMaxHealth(tk, set ? amount : tk.state.player.maxHp + amount, true);
-        else if (stat === "magic") changeMagic(tk, set ? amount - tk.state.player.magic : amount);
-        else if (set) setHealth(tk, amount);
-        else changeHealth(tk, amount);
-        return;
-      }
       const set = boolOr(params.set, false);
       const maxHealth = numOr(params.maxHealth, 0);
       const health = numOr(params.health, 0);
@@ -582,7 +498,7 @@ const createEnemy = defineEvent({
   parameterDefs: {
     template: choice("Template", "Behaviour and stats; Custom enemy 1–6 are made with Zelda: Define Enemy. / Шаблон врага.", TEMPLATE_OPTIONS, "slime"),
     position: mapPos("Position", "Where to spawn: pick it on the map. Empty = next to the player. / Точка появления."),
-    character: npc("Look (PS Maker character)", "Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker."),
+    character: npc("Look (PS Maker character)", "Optional: pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker."),
     group: choice("Group", "Rules can wait until the whole group is defeated. / Группа врагов.", GROUP_OPTIONS, ""),
     ...STAT_FIELDS,
     walkAnimation: animation("Walk animation", "Optional: a PS Maker animation (any direction; the whole sheet is used); also used when standing. Overrides Look. / Анимация ходьбы."),
@@ -596,18 +512,17 @@ const createEnemy = defineEvent({
     run("Zelda: Create Enemy", ctx, params, (s, tk) => {
       const at = where(s, params.position, "Create Enemy");
       if (!at) return;
-      const overrides: Partial<EnemyConfig> = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Create Enemy") ?? {}) };
+      const overrides: Partial<EnemyConfig> = {};
       const anims: Record<string, string> = {};
       applyLook(s, tk, params.character, overrides, anims, "Create Enemy");
       Object.assign(overrides, enemyStats(params));
-      Object.assign(anims, parseAnimationMap(textOf((params as Record<string, unknown>).animations)) ?? {});
       for (const [state, picked, loop] of [["walk", params.walkAnimation, true], ["attack", params.attackAnimation, false], ["hurt", params.hurtAnimation, false], ["death", params.deathAnimation, false]] as const) {
         const id = psAnimation(s, tk, picked, loop, "Create Enemy");
         if (id) anims[state] = id;
       }
       if (Object.keys(anims).length) overrides.animations = { ...(overrides.animations ?? {}), ...anims } as EnemyConfig["animations"];
-      // Route: points clicked on the map, or marker ids typed in 0.5.x.
-      const route: unknown[] = pathOf(params.patrol).length ? pathOf(params.patrol) : listOf(params.patrol);
+      // Route: points clicked on the map.
+      const route = pathOf(params.patrol);
       if (route.length > 0) overrides.patrol = { ...(overrides.patrol ?? {}), mode: "path", points: route as EnemyConfig["patrol"]["points"] } as EnemyConfig["patrol"];
       const template = templateOf(params, "slime");
       spawnEnemy(s, template, at.x, at.y, { id: idFor(s, params, template, at.x, at.y), group: textOf(params.group), overrides });
@@ -628,12 +543,12 @@ const enemyFromNpc = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Enemy From NPC", ctx, params, (s) => {
-      const adopt = resolveNpc(params.npc, (s.host as { scene?: unknown }).scene ?? ctx.scene) ?? resolveNpc(params.npc, ctx.scene);
+      const adopt = resolveNpc(params.npc, (s.host as { scene?: unknown }).scene ?? ctx.scene);
       if (!adopt) {
         s.logger.warn(`Enemy From NPC: NPC ${JSON.stringify(params.npc)} was not found on this map.`);
         return;
       }
-      const overrides = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Enemy From NPC") ?? {}), ...enemyStats(params) };
+      const overrides = enemyStats(params);
       spawnEnemy(s, templateOf(params, "soldier"), adopt.x, adopt.y, { id: idFor(s, params, "npc_enemy", adopt.x, adopt.y), group: textOf(params.group), overrides, adopt });
     });
   },
@@ -662,10 +577,7 @@ const createObjectAction = defineEvent({
     run("Zelda: Create Object", ctx, params, (s) => {
       const at = where(s, params.position, "Create Object");
       if (!at) return;
-      const old = params as Record<string, unknown>;
-      const overrides: Partial<ObjectConfig> = legacy<Partial<ObjectConfig>>(s, params, "config", "Create Object") ?? {};
-      const sprite = resolveImage(params.sprite);
-      if (sprite) overrides.sprite = overrides.sprite ?? sprite;
+      const overrides: Partial<ObjectConfig> = {};
       applyObjectLook(s, overrides, params.look, params.lookUsed, "Create Object", numOr(params.width, 0) > 0 || numOr(params.height, 0) > 0);
       if (boolOr(params.hidden, false)) overrides.hidden = true;
       if (boolOr(params.staysOn, false)) {
@@ -677,9 +589,8 @@ const createObjectAction = defineEvent({
       if (textOf(params.text)) overrides.message = textOf(params.text);
       const tools = multiOf(params.reactsTo).map(damageType);
       if (tools.length) overrides.tools = tools;
-      if (textOf(old.setFlag)) overrides.setFlag = textOf(old.setFlag); // 0.5.x
-      const onUse = buildThen({ openDoorAt: params.openDoorAt, revealAt: params.revealAt, turnOnVariable: params.turnOnVariable, openDoors: old.openDoors, reveal: old.reveal });
-      if (onUse.length) overrides.onActivate = [...(overrides.onActivate ?? []), ...onUse];
+      const onUse = buildThen({ openDoorAt: params.openDoorAt, revealAt: params.revealAt, turnOnVariable: params.turnOnVariable });
+      if (onUse.length) overrides.onActivate = onUse;
       const type = textOf(params.type) || "bush";
       createObject(s, type, at.x, at.y, { id: idFor(s, params, type, at.x, at.y), overrides });
     });
@@ -725,18 +636,7 @@ const createDoor = defineEvent({
     run("Zelda: Create Door", ctx, params, (s) => {
       const at = where(s, params.position, "Create Door");
       if (!at) return;
-      const old = params as Record<string, unknown>;
-      // 0.5.0–0.5.3 saved three checkboxes instead of the Lock dropdown.
-      const lock =
-        typeof old.lock === "string" && ["none", "small_key", "big_key", "switch"].includes(old.lock)
-          ? old.lock
-          : boolOr(old.bySwitch, false)
-            ? "switch"
-            : boolOr(old.bigKey, false)
-              ? "big_key"
-              : boolOr(old.smallKey, true)
-                ? "small_key"
-                : "none";
+      const lock = ["none", "small_key", "big_key", "switch"].includes(textOf(params.lock)) ? textOf(params.lock) : "small_key";
       const overrides: Partial<ObjectConfig> = { lock: lock as ObjectConfig["lock"], startOpen: boolOr(params.startOpen, false) };
       if (numOr(params.width, 0) > 0) overrides.width = numOr(params.width, 0);
       if (numOr(params.height, 0) > 0) overrides.height = numOr(params.height, 0);
@@ -782,19 +682,14 @@ const damageTarget = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Damage Target", ctx, params, (s) => {
-      const old = params as Record<string, unknown>;
       const type = damageType(textOf(params.damageType));
       const amount = numOr(params.amount, 1);
-      if (boolOr(params.player, false) || old.id === "player") {
+      if (boolOr(params.player, false)) {
         s.player.applyDamage(amount, { type, sourceId: "script", originX: s.player.box.x, originY: s.player.box.y, knockback: 0 });
         return;
       }
       const at = pointOf(params.objectAt);
-      const targets = textOf(old.id)
-        ? [s.world.get(textOf(old.id))]
-        : textOf(params.group)
-          ? s.world.list("enemy").filter((e) => e.group === textOf(params.group))
-          : [at ? s.world.at("object", at.x, at.y) : null];
+      const targets = textOf(params.group) ? s.world.list("enemy").filter((e) => e.group === textOf(params.group)) : [at ? s.world.at("object", at.x, at.y) : null];
       let hit = 0;
       for (const e of targets) {
         if (!e || !isDamageable(e)) continue;
@@ -823,18 +718,15 @@ const addRule = defineEvent({
         return;
       }
       // A rule is remembered (Once) by what it says, so no id has to be typed.
-      const id = textOf((params as Record<string, unknown>).id) || `rule_${hashText(JSON.stringify([buildWhen(params), buildThen(params)]))}`;
-      const when = legacy<Record<string, unknown>>(s, params, "when", `Rule ${id}`) ?? buildWhen(params);
-      const then = [...asList(legacy<RuleAction[]>(s, params, "then", `Rule ${id}`)), ...buildThen(params)];
+      const when = buildWhen(params);
+      const then = buildThen(params);
+      const id = `rule_${hashText(JSON.stringify([when, then]))}`;
       if (Object.keys(when).length === 0) {
         s.logger.warn(`Add Rule: no condition — fill at least one When field.`);
         return;
       }
       if (then.length === 0) s.logger.warn(`Add Rule: no actions — fill at least one action field.`);
-      const spec: RuleSpec = { id, when, then, once: boolOr(params.once, true) };
-      const otherwise = legacy<RuleAction[]>(s, params, "else", `Rule ${id}`);
-      if (otherwise) spec.else = asList(otherwise);
-      s.rules.addRule(spec);
+      s.rules.addRule({ id, when, then, once: boolOr(params.once, true) });
     });
   },
 });
@@ -850,18 +742,15 @@ const switchSequence = defineEvent({
   execute(params, ctx) {
     run("Zelda: Create Switch Sequence", ctx, params, (s) => {
       if (!s.rules) return;
-      const old = params as Record<string, unknown>;
       const points = pathOf(params.order);
-      const switches = points.length
-        ? points.map((p) => s.world.at("object", p.x, p.y, 12, (e) => e instanceof Interactable && e.cfg.type !== "block")?.id ?? "").filter(Boolean)
-        : listOf(old.switches); // 0.5.x: ids typed as text
+      const switches = points.map((p) => s.world.at("object", p.x, p.y, 12, (e) => e instanceof Interactable && e.cfg.type !== "block")?.id ?? "").filter(Boolean);
       if (points.length && switches.length < points.length) s.logger.warn(`Create Switch Sequence: ${points.length - switches.length} of the clicked points have no switch — put this action after the switches.`);
       if (switches.length === 0) return;
       s.rules.addSequence({
-        id: textOf(old.id) || `sequence_${switches.join("_")}`,
+        id: `sequence_${switches.join("_")}`,
         switches,
         resetOnWrong: boolOr(params.resetOnWrong, true),
-        onSolved: [...asList(legacy<RuleAction[]>(s, params, "onSolved", "Switch Sequence")), ...buildThen(params)],
+        onSolved: buildThen(params),
       });
     });
   },
@@ -905,34 +794,20 @@ const setPlayerSprites = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Set Player Sprites", ctx, params, (s, tk) => {
-      const old = params as Record<string, unknown>;
-      const behind: Facing[] =
-        params.behindUp === undefined && typeof old.weaponBehind === "string"
-          ? listOf(old.weaponBehind).filter((x): x is Facing => isFacing(x))
-          : (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
+      const behind: Facing[] = (["up", "down", "left", "right"] as const).filter((d) => boolOr(params[`behind${d[0].toUpperCase()}${d.slice(1)}` as "behindUp"], d === "up"));
       const pick = (v: unknown) => psAnimation(s, tk, v, false, "Set Player Sprites");
       const loop = (v: unknown) => psAnimation(s, tk, v, true, "Set Player Sprites");
-      // 0.5.2 checkbox (sheets found by name) and 0.6.0 attackAnimation / hurtAnimation fields.
-      const auto: Record<string, string> = {};
-      if (boolOr(old.usePsMaker, false)) {
-        const story = psStory(s, "Set Player Sprites");
-        for (const [slot, f] of Object.entries(story ? playerAutoAnims(story, columnsOf(s, story)) : {})) {
-          registerPsSheets(s, tk, story!, { [f.sheetKey]: f.sheet }, "Set Player Sprites");
-          tk.configure({ sprites: { animations: { [`ps_player_${slot}`]: f.anim } } }, "Set Player Sprites");
-          auto[slot] = `ps_player_${slot}`;
-        }
-      }
       tk.configure(
         {
           player: {
             sprites: {
-              attack: pick(params.attack) || pick(old.attackAnimation) || auto.attack || "",
+              attack: pick(params.attack),
               weaponAttack: pick(params.weaponAttack),
               spin: pick(params.spin),
               weaponSpin: pick(params.weaponSpin),
               charge: pick(params.charge),
               weaponCharge: pick(params.weaponCharge),
-              hurt: pick(params.hurt) || pick(old.hurtAnimation) || auto.hurt || "",
+              hurt: pick(params.hurt),
               // Ongoing states loop while they last; one-shot actions play once and hold the last frame.
               chargeWalk: loop(params.chargeWalk),
               shield: loop(params.shield),
@@ -975,8 +850,7 @@ const setSound = defineEvent({
         s.logger.warn(`Set Sound: unknown moment "${params.moment}" (${SOUND_EVENTS.join(", ")}).`);
         return;
       }
-      const scene = (s.host as { scene?: { cache?: { audio?: { exists(k: string): boolean } } } }).scene;
-      const src = textOf((params as Record<string, unknown>).soundKey) || pickAudioSource(params.sound, (k) => !!scene?.cache?.audio?.exists(k));
+      const src = textOf((params as Record<string, unknown>).soundKey) || assetId(params.sound);
       tk.configure({ audio: { sounds: { [params.moment]: { src, volume: Number.isFinite(params.volume) ? params.volume : 1 } } } }, "Set Sound");
       if (!src) s.logger.info(`Set Sound: "${params.moment}" has no sound now.`);
     });
@@ -995,24 +869,20 @@ const waveRoom = defineEvent({
   execute(params, ctx) {
     run("Zelda: Create Wave Room", ctx, params, (s) => {
       if (!s.dungeons) return;
-      const old = params as Record<string, unknown>;
-      const extra = legacy<Partial<WaveRoomSpec>>(s, params, "advanced", "Create Wave Room") ?? {};
-      const onCleared = [...asList(legacy<RuleAction[]>(s, params, "onCleared", "Create Wave Room")), ...buildThen(params)];
       const area = areaOf(params.area);
-      if (!area && !textOf(old.id)) {
+      if (!area) {
         s.logger.warn("Create Wave Room: draw the room area on the map.");
         return;
       }
-      const atOnce = boolOr(params.startAtOnce, false) || boolOr(old.autoStart, false);
+      const onCleared = buildThen(params);
+      const atOnce = boolOr(params.startAtOnce, false);
       s.dungeons.addWaveRoom({
-        ...extra,
-        id: textOf(old.id) || extra.id || `room@${Math.round(area!.x)},${Math.round(area!.y)}`,
-        area: area ?? undefined,
+        id: `room@${Math.round(area.x)},${Math.round(area.y)}`,
+        area,
         autoStart: atOnce,
-        startOnEnter: !!area && !atOnce,
-        delayMs: params.delayMs === undefined ? extra.delayMs : Math.max(0, numOr(params.delayMs, 800)),
-        lockDoors: listOf(old.lockDoors).length ? listOf(old.lockDoors) : extra.lockDoors,
-        onCleared: onCleared.length ? onCleared : extra.onCleared,
+        startOnEnter: !atOnce,
+        delayMs: Math.max(0, numOr(params.delayMs, 800)),
+        onCleared: onCleared.length ? onCleared : undefined,
       });
     });
   },
@@ -1035,12 +905,9 @@ const addWaveEnemy = defineEvent({
         s.logger.warn("Add Wave Enemy: pick the spawn point on the map.");
         return;
       }
-      const old = params as Record<string, unknown>;
-      const overrides = { ...(legacy<Partial<EnemyConfig>>(s, params, "overrides", "Add Wave Enemy") ?? {}), ...enemyStats(params) };
+      const overrides = enemyStats(params);
       const wave = Math.max(1, Math.round(numOr(params.wave, 1)));
-      const spawn = { template: templateOf(params, "slime"), x: p.x, y: p.y, overrides: Object.keys(overrides).length ? overrides : undefined };
-      if (textOf(old.roomId)) s.dungeons.addWaveSpawn(textOf(old.roomId), wave, spawn); // 0.5.x: room id typed as text
-      else s.dungeons.addWaveSpawnAt(wave, spawn);
+      s.dungeons.addWaveSpawnAt(wave, { template: templateOf(params, "slime"), x: p.x, y: p.y, overrides: Object.keys(overrides).length ? overrides : undefined });
     });
   },
 });
@@ -1363,26 +1230,23 @@ const defineItem = defineEvent({
     give: bool("Give now", "Also give the item to the player.", false),
   },
   execute(params, ctx) {
-    run("Zelda: Define Item", ctx, params, (s, tk) => {
-      let spec = legacy<DataItemSpec>(s, params, "json", "Define Item");
-      if (!spec) {
-        const id = textOf((params as Record<string, unknown>).id) || textOf(params.slot) || "custom_item_1";
-        const damage = numOr(params.damage, 0);
-        const heal = numOr(params.heal, 0);
-        const type = damageType(textOf(params.damageType) || "magic");
-        const stunMs = Math.max(0, numOr(params.stunMs, 0));
-        spec = {
-          id,
-          name: textOf(params.name) || id,
-          icon: resolveImage(params.icon) || undefined,
-          resource: textOf(params.resource) || undefined,
-          cost: Math.max(0, numOr(params.cost, 1)),
-          effect: heal > 0 ? "heal" : damage > 0 ? (boolOr(params.area, false) ? "area" : "projectile") : "none",
-          amount: heal,
-          projectile: { damage, damageType: type, stunMs },
-          area: { damage, damageType: type, stunMs },
-        };
-      }
+    run("Zelda: Define Item", ctx, params, (_s, tk) => {
+      const id = textOf(params.slot) || "custom_item_1";
+      const damage = numOr(params.damage, 0);
+      const heal = numOr(params.heal, 0);
+      const type = damageType(textOf(params.damageType) || "magic");
+      const stunMs = Math.max(0, numOr(params.stunMs, 0));
+      const spec: DataItemSpec = {
+        id,
+        name: textOf(params.name) || id,
+        icon: assetId(params.icon) || undefined,
+        resource: textOf(params.resource) || undefined,
+        cost: Math.max(0, numOr(params.cost, 1)),
+        effect: heal > 0 ? "heal" : damage > 0 ? (boolOr(params.area, false) ? "area" : "projectile") : "none",
+        amount: heal,
+        projectile: { damage, damageType: type, stunMs },
+        area: { damage, damageType: type, stunMs },
+      };
       tk.items.register(createDataItem(spec));
       if (boolOr(params.give, false)) tk.inventory.give(spec.id, 1, { silent: true });
     });
@@ -1404,9 +1268,8 @@ const defineEnemy = defineEvent({
   },
   execute(params, ctx) {
     run("Zelda: Define Enemy", ctx, params, (s, tk) => {
-      const name = textOf((params as Record<string, unknown>).name) || textOf(params.slot) || "custom_enemy_1";
-      const old = legacy<Partial<EnemyConfig> & { extends?: string }>(s, params, "json", "Define Enemy");
-      const t: Partial<EnemyConfig> & { extends?: string } = old ?? { extends: textOf(params.basedOn) || "soldier" };
+      const name = textOf(params.slot) || "custom_enemy_1";
+      const t: Partial<EnemyConfig> & { extends?: string } = { extends: textOf(params.basedOn) || "soldier" };
       const anims: Record<string, string> = {};
       applyLook(s, tk, params.look, t, anims, "Define Enemy");
       if (Object.keys(anims).length) t.animations = anims as EnemyConfig["animations"];

@@ -51,7 +51,7 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
 
   action("Zelda: Create Enemy").execute({ template: "slime", position: { x: 140, y: 100 }, id: "e1", group: "g" }, ctx);
   action("Zelda: Create Chest").execute({ id: "c1", position: { x: 100, y: 80 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }, ctx);
-  action("Zelda: Add Rule").execute({ id: "r", whenDefeated: "g", setFlag: "won", once: true }, ctx);
+  action("Zelda: Add Rule").execute({ whenGroup: "g", giveItem: "rupees", giveCount: 7, once: true }, ctx);
   action("Zelda: Give Item").execute({ item: "bow", count: 1, silent: true }, ctx);
   assert.equal(tk.session!.world.count("enemy"), 1);
 
@@ -74,9 +74,9 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   f.events.emit("postupdate", 0, 16.6667);
   f.keyboard.emit("keyup", { code: "KeyX" });
   for (let i = 0; i < 30; i++) f.events.emit("postupdate", 0, 16.6667);
-  action("Zelda: Remove Target").execute({ id: "e1", group: "", defeat: true }, ctx);
+  action("Zelda: Remove Target").execute({ group: "g", defeat: true }, ctx);
   f.events.emit("postupdate", 0, 16.6667);
-  assert.equal(tk.state.flags.won, true);
+  assert.equal(tk.inventory.count("rupees"), 7, "the rule ran when the group was beaten");
 
   // Map closes.
   const busBefore = tk.bus.listenerCount();

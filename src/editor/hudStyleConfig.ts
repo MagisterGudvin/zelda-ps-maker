@@ -1,6 +1,6 @@
 import type { ToolkitConfig } from "../core/config.ts";
 import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
-import { resolveImage } from "./paramResolvers.ts";
+import { assetId } from "./paramResolvers.ts";
 import type { HudPart } from "../ui/hudLayout.ts";
 
 /** Slots of Zelda: HUD Style, in form order (config.ui.skin). */
@@ -41,8 +41,8 @@ const text = (v: unknown) => (typeof v === "string" ? v : "");
  */
 export function hudStyleConfig(p: Record<string, unknown>, story: PsStory | null): Partial<ToolkitConfig["ui"]> {
   const skin: Record<string, string> = {};
-  for (const slot of HUD_SKIN_SLOTS) skin[slot] = resolveImage(p[slot]);
-  for (const [field, item] of HUD_ITEM_ICONS) skin[`item_${item}`] = resolveImage(p[field]);
+  for (const slot of HUD_SKIN_SLOTS) skin[slot] = assetId(p[slot]);
+  for (const [field, item] of HUD_ITEM_ICONS) skin[`item_${item}`] = assetId(p[field]);
   // An action saved before 0.18 has no parts: everything stays on.
   const parts = new Set(Array.isArray(p.parts) ? (p.parts as string[]) : HUD_PART_OPTIONS.map(([v]) => v));
   const places: Record<string, { x: number; y: number }> = {};

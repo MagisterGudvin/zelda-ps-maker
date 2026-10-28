@@ -3,7 +3,8 @@ import { HudPainter } from "../host/hudPainter.ts";
 import type { HudModel } from "../host/types.ts";
 import type { PsStory } from "../host/psmakerAssets.ts";
 import { I18n } from "../ui/i18n.ts";
-import { digitsFor, HUD_PARTS, type HudPart, type Rect } from "../ui/hudLayout.ts";
+import { HUD_PARTS, type HudPart, type Rect } from "../ui/hudLayout.ts";
+import { hudCounter } from "../ui/hud.ts";
 import { HUD_PART_LABELS, hudStyleConfig } from "./hudStyleConfig.ts";
 
 /**
@@ -34,7 +35,6 @@ const LISTS = [
   ["initialActions", "__map_start__"],
   ["enterActions", "__map_enter__"],
 ] as const;
-const COUNTER_ICONS: Record<string, string> = { rupees: "hud_rupee", bombs: "hud_bomb", arrows: "hud_arrow", keys: "hud_key" };
 const DEPTH = 1_000_100;
 
 export interface HudPreviewSetup {
@@ -84,10 +84,7 @@ export function hudPreviewSetup(map: MapLike, story: (PsStory & Raw) | null, cam
     showMagic: ui.showMagic && sp.magicBar !== false,
     showItem: ui.showActiveItem,
     activeItem: null,
-    counters: ui.counters.map((id) => {
-      const max = id === "keys" ? 9 : (cfg.inventory.capacities[id] ?? 99);
-      return { id, label: id, icon: COUNTER_ICONS[id] ?? `icon_${id}`, value: 0, digits: Math.min(4, digitsFor(max === 9999 ? 99 : max)) };
-    }),
+    counters: ui.counters.map((id) => hudCounter(id, id, 0, cfg.inventory.capacities[id] ?? 99)),
     messages: [],
     inventoryOpen: false,
     inventoryTitle: "",

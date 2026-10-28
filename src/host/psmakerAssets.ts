@@ -73,73 +73,17 @@ export function isStory(v: unknown): v is PsStory {
 }
 
 /**
- * Breadth-first search for the project data from a few roots. Bounded in depth
- * and node count; DOM nodes, typed arrays and functions are skipped.
+ * The project data of a map scene: GameMap.init keeps it as `scene.story` (also in the scene's
+ * settings data), in the game and in the editor alike (docs/ENGINE_AUDIT.md, section 11).
  */
-export function findStory(roots: { label: string; value: unknown }[], maxDepth = 4, maxNodes = 4000): { story: PsStory; where: string } | null {
-  const seen = new Set<unknown>();
-  const queue: { v: unknown; path: string; depth: number }[] = roots.map((r) => ({ v: r.value, path: r.label, depth: 0 }));
-  let visited = 0;
-  while (queue.length > 0 && visited < maxNodes) {
-    const { v, path, depth } = queue.shift()!;
-    if (!v || typeof v !== "object" || seen.has(v)) continue;
-    seen.add(v);
-    visited++;
-    if (isStory(v)) return { story: v, where: path };
-    if (depth >= maxDepth || ArrayBuffer.isView(v) || (typeof (v as { nodeType?: unknown }).nodeType === "number")) continue;
-    if (v instanceof Map) {
-      for (const [k, child] of v) queue.push({ v: child, path: `${path}.${String(k)}`, depth: depth + 1 });
-      continue;
-    }
-    if (Array.isArray(v)) {
-      for (let i = 0; i < Math.min(v.length, 50); i++) queue.push({ v: v[i], path: `${path}[${i}]`, depth: depth + 1 });
-      continue;
-    }
-    let keys: string[];
-    try {
-      keys = Object.keys(v);
-    } catch {
-      continue;
-    }
-    for (const k of keys.slice(0, 200)) {
-      let child: unknown;
-      try {
-        child = (v as Record<string, unknown>)[k];
-      } catch {
-        continue;
-      }
-      if (child && typeof child === "object") queue.push({ v: child, path: `${path}.${k}`, depth: depth + 1 });
-    }
-  }
+export function storyOfScene(scene: any): PsStory | null {
+  for (const v of [scene?.story, scene?.sys?.settings?.data?.story]) if (isStory(v)) return v;
   return null;
 }
 
-const norm = (s: string) => s.trim().toLowerCase();
-
-export function findCharacter(story: PsStory, name: string): PsCharacter | null {
-  const n = norm(name);
-  return story.characters.find((c) => norm(c.name) === n || norm(c.key ?? "") === n || c.id === name) ?? null;
-}
-
-/**
- * Character chosen in an `npc` field ("Select NPC" dropdown). The value PS Maker
- * passes is not documented: an id, a name, an object carrying one of them, or a
- * spawned game object are accepted.
- */
+/** The character picked in an `npc` field: PS Maker saves its id in the library. */
 export function characterFromParam(story: PsStory, value: unknown): PsCharacter | null {
-  if (value === null || value === undefined || value === "") return null;
-  if (typeof value === "string" || typeof value === "number") return findCharacter(story, String(value));
-  if (typeof value !== "object") return null;
-  const o = value as Record<string, unknown> & { texture?: { key?: unknown }; getData?: (k: string) => unknown };
-  const candidates: unknown[] = [o.characterId, o.npcId, o.assetId, o.npcAssetId, o.id, o.key, o.name, o.texture?.key];
-  if (typeof o.getData === "function") for (const k of ["characterId", "npcId", "assetId", "id"]) candidates.push(o.getData(k));
-  for (const c of [o.character, o.npc, o.asset, o.value]) if (c && typeof c === "object") candidates.push((c as Record<string, unknown>).id, (c as Record<string, unknown>).name);
-  for (const c of candidates) {
-    if (typeof c !== "string" && typeof c !== "number") continue;
-    const ch = findCharacter(story, String(c));
-    if (ch) return ch;
-  }
-  return null;
+  return typeof value === "string" && value ? (story.characters.find((c) => c.id === value) ?? null) : null;
 }
 
 function defaultSet(sets: PsAnimationSet[] | undefined, id: string | undefined): PsAnimationSet | null {
@@ -296,20 +240,6 @@ export function characterPlan(story: PsStory, character: PsCharacter, columnsOf?
   return plan;
 }
 
-/** A player sheet by name (e.g. "Sword Attack") as a directional animation. */
-export function playerSheetAnim(story: PsStory, name: string, loop = false, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
-  const sheet = sheetsOf(story, { type: "player" }).find((s) => norm(s.name) === norm(name));
-  return sheet ? playerAnimOf(story, sheet, loop, columnsOf) : null;
-}
-
-/**
- * The sheet holding an animation picked in a "player-animation-picker" field (one
- * row, e.g. Sword Attack facing down) as a directional animation over all its rows.
- */
-export function playerAnimFromPick(story: PsStory, animationId: unknown, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } | null {
-  return animFromPick(story, animationId, false, columnsOf);
-}
-
 /**
  * Any picked PS Maker animation ("animation" / "player-animation-picker" fields) as a
  * directional animation over its whole sheet, with the row order of the sheet's owner
@@ -324,27 +254,6 @@ export function animFromPick(story: PsStory, animationId: unknown, loop: boolean
   const anim: AnimDef = { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set), columnsOf), loop };
   if (loop) anim.fps = sheet.frameRate || 8;
   return { sheetKey: sheetId(sheet), sheet, anim };
-}
-
-function playerAnimOf(story: PsStory, sheet: PsSheet, loop: boolean, columnsOf?: ColumnsOf): { sheetKey: string; sheet: PsSheet; anim: AnimDef } {
-  const set = defaultSet(story.player?.animationSets, story.player?.defaultAnimationSetId);
-  return { sheetKey: sheetId(sheet), sheet, anim: { sheet: sheetId(sheet), frames: directionalFrames(sheet, directionRows(story, set), columnsOf), loop } };
-}
-
-/**
- * The player's attack and hurt sheets found by name ("Sword Attack", "Sword Hurt").
- * The hurt sheet of the same set as the attack wins ("Sword Hurt" over "Unarmed Hurt").
- */
-export function playerAutoAnims(story: PsStory, columnsOf?: ColumnsOf): Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> {
-  const sheets = sheetsOf(story, { type: "player" });
-  const out: Partial<Record<"attack" | "hurt", { sheetKey: string; sheet: PsSheet; anim: AnimDef }>> = {};
-  const attack = sheetForState(sheets, "attack");
-  if (attack) out.attack = playerAnimOf(story, attack, false, columnsOf);
-  const prefix = attack ? norm(attack.name).split(/\s+/)[0] : "";
-  const hurts = sheets.filter((s) => STATE_WORDS.hurt.test(s.name));
-  const hurt = hurts.find((s) => prefix && norm(s.name).startsWith(prefix)) ?? sheetForState(sheets, "hurt");
-  if (hurt) out.hurt = playerAnimOf(story, hurt, false, columnsOf);
-  return out;
 }
 
 /** Names of sheets a character (or the player) owns, for messages. */
@@ -364,36 +273,12 @@ interface TextureManagerLike {
 }
 
 /**
- * Texture key PS Maker loaded a sheet under, or a URL to load it from. PS Maker 1.2.1
- * uses "<animationId>frames" (StoryAnimations/loadAnimations.ts); the sheet id, its file
- * name, any key containing either, or a texture whose image URL ends with the file
- * name are accepted too. As a last resort the URL is built from the folder
- * of another loaded project image.
+ * Texture key of a PS Maker sheet: PS Maker 1.2.1 loads every animation (one row of a sheet) of the
+ * project as a whole-sheet texture "<animationId>frames" before the first map
+ * (StoryAnimations/loadAnimations.ts).
  */
-export function sheetImage(textures: TextureManagerLike, sheet: PsSheet, story: PsStory): string | null {
-  // PS Maker 1.2.1 loads every animation (one row) as a whole-sheet texture "<animationId>frames".
+export function sheetImage(textures: TextureManagerLike, sheet: PsSheet): string | null {
   for (const a of sheet.animations) if (textures.exists(`${a.id}frames`)) return `${a.id}frames`;
-  const base = sheet.src.replace(/\.[a-z0-9]+$/i, "");
-  for (const k of [sheet.id, sheet.src, base]) if (k && textures.exists(k)) return k;
-  const keys = textures.getTextureKeys?.() ?? [];
-  const byName = keys.find((k) => k.includes(sheet.id) || k.includes(base));
-  if (byName) return byName;
-  const srcOf = (k: string) => {
-    try {
-      return textures.get?.(k)?.source?.[0]?.image?.src ?? "";
-    } catch {
-      return "";
-    }
-  };
-  const byUrl = keys.find((k) => srcOf(k).endsWith(sheet.src));
-  if (byUrl) return byUrl;
-  // Folder of any other project image that is loaded.
-  const known = story.spritesheetAnimations.map((s) => s.src);
-  for (const k of keys) {
-    const url = srcOf(k);
-    const hit = known.find((src) => src && url.endsWith(src));
-    if (hit) return url.slice(0, url.length - hit.length) + sheet.src;
-  }
   return null;
 }
 

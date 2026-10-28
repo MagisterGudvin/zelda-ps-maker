@@ -41,6 +41,8 @@ class GameMap extends Phaser.Scene {
   constructor(mapId) {
     super(mapId);
     this.mapId = mapId;
+    // As GameMap.init: the PS Maker map of this scene (the toolkit takes its id as the map id).
+    this.map = { id: mapId };
   }
 
   init() {
@@ -91,6 +93,8 @@ class GameMap extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, map.size.w, map.size.h);
     this.physics.add.collider(this.player, this.walls);
 
+    // As GameMap: NPC sprites in NPCs, each with the inGameCharacterId an "in-map-npc" field saves.
+    this.NPCs = [];
     for (const n of map.npcs) {
       makeTexture(this, `npc_${n.name}`, 14, 16, (c) => {
         c.fillStyle = n.color;
@@ -100,6 +104,8 @@ class GameMap extends Phaser.Scene {
       });
       const npc = this.physics.add.staticSprite(n.x, n.y, `npc_${n.name}`);
       npc.name = n.name;
+      npc.inGameCharacterId = n.name;
+      this.NPCs.push(npc);
     }
 
     this.cursors = this.input.keyboard.createCursorKeys();

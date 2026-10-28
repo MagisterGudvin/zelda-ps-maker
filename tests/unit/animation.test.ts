@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { animFrame, framesFor, validateAnim } from "../../src/core/animation.ts";
+import { animFrame, framesFor } from "../../src/core/animation.ts";
 import { createRig, type TestRig } from "../helpers/fakeHost.ts";
 import { spawnEnemy } from "../../src/enemies/spawn.ts";
 import type { FakeView } from "../helpers/fakeHost.ts";
@@ -17,7 +17,6 @@ test("frames per direction, left mirrored from right, stretch and fps timing", (
   assert.equal(animFrame(def, "down", 399, 400)!.frame, 3);
   assert.equal(animFrame(def, "down", 5000, 400)!.frame, 3, "non-looping holds the last frame");
   assert.equal(animFrame({ ...def, fps: 10, loop: true }, "down", 450)!.frame, 0, "loops at 10 fps");
-  assert.deepEqual(validateAnim({ sheet: "nope", frames: [1, -1] }, SHEETS), ['sheet "nope" is not defined (use Zelda: Define Sprite Sheet first)', "frame numbers must be whole numbers ≥ 0"]);
 });
 
 function faceRight(rig: TestRig): void {

@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.20.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.21.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
@@ -112,7 +112,7 @@ Spawns an enemy from a template: slime, soldier, spitter, knight, sentry, ogre o
 |---|---|---|---|
 | `template` (Template) | string-enum | `"slime"` | Behaviour and stats; Custom enemy 1–6 are made with Zelda: Define Enemy. / Шаблон врага. Варианты: slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
 | `position` (Position) | map-position | — | Where to spawn: pick it on the map. Empty = next to the player. / Точка появления. |
-| `character` (Look (PS Maker character)) | npc | — | Optional (experimental): pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker. |
+| `character` (Look (PS Maker character)) | npc | — | Optional: pick a character from your library, e.g. Slime. Its animations (Run/Walk, Idle, Attack, Hurt, Death) and collision box are used; it does not have to be on the map. / Внешний вид — персонаж PS Maker. |
 | `group` (Group) | string-enum | `""` | Rules can wait until the whole group is defeated. / Группа врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
 | `hp` (Health) | number | `0` | Hit points; 0 = template value. / Здоровье (0 — как в шаблоне). |
 | `damage` (Damage) | number | `0` | Damage to the player; 0 = template value. / Урон (0 — как в шаблоне). |

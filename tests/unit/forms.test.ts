@@ -87,16 +87,16 @@ test("dropdowns: difficulty, door lock; Position is a map picker", async () => {
   done();
 });
 
-test("Start Toolkit saved by an older version keeps its preset values", async () => {
-  const { tk, done } = await setup({ preset: "casual", config: "" });
+test("Start Toolkit saved by 0.5 (Difficulty as a number, no Hearts) keeps its preset values", async () => {
+  const { tk, done } = await setup({ difficulty: 1 });
   assert.equal(tk.config.player.maxHealth, 10, "casual health is not reset by the new Hearts default");
   assert.equal(tk.config.shield.mode, "passive");
   done();
 });
 
-test("Set Controls: PS Maker key picker (and older comma lists)", async () => {
+test("Set Controls: PS Maker key picker", async () => {
   const { run, tk, done } = await setup({});
-  run("Zelda: Set Controls", { sword: [{ type: "key", key: "Space" }, { type: "key", key: "KeyJ" }], useItem: [], inventory: "Tab" });
+  run("Zelda: Set Controls", { sword: [{ type: "key", key: "Space" }, { type: "key", key: "KeyJ" }], useItem: [], inventory: [{ type: "key", key: "Tab" }] });
   assert.deepEqual(tk.config.controls.sword, ["Space", "KeyJ"]);
   assert.deepEqual(tk.config.controls.inventory, ["Tab"]);
   assert.deepEqual(tk.config.controls.useItem, ["KeyC"], "empty = keep");

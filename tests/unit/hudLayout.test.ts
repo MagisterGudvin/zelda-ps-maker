@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeHudLayout, intersects, type Rect } from "../../src/ui/hudLayout.ts";
+import { computeHudLayout, type Rect } from "../../src/ui/hudLayout.ts";
+
+const intersects = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 const SCREENS = [
   [256, 224],

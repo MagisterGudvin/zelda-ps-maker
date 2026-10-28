@@ -33,7 +33,6 @@
     "positionUnits": "pixels",
     "tileSize": 16,
     "useArcadeStaticBodies": true,
-    "useTilemapLayers": true,
     "npcsBlock": true,
     "depthMode": "auto",
     "depthBase": 0,

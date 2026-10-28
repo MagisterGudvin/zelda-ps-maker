@@ -383,7 +383,7 @@ await check("PS Maker project data: a character's sheets and collision box shape
   });
   assert(r.frame && r.frame.startsWith("zmt_32x32_"), `enemy frame ${r.frame}`);
   assert(r.w === 12, `hitbox width ${r.w}`);
-  assert(/scene\.data/.test(r.diag), r.diag);
+  assert(/PS Maker data: scene\.story \(/.test(r.diag), r.diag);
   return `${r.frame}, ${r.diag}, search ${r.searchMs} ms`;
 });
 

@@ -1,7 +1,7 @@
 import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { isObjectType, resolveObjectConfig } from "../interactions/objectTypes.ts";
 import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
-import { characterFromParam, findStory, isStory, mapObjectLook, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
+import { characterFromParam, mapObjectLook, storyOfScene, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
 import { HudPreview, hudPreviewSetup, placeFieldValues, writeFormNumbers } from "./hudPreview.ts";
 import type { HudPart } from "../ui/hudLayout.ts";
 import { areaOf, fillDialogLayoutOptions, fillFontOptions, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
@@ -266,7 +266,7 @@ export function startEditorPreview(win: any = globalThis): void {
   /** A HUD part dropped on the map: its place goes into the HUD Style form (opened if needed). */
   const dropHudPart = (part: HudPart, x: number, y: number) => {
     const scene = hud?.scene;
-    const setup = scene ? hudPreviewSetup(scene.map, storyOf(scene), Number(scene.CAMERA_ZOOM) || 0) : null;
+    const setup = scene ? hudPreviewSetup(scene.map, storyOfScene(scene), Number(scene.CAMERA_ZOOM) || 0) : null;
     if (!scene || !setup?.style) return;
     const values = placeFieldValues(part, x, y);
     if (writeFormNumbers(win.document, "Zelda: HUD Style", values)) return;
@@ -297,13 +297,13 @@ export function startEditorPreview(win: any = globalThis): void {
     const opened = /\/maps\/[^/]+\/([^/?#]+)/.exec(win.location?.pathname ?? "")?.[1];
     if (opened && decodeURIComponent(opened) !== selected && zeldaActions(scene.map).some(({ action }) => action.id === decodeURIComponent(opened))) select(decodeURIComponent(opened));
     // The "Look (map object)" dropdowns list this project's map objects.
-    fillMapObjectOptions(storyOf(scene)?.mapObjects);
-    fillFontOptions(storyOf(scene)?.gameUI?.fonts);
-    fillDialogLayoutOptions(storyOf(scene)?.gameUI?.dialogLayouts as { id: string; name: string }[] | undefined);
+    fillMapObjectOptions(storyOfScene(scene)?.mapObjects);
+    fillFontOptions(storyOfScene(scene)?.gameUI?.fonts);
+    fillDialogLayoutOptions(storyOfScene(scene)?.gameUI?.dialogLayouts as { id: string; name: string }[] | undefined);
     const sig = signature(scene.map);
     if (!overlay || overlay.scene !== scene || overlay.sig !== sig) {
       clear();
-      overlay = draw(scene, sig, previewItems(scene.map, storyOf(scene)), onClick);
+      overlay = draw(scene, sig, previewItems(scene.map, storyOfScene(scene)), onClick);
       outline(overlay, selected);
     }
     overlay.collisions.setVisible(editorShowsCollisions(scene));
@@ -313,7 +313,7 @@ export function startEditorPreview(win: any = globalThis): void {
       hud = null;
     }
     hud ??= new HudPreview(scene, dropHudPart);
-    hud.update(hudPreviewSetup(scene.map, storyOf(scene), Number(scene.CAMERA_ZOOM) || 0));
+    hud.update(hudPreviewSetup(scene.map, storyOfScene(scene), Number(scene.CAMERA_ZOOM) || 0));
   };
   const timer = win.setInterval(() => {
     try {
@@ -334,14 +334,6 @@ export function startEditorPreview(win: any = globalThis): void {
 function signature(map: MapLike): string {
   const npcs = [map.setupActions, map.initialActions].flatMap((l) => l ?? []).filter((a) => a?.type === "spawnNPCAction");
   return JSON.stringify([map.id, zeldaActions(map).map(({ action: a, root }) => [a.id, root, a.actionName, a.pluginParams]), npcs.map((a) => [a.inGameCharacterId, a.position])]);
-}
-
-function storyOf(scene: any): PsStory | null {
-  if (isStory(scene.story)) return scene.story;
-  return findStory([
-    { label: "scene.data", value: scene.sys?.settings?.data },
-    { label: "scene", value: scene },
-  ])?.story ?? null;
 }
 
 /** The editor's collision toggle, read from its own collision boxes (shown or hidden together). */
@@ -420,7 +412,7 @@ function outline(o: Overlay, id: string): void {
 function draw(scene: any, sig: string, items: PreviewItem[], onClick: (ref: ActionRef) => void): Overlay {
   const objects: any[] = [];
   const bounds = new Map<string, { x: number; y: number; w: number; h: number }[]>();
-  const story = storyOf(scene);
+  const story = storyOfScene(scene);
   const clickable = (obj: any, ref: ActionRef | undefined, b: { x: number; y: number; w: number; h: number }) => {
     if (!ref) return;
     bounds.set(ref.id, [...(bounds.get(ref.id) ?? []), b]);

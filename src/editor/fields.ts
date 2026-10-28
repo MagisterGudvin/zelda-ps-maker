@@ -89,9 +89,9 @@ export function areaOf(v: unknown): { x: number; y: number; width: number; heigh
   return [x, y, w, h].every(Number.isFinite) && w > 0 && h > 0 ? { x: x - w / 2, y: y - h / 2, width: w, height: h } : null;
 }
 
-/** Options of a multi-select (or a legacy comma list). */
+/** Options of a multi-select ("string-enum-multi" saves a list). */
 export function multiOf(v: unknown): string[] {
-  return Array.isArray(v) ? v.map(String).filter(Boolean) : listOf(v);
+  return Array.isArray(v) ? v.map(String).filter(Boolean) : [];
 }
 
 // ---- option lists -------------------------------------------------------------------------
@@ -140,9 +140,9 @@ export const DUNGEON_OPTIONS = [["", "Overworld (no dungeon)"], ...[1, 2, 3, 4, 
 
 export const SLOT_OPTIONS = [["default", "Slot 1"], ["2", "Slot 2"], ["3", "Slot 3"]] as const;
 
-/** Template dropdown (an older saved "Custom template" name still wins). */
+/** Template dropdown. */
 export function templateOf(p: Record<string, unknown>, fallback: string): string {
-  return textOf(p.customTemplate) || textOf(p.template) || fallback;
+  return textOf(p.template) || fallback;
 }
 
 // ---- reading values -------------------------------------------------------------------------
@@ -164,13 +164,6 @@ export function boolOr(v: unknown, fallback: boolean): boolean {
 
 export function textOf(v: unknown): string {
   return typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "";
-}
-
-export function listOf(v: unknown): string[] {
-  return textOf(v)
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
 }
 
 // ---- shared field groups ------------------------------------------------------------------
@@ -213,16 +206,13 @@ export const SPRITE_FIELDS = {
 
 export function buildWhen(p: Record<string, unknown>): Condition {
   const when: Condition = {};
-  const group = textOf(p.whenGroup) || textOf(p.whenDefeated);
+  const group = textOf(p.whenGroup);
   if (group) when.enemiesDefeated = group;
   const points = [pointOf(p.whenObjectAt), pointOf(p.whenObjectAt2)].filter(Boolean);
   if (points.length) when.objectActiveAt = points;
   if (textOf(p.whenVariable)) when.variableOn = textOf(p.whenVariable);
   if (textOf(p.whenItem)) when.hasItem = textOf(p.whenItem);
   if (boolOr(p.whenBoss, false)) when.bossDefeated = true;
-  // Fields saved by 0.5.x (ids and flag names typed as text).
-  if (listOf(p.whenActive).length) when.objectActive = listOf(p.whenActive);
-  if (textOf(p.whenFlag)) when.flag = textOf(p.whenFlag);
   return when;
 }
 
@@ -236,11 +226,7 @@ export function buildThen(p: Record<string, unknown>): RuleAction[] {
   if (textOf(p.giveItem)) then.push({ giveItem: { item: textOf(p.giveItem), count: Math.max(1, Math.round(numOr(p.giveCount, 1))) } });
   if (textOf(p.message)) then.push({ message: textOf(p.message) });
   const spawnAt = pointOf(p.spawnAt);
-  if (textOf(p.spawnEnemy)) then.push({ spawnEnemy: spawnAt ? { template: textOf(p.spawnEnemy), x: spawnAt.x, y: spawnAt.y } : { template: textOf(p.spawnEnemy), at: textOf(p.spawnAt) } });
-  // Fields saved by 0.5.x.
-  if (listOf(p.openDoors).length) then.push({ openDoor: listOf(p.openDoors) });
-  if (listOf(p.reveal).length) then.push({ reveal: listOf(p.reveal) });
-  if (textOf(p.setFlag)) then.push({ setFlag: textOf(p.setFlag) });
+  if (textOf(p.spawnEnemy)) then.push({ spawnEnemy: spawnAt ? { template: textOf(p.spawnEnemy), x: spawnAt.x, y: spawnAt.y } : { template: textOf(p.spawnEnemy), at: "" } });
   return then;
 }
 
