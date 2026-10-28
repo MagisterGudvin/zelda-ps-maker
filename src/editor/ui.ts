@@ -336,9 +336,15 @@ export const ACTION_UI: Record<string, ActionUi> = {
     collapsed: ["Counters", "Item and magic", "Bar and text"],
     preview: (p) => join(["heartFull", "rupees", "digits", "itemBox", "magicFrame", "bar"].filter((k) => set(p[k])).map((k) => k.replace(/[A-Z].*/, ""))) || "built-in pictures",
   },
+  "Zelda: Message Style": {
+    keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign", "typewriter"],
+    fields: { position: { ui: "radio" } },
+    preview: (p, show) => join([set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
+  },
   "Zelda: Show Message": {
     keywords: ["message", "text", "toast", "notification", "say"],
     fields: { durationMs: { min: 0, step: 100 } },
+    visible: { durationMs: (p) => p.box !== true },
     preview: (p) => (set(p.text) ? `"${String(p.text).slice(0, 40)}"` : undefined),
   },
   "Zelda: Set Respawn Point": {

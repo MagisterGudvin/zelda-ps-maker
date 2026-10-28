@@ -140,7 +140,7 @@ export class InteractionSystem implements SessionSystem {
     const s = this.s;
     const need = obj.cfg.liftRequires;
     if (need && !s.toolkit.inventory.owns(need)) {
-      s.bus.emit("zelda:message", { text: s.i18n.t("msg.too_heavy"), durationMs: 1200 });
+      s.bus.emit("zelda:message", { text: s.i18n.t("msg.too_heavy"), durationMs: 1200, kind: "hint" });
       return;
     }
     this.carried = obj;

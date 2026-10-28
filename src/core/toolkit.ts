@@ -11,6 +11,7 @@ import { registerBuiltinItems } from "../items/builtinItems.ts";
 import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { RuleRegistry } from "../puzzles/ruleRegistry.ts";
 import { SaveManager, type SaveStorage, createBrowserStorage } from "../save/save.ts";
+import type { MessageBoxSettings } from "../ui/messageBox.ts";
 
 export interface ToolkitOptions {
   storage?: SaveStorage | null;
@@ -42,6 +43,8 @@ export class Toolkit {
    * the toolkit's progress too.
    */
   progressVariable: string | null = null;
+  /** Dialogue box for toolkit messages (Zelda: Message Style); null = short HUD notes. */
+  messageBox: MessageBoxSettings | null = null;
   private progressWritten: string | null = null;
   /** Executed editor actions by name (shown by the diagnostics panel). */
   readonly actionCounts = new Map<string, number>();

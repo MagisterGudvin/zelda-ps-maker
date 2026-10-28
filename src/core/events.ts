@@ -6,6 +6,13 @@ import type { Facing } from "./math.ts";
  * Every event the toolkit emits. Names follow `zelda:<subsystem>:<verb>`.
  * Authors can also emit their own `zelda:custom:<name>` events from rules.
  */
+/**
+ * What a toolkit message is about (Zelda: Message Style picks which kinds go into the dialogue
+ * box): a sign or an object's text, an item received, a hint (locked, need an item), a short note
+ * (saved, rupees), or "box" (Show Message with "In a dialogue box").
+ */
+export type MessageKind = "sign" | "item" | "hint" | "info" | "box";
+
 export interface ZeldaEventMap {
   "zelda:toolkit:started": { mapId: string };
   "zelda:toolkit:stopped": { mapId: string; reason: string };
@@ -51,7 +58,7 @@ export interface ZeldaEventMap {
   "zelda:wave:cleared": { roomId: string };
   "zelda:dungeon:entered": { dungeonId: string };
   "zelda:dungeon:completed": { dungeonId: string };
-  "zelda:message": { text: string; durationMs: number };
+  "zelda:message": { text: string; durationMs: number; kind?: MessageKind };
   "zelda:inventory:toggled": { open: boolean };
   "zelda:save:written": { slot: string };
   "zelda:save:loaded": { slot: string };

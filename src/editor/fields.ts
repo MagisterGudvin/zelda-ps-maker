@@ -288,6 +288,14 @@ export function fillFontOptions(fonts: readonly { id: string; name: string }[] |
   return fillOptions(FONT_OPTIONS, fonts);
 }
 
+/** Dialogue layouts of the project (gameUI.dialogLayouts); "" = the project's default layout. */
+export const DIALOG_LAYOUT_OPTIONS: { label: string; value: string }[] = [{ label: "Default layout", value: "" }];
+export const dialogLayoutField = (label: string, description: string) =>
+  ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: DIALOG_LAYOUT_OPTIONS }) as unknown as ReturnType<typeof str>;
+export function fillDialogLayoutOptions(layouts: readonly { id: string; name: string }[] | undefined): boolean {
+  return fillOptions(DIALOG_LAYOUT_OPTIONS, layouts);
+}
+
 /**
  * PS Maker 1.2.1 has no parameter type for these project lists, so the dropdown's options are
  * filled in place from the open project (the registry keeps the action definitions by reference).

@@ -144,6 +144,34 @@ export interface HudItemSlot {
   selected: boolean;
 }
 
+/** Look of the toolkit's dialogue box, in the game's logical UI pixels (from a PS Maker dialogue layout). */
+export interface MessageBoxStyle {
+  logicalW: number;
+  logicalH: number;
+  width: number;
+  height: number;
+  /** Distance from the screen edge. */
+  gap: number;
+  padding: { top: number; right: number; bottom: number; left: number };
+  background:
+    | { type: "plain"; color: string; opacity: number; borderColor: string; borderWidth: number; borderRadius: number }
+    | { type: "image"; imageId: string; opacity: number; mode: "nine-slice" | "stretch" | "fit"; slice: { top: number; right: number; bottom: number; left: number }; borderWidth: number };
+  text: { fontFamily: string; size: number; color: string; lineHeight: number; strokeWidth: number; strokeColor: string; align: "left" | "center" | "right" };
+  /** Characters per second. */
+  typingSpeed: number;
+  caretColor: string;
+}
+
+export interface MessageBoxModel {
+  text: string;
+  /** Characters typed so far. */
+  shown: number;
+  /** All typed, waiting for the action key (the caret blinks). */
+  waiting: boolean;
+  position: "bottom" | "top";
+  style: MessageBoxStyle;
+}
+
 export interface HudModel {
   visible: boolean;
   hp: number;
@@ -171,6 +199,8 @@ export interface HudModel {
   barSlice: number;
   showLifeLabel: boolean;
   textColor: string;
+  /** The open dialogue box (Zelda: Message Style), or null. */
+  box: MessageBoxModel | null;
 }
 
 /** Sheet shown full-screen with frame numbers (Zelda: Preview Sprite Sheet). */

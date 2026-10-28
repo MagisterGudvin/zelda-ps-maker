@@ -71,7 +71,7 @@ export class ItemSystem implements SessionSystem {
     if (this.cooldowns.has(itemId)) return this.fail(itemId, "cooldown");
     const cost = resolveNumber(def.cost, s, 0);
     if (!options.free && def.resource && cost > 0 && !inv.has(def.resource, cost)) {
-      s.bus.emit("zelda:message", { text: s.i18n.t("msg.no_resource", { resource: inv.displayName(def.resource) }), durationMs: 1200 });
+      s.bus.emit("zelda:message", { text: s.i18n.t("msg.no_resource", { resource: inv.displayName(def.resource) }), durationMs: 1200, kind: "hint" });
       return this.fail(itemId, "noResource");
     }
     const max = resolveNumber(def.maxActive, s, 0);

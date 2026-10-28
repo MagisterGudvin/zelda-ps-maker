@@ -127,7 +127,7 @@ export class Inventory {
     if (!options.silent && (applied > 0 || id === "heart_container")) {
       const name = this.displayName(id);
       const text = n > 1 ? tk.i18n.t("msg.got_item_count", { item: name, count: n }) : tk.i18n.t("msg.got_item", { item: name });
-      tk.bus.emit("zelda:message", { text, durationMs: tk.config.ui.messageMs });
+      tk.bus.emit("zelda:message", { text, durationMs: tk.config.ui.messageMs, kind: this.isResource(id) ? "info" : "item" });
     }
     if (tk.config.save.autoSave && !SPECIAL.has(id) && !this.isResource(id)) tk.saves.autoSave("item");
     return applied;

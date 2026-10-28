@@ -21,6 +21,7 @@ export class HudSystem {
   readonly name = "hud";
   private readonly s: Session;
   private dirty = true;
+  private boxWasOpen = false;
   private readonly messages: { text: string; remainingMs: number }[] = [];
   private readonly offAny: () => void;
   private readonly offMsg: () => void;
@@ -31,6 +32,7 @@ export class HudSystem {
       this.dirty = true;
     });
     this.offMsg = session.bus.on("zelda:message", (m) => {
+      if (this.s.messageBox?.accepts(m.kind)) return;
       this.messages.push({ text: m.text, remainingMs: m.durationMs });
       while (this.messages.length > MAX_MESSAGES) this.messages.shift();
     });
@@ -44,11 +46,12 @@ export class HudSystem {
   tick(dtMs: number): void {
     const hud = this.s.host.hud;
     if (!hud) return;
-    if (this.messages.length > 0) {
+    if (this.messages.length > 0 || this.s.messageBox?.isOpen || this.boxWasOpen) {
       for (const m of this.messages) m.remainingMs -= dtMs;
       while (this.messages.length > 0 && this.messages[0].remainingMs <= 0) this.messages.shift();
       this.dirty = true;
     }
+    this.boxWasOpen = !!this.s.messageBox?.isOpen;
     if (!this.dirty) return;
     this.dirty = false;
     hud.render(this.buildModel());
@@ -110,6 +113,7 @@ export class HudSystem {
       barSlice: ui.barSlice,
       showLifeLabel: ui.showLifeLabel,
       textColor: ui.textColor,
+      box: s.messageBox?.model() ?? null,
     };
   }
 

@@ -16,13 +16,15 @@ import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { styleFromLayout } from "../ui/messageBox.ts";
+import type { MessageKind } from "../core/events.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, fontFamilyCss, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -1155,12 +1157,50 @@ const hudStyle = defineEvent({
   },
 });
 
+const MESSAGE_KINDS = [["sign", "Signs and object texts"], ["item", "Item received (chests, big items)"], ["hint", "Hints (locked, need an item, too heavy)"], ["info", "Short notes (saved, rupees and other pickups)"]] as const;
+
+const messageStyle = defineEvent({
+  name: "Zelda: Message Style",
+  description: "Shows toolkit messages (signs, \"You got...\") in a dialogue box drawn like a dialogue layout of your project (Game UI → Dialogue layouts: background colour or picture, font, size), typed letter by letter and closed with the action key. Put it after Start Toolkit. / Окно сообщений Toolkit в стиле диалога PS Maker.",
+  parameterDefs: {
+    layout: dialogLayoutField("Dialogue layout", "Which dialogue layout of the project the box looks like. / Макет диалога PS Maker."),
+    kinds: { ...multi("Messages in the box", "Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне.", MESSAGE_KINDS), defaultValue: ["sign", "item"] },
+    typing: bool("Type letter by letter", "At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам.", true),
+    waitForKey: bool("Wait for the action key", "The box stays until the player presses the action key; off: it closes by itself. / Ждать клавишу.", true),
+    pause: bool("Pause the game", "Enemies and the player wait while the box is open. / Пауза, пока открыто окно.", true),
+    position: choice("Position", "Where the box is shown. / Где показывать.", [["bottom", "Bottom"], ["top", "Top"]], "bottom"),
+  },
+  execute(params, ctx) {
+    run("Zelda: Message Style", ctx, params, (s, tk) => {
+      const p = params as Record<string, unknown>;
+      const story = psStory(s, "Message Style");
+      const raw = Array.isArray(p.kinds) ? p.kinds : ["sign", "item"];
+      const kinds = raw.filter((k): k is MessageKind => typeof k === "string" && MESSAGE_KINDS.some(([v]) => v === k));
+      const layout = textOf(p.layout);
+      const layouts = (story?.gameUI?.dialogLayouts ?? []) as { id?: string }[];
+      if (layout && !layouts.some((l) => l?.id === layout)) s.logger.warn(`Message Style: dialogue layout "${layout}" is not in the project; the default one is used.`);
+      tk.messageBox = {
+        kinds,
+        typing: boolOr(p.typing, true),
+        waitForKey: boolOr(p.waitForKey, true),
+        pause: boolOr(p.pause, true),
+        position: textOf(p.position) === "top" ? "top" : "bottom",
+        style: styleFromLayout(story, layout),
+      };
+    });
+  },
+});
+
 const showMessage = defineEvent({
   name: "Zelda: Show Message",
-  description: "Shows a short HUD message (not a PS Maker dialogue box). / Короткое сообщение в HUD.",
-  parameterDefs: { text: str("Text", "Message to show. / Текст сообщения.", ""), durationMs: num("Duration (ms)", "How long it stays: 1000 = one second. / Сколько показывать.", 2200) },
+  description: "Shows a toolkit message: a short HUD note, or the toolkit's dialogue box (see Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.",
+  parameterDefs: {
+    text: str("Text", "Message to show. / Текст сообщения.", ""),
+    durationMs: num("Duration (ms)", "How long a short note stays: 1000 = one second. / Сколько показывать.", 2200),
+    box: bool("In a dialogue box", "Show it in the toolkit's dialogue box (typed out, closed with the action key), styled by Message Style. / В окне диалога.", false),
+  },
   execute(params, ctx) {
-    run("Zelda: Show Message", ctx, params, (s) => s.bus.emit("zelda:message", { text: s.i18n.text(params.text), durationMs: params.durationMs }));
+    run("Zelda: Show Message", ctx, params, (s) => s.bus.emit("zelda:message", { text: s.i18n.text(params.text), durationMs: params.durationMs, ...(boolOr(params.box, false) ? { kind: "box" as const } : {}) }));
   },
 });
 
@@ -1379,6 +1419,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   changePlayerStats,
   setAbility,
   showMessage,
+  messageStyle,
   hudStyle,
   linkVariable,
   setRespawn,

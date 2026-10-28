@@ -481,6 +481,66 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
   return `${r.hearts} hearts, digits ${r.digits}, bar ${r.bar}`;
 });
 
+await check("Message Style: a sign's text in a box drawn like a PS Maker dialogue layout (9-slice picture), typed, closed with Z", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    const c = document.createElement("canvas");
+    c.width = 24;
+    c.height = 24;
+    const g = c.getContext("2d");
+    g.fillStyle = "#6b4a2a";
+    g.fillRect(0, 0, 24, 24);
+    g.fillStyle = "#f0e0b0";
+    g.fillRect(6, 6, 12, 12);
+    scene.textures.addCanvas("IMG_PANEL", c);
+    const data = scene.sys.settings.data ?? (scene.sys.settings.data = {});
+    // The project data object stays the same in PS Maker (the toolkit keeps a reference to it).
+    data.story = Object.assign(data.story ?? { characters: [], spritesheetAnimations: [] }, {
+      gameConfig: { width: 1280, height: 720 },
+      gameUI: {
+        fonts: [],
+        defaultDialogLayoutId: "wood",
+        dialogLayouts: [{ id: "wood", name: "Wood", bottomGap: 14, typingSpeed: 60, textBox: { width: 896, height: 220, padding: { top: 24, right: 30, bottom: 24, left: 30 }, background: { type: "image", imageId: "IMG_PANEL", backgroundOpacity: 100, scalingMode: "nine-slice", borderWidth: 24, slice: { top: 6, right: 6, bottom: 6, left: 6 } }, textStyles: { fontFamily: "serif", fontAssetId: null, fontSize: 44, lineHeightPercent: 120, color: "#3a2a1a", textAlign: "left" } } }],
+      },
+    });
+    H.run("Zelda: Message Style", { layout: "", kinds: ["sign", "item"] });
+    H.run("Zelda: Show Message", { text: "It's dangerous to go alone! Take this.", box: true });
+    await new Promise((ok) => setTimeout(ok, 200));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const texts = () => hud.children.list.filter((o) => o.type === "Text" && o.visible && o.depth === 16);
+    const early = texts()[0]?.text ?? "";
+    const pics = hud.children.list.filter((o) => o.visible && o.texture?.key === "IMG_PANEL").length;
+    const paused = window.ZeldaMakerToolkit.session.isPaused("message");
+    const press = async () => {
+      scene.input.keyboard.emit("keydown", { code: "KeyZ", timeStamp: performance.now() });
+      await new Promise((ok) => setTimeout(ok, 60));
+      scene.input.keyboard.emit("keyup", { code: "KeyZ", timeStamp: performance.now() });
+      await new Promise((ok) => setTimeout(ok, 120));
+    };
+    await press();
+    const full = texts()[0]?.text ?? "";
+    return { early, full, pics, paused, press: true };
+  });
+  await page.screenshot({ path: `${ARTIFACTS}message-box.png` });
+  const closed = await ev(async () => {
+    const scene = window.__harness.scene();
+    scene.input.keyboard.emit("keydown", { code: "KeyZ", timeStamp: performance.now() });
+    await new Promise((ok) => setTimeout(ok, 60));
+    scene.input.keyboard.emit("keyup", { code: "KeyZ", timeStamp: performance.now() });
+    await new Promise((ok) => setTimeout(ok, 150));
+    const hud = window.__harness.game.scene.getScene("ZeldaMakerToolkitHUD");
+    return { open: hud.children.list.some((o) => o.type === "Text" && o.visible && o.depth === 16), paused: window.ZeldaMakerToolkit.session.isPaused("message") };
+  });
+  await ev(() => (window.ZeldaMakerToolkit.toolkit.messageBox = null));
+  assert(r.paused, "the game waits while the box is open");
+  assert(r.pics === 9, `9-slice picture: ${r.pics} pieces`);
+  assert(r.early.length > 0 && r.early.replace(/\n/g, " ").length < 38, `typing: "${r.early}"`);
+  assert(r.full.replace(/\n/g, " ") === "It's dangerous to go alone! Take this.", `Z shows all: "${r.full}"`);
+  assert(!closed.open && !closed.paused, `Z again closes: ${JSON.stringify(closed)}`);
+  return `typed "${r.early.replace(/\n/g, " ")}" → all, 9 picture pieces`;
+});
+
 await check("no page errors or console errors", async () => {
   assert(pageErrors.length === 0, pageErrors.join("\n"));
   assert(consoleErrors.length === 0, consoleErrors.join("\n"));

@@ -186,7 +186,7 @@ export class Interactable extends Entity implements Damageable {
     if (activated) {
       if (cfg.setFlag) this.writeFlag(cfg.setFlag, true);
       if (cfg.emit) s.bus.emit(`zelda:custom:${cfg.emit}`, { objectId: this.id });
-      if (cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(cfg.message), durationMs: s.config.ui.messageMs });
+      if (cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(cfg.message), durationMs: s.config.ui.messageMs, kind: "sign" });
     } else if (cfg.setFlag && cfg.toggle) {
       this.writeFlag(cfg.setFlag, false);
     }
@@ -232,15 +232,15 @@ export class Interactable extends Entity implements Damageable {
     const s = this.session;
     const req = this.cfg.requires;
     if (req.item && !s.toolkit.inventory.has(req.item)) {
-      s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_item", { item: s.toolkit.inventory.displayName(req.item) }), durationMs: 1500 });
+      s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_item", { item: s.toolkit.inventory.displayName(req.item) }), durationMs: 1500, kind: "hint" });
       return false;
     }
     if (req.flag && !s.state.flags[req.flag]) {
-      if (this.cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(this.cfg.message), durationMs: 1500 });
+      if (this.cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(this.cfg.message), durationMs: 1500, kind: "hint" });
       return false;
     }
     if (req.bigKey && !getDungeon(s.state, s.state.currentDungeon).bigKey) {
-      s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_big_key"), durationMs: 1500 });
+      s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_big_key"), durationMs: 1500, kind: "hint" });
       return false;
     }
     return true;
@@ -266,7 +266,7 @@ export class Interactable extends Entity implements Damageable {
         this.toggleOrActivate();
         return true;
       case "sign":
-        if (this.cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(this.cfg.message), durationMs: s.config.ui.messageMs });
+        if (this.cfg.message) s.bus.emit("zelda:message", { text: s.i18n.text(this.cfg.message), durationMs: s.config.ui.messageMs, kind: "sign" });
         return true;
       case "reactive":
         if (!this.cfg.actionable) return false;
@@ -286,7 +286,7 @@ export class Interactable extends Entity implements Damageable {
       this.setState("opened");
       s.bus.emit("zelda:chest:opened", { chestId: this.id, itemId: c?.item ?? null, count: c?.count ?? 0 });
       if (c && c.item) s.toolkit.inventory.give(c.item, c.count ?? 1);
-      else s.bus.emit("zelda:message", { text: s.i18n.t("msg.chest_empty"), durationMs: 1500 });
+      else s.bus.emit("zelda:message", { text: s.i18n.t("msg.chest_empty"), durationMs: 1500, kind: "hint" });
       if (s.config.save.autoSave) s.toolkit.saves.autoSave("chest");
       return;
     }
@@ -313,11 +313,11 @@ export class Interactable extends Entity implements Damageable {
     if (!this.checkRequirements()) return false;
     if (lock === "small_key") {
       if (!s.toolkit.inventory.spend("key", 1)) {
-        if (showMessages) s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_key"), durationMs: 1500 });
+        if (showMessages) s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_key"), durationMs: 1500, kind: "hint" });
         return false;
       }
     } else if (lock === "big_key" && !getDungeon(s.state, s.state.currentDungeon).bigKey) {
-      if (showMessages) s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_big_key"), durationMs: 1500 });
+      if (showMessages) s.bus.emit("zelda:message", { text: s.i18n.t("msg.need_big_key"), durationMs: 1500, kind: "hint" });
       return false;
     }
     this.setState("unlocked");
