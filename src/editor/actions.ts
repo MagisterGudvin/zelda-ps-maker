@@ -16,13 +16,14 @@ import type { RuleAction, RuleSpec } from "../puzzles/ruleTypes.ts";
 import type { WaveRoomSpec } from "../dungeons/dungeonSystem.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { parseJsonValue, pickAudioSource, resolveImage, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
 import { styleFromLayout } from "../ui/messageBox.ts";
 import type { MessageKind } from "../core/events.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
-import { animFromPick, characterFromParam, characterPlan, fontFamilyCss, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
+import { animFromPick, characterFromParam, characterPlan, mapObjectLook, playerAutoAnims, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import { type Facing, isFacing } from "../core/math.ts";
 import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, listOf, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
@@ -1105,17 +1106,13 @@ const setAbility = defineEvent({
   },
 });
 
-const HUD_PARTS = [["hearts", "Hearts"], ["counters", "Counters (rupees, bombs, arrows, keys)"], ["item", "Item box"], ["magic", "Magic meter"]] as const;
-const DEFAULT_COUNTERS = ["rupees", "bombs", "arrows", "keys"];
-
-/** Slots of Zelda: HUD Style, in form order (config.ui.skin). */
-export const HUD_SKIN_SLOTS = ["heartFull", "heartHalf", "heartEmpty", "rupees", "bombs", "arrows", "keys", "digits", "itemBox", "magicFrame", "magicFill", "bar"] as const;
+const PART_LABEL: Record<string, string> = HUD_PART_LABELS;
 
 const hudStyle = defineEvent({
   name: "Zelda: HUD Style",
   description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
   parameterDefs: {
-    parts: { ...multi("Toolkit HUD parts", "What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit.", HUD_PARTS), defaultValue: HUD_PARTS.map(([v]) => v) },
+    parts: { ...multi("Toolkit HUD parts", "What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit.", HUD_PART_OPTIONS), defaultValue: HUD_PART_OPTIONS.map(([v]) => v) },
     heartFull: img("Heart: full", "Picture of a full heart (its size sets the size of all hearts). / Полное сердце."),
     heartHalf: img("Heart: half", "Half a heart. Empty = the full heart. / Половина сердца."),
     heartEmpty: img("Heart: empty", "An empty heart container. / Пустое сердце."),
@@ -1132,38 +1129,24 @@ const hudStyle = defineEvent({
     lifeLabel: bool("LIFE label", "Show the LIFE label above the hearts. / Надпись над сердцами.", true),
     font: fontField("Font", "A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта."),
     textColor: choice("Text color", "Colour of the HUD texts. / Цвет текста.", [["#f8e0a0", "Cream"], ["#ffffff", "White"], ["#ffd23a", "Gold"], ["#202020", "Dark"]], "#f8e0a0"),
-    scale: num("Scale", "Size of one HUD pixel on screen: 0 = automatic (largest that fits), 4 = four screen pixels. / Масштаб.", 0),
+    scale: num("Scale", "Size of one HUD pixel on screen: 0 = like the map (one HUD pixel = one map pixel), 4 = four screen pixels. / Масштаб: 0 — как у карты.", 0),
+    ...Object.fromEntries(
+      Object.entries(HUD_PLACE_FIELDS).flatMap(([part, [fx, fy]]) => [
+        [fx, num(`${PART_LABEL[part]} X`, `Left edge of the ${PART_LABEL[part].toLowerCase()} in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место).`, -1)],
+        [fy, num(`${PART_LABEL[part]} Y`, `Top edge of the ${PART_LABEL[part].toLowerCase()} in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место).`, -1)],
+      ]),
+    ),
   },
   execute(params, ctx) {
     run("Zelda: HUD Style", ctx, params, (s, tk) => {
       const p = params as Record<string, unknown>;
-      const skin: Record<string, string> = {};
-      for (const slot of HUD_SKIN_SLOTS) {
-        const key = resolveImage(p[slot]);
-        skin[slot] = key;
+      const ui = hudStyleConfig(p, psStory(s, "HUD Style"));
+      for (const [slot, key] of Object.entries(ui.skin ?? {})) {
         if (key && s.host.textureSize && !s.host.textureSize(key)) s.logger.warn(`HUD Style: picture "${key}" (${slot}) is not loaded; the built-in one is shown.`);
       }
       const font = textOf(p.font);
       if (font) s.host.loadProjectFont?.(font);
-      // An action saved before 0.18 has no parts: everything stays on.
-      const parts = new Set(Array.isArray(p.parts) ? (p.parts as string[]) : HUD_PARTS.map(([v]) => v));
-      tk.configure(
-        {
-          ui: {
-            showHearts: parts.has("hearts"),
-            counters: parts.has("counters") ? DEFAULT_COUNTERS : [],
-            showActiveItem: parts.has("item"),
-            showMagic: parts.has("magic"),
-            skin,
-            barSlice: Math.max(0, Math.round(numOr(p.barSlice, 4))),
-            showLifeLabel: boolOr(p.lifeLabel, true),
-            textColor: textOf(p.textColor) || "#f8e0a0",
-            scale: Math.max(0, Math.round(numOr(p.scale, 0))),
-            fontFamily: font ? fontFamilyCss(psStory(s, "HUD Style"), font) : "monospace",
-          },
-        },
-        "HUD Style",
-      );
+      tk.configure({ ui }, "HUD Style");
     });
   },
 });

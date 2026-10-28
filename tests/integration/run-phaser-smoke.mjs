@@ -477,8 +477,27 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
   assert(r.hearts === r.maxHearts && r.heartScale === 2, `hearts ${r.hearts}/${r.maxHearts} at ×${r.heartScale}`);
   assert(r.rupee === 1 && r.box === 1 && r.magic === 2, JSON.stringify(r));
   assert(r.digits.split(",").includes("zmt_digit_7"), `digits ${r.digits}`);
-  assert(/^(NineSlice|Image):-1$/.test(r.bar), `bar ${r.bar}`);
+  assert(/^(NineSlice|Image):-[0-9.]+$/.test(r.bar), `bar ${r.bar} (must be behind the HUD)`);
   return `${r.hearts} hearts, digits ${r.digits}, bar ${r.bar}`;
+});
+
+await check("HUD Style positions: a placed part is drawn there in the game (HUD pixels × scale), each part on its own panel", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    // IMG_BAR: the picture of the check above.
+    H.run("Zelda: HUD Style", { bar: "IMG_BAR", barSlice: 4, scale: 2, heartsX: 40, heartsY: 60 });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    const hearts = shown.filter((o) => /heart8_/.test(o.texture?.key ?? ""));
+    return { first: hearts[0] && [hearts[0].x, hearts[0].y], panels: shown.filter((o) => o.texture?.key === "IMG_BAR").length, keys: [...new Set(shown.map((o) => o.texture?.key))].join(",") };
+  });
+  await page.screenshot({ path: `${ARTIFACTS}hud-places.png` });
+  await ev(() => window.__harness.run("Zelda: HUD Style", {}));
+  // The hearts part starts with the LIFE label (7 px and a 2 px gap): its first heart is 9 HUD px lower.
+  assert(r.first && r.first[0] === 80 && r.first[1] === (60 + 9) * 2, `first heart at ${JSON.stringify(r.first)} (${r.keys})`);
+  assert(r.panels === 4, `${r.panels} panels`);
+  return `first heart at ${r.first.join(",")} screen px, ${r.panels} panels`;
 });
 
 await check("Message Style: a sign's text in a box drawn like a PS Maker dialogue layout (9-slice picture), typed, closed with Z", async () => {

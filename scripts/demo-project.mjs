@@ -26,8 +26,12 @@ export const BUTTON_STYLE_ID = "zelda-button-style";
 /** The main menu map (the game starts on it). */
 export const TITLE_MAP_ID = "zelda-demo-title";
 
-/** Number variables of the demo's Add UI HUD, kept up to date by Zelda: HUD Variables. */
-export const HUD_VARIABLES_IDS = { full: "zelda-hud-full", half: "zelda-hud-half", max: "zelda-hud-max", rupees: "zelda-hud-rupees", bombs: "zelda-hud-bombs", arrows: "zelda-hud-arrows", keys: "zelda-hud-keys" };
+/**
+ * The demo's font (Game UI → Fonts): Pixelify Sans (SIL OFL 1.1, scripts/demo-assets), a pixel font
+ * with Cyrillic. PixelOperator, the font of a new PS Maker project, has no Cyrillic letters, so
+ * Russian text in it falls back to the browser's serif font.
+ */
+export const DEMO_FONT = { id: "zelda-font-pixelify-sans", name: "Pixelify Sans", key: "PixelifySans.ttf" };
 
 /** Text variable that carries the toolkit's progress in PS Maker saves (Start Toolkit → Progress variable). */
 export const PROGRESS_VARIABLE = { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" };
@@ -117,11 +121,11 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     return { type: `plugin:${pluginType}:${sanitizeName(actionName)}`, name: actionName, id: makeId(), pluginName: plugin.name, actionName, pluginParams: { ...defaults, ...structuredClone(params) } };
   };
   const ownedStoryEvents = [];
-  const uiFont = source.gameUI?.fonts?.[0];
+  const uiFont = DEMO_FONT;
   const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
   const textStyles = (size, color, align = "center", stroke = 0) => ({
-    fontFamily: uiFont?.name ?? "sans-serif",
-    fontAssetId: uiFont?.id ?? null,
+    fontFamily: uiFont.name,
+    fontAssetId: uiFont.id,
     fontSize: size,
     fontWeight: 400,
     lineHeightPercent: 120,
@@ -132,47 +136,6 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     outlineOrder: "below-text",
     textAlign: align,
   });
-  const noBackground = { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 };
-  const picture = (imageId, scalingMode, opacity = 100) => ({ type: "image", imageId, backgroundOpacity: opacity, scalingMode, borderWidth: 0, slice: { top: 0, right: 0, bottom: 0, left: 0 }, repeat: "repeat" });
-  const at = (x, y, width, height) => ({ position: { x, y }, size: { width, height }, rotation: 0, zIndex: 0, sizeAnchor: "top-left" });
-  const v = (id) => `@{${id}}`;
-  /**
-   * The demo's HUD built with PS Maker's Add UI (HUD Variables keeps the variables up to date): a
-   * row of empty hearts as wide as the heart containers, full hearts over it as wide as the full
-   * hearts (pictures tiled), the half heart after them shown by its opacity; counter icons with
-   * their numbers. The toolkit itself draws the bar behind, the item box and the magic meter.
-   */
-  const hudUi = () => {
-    const H = HUD_VARIABLES_IDS;
-    const heartX = ui.w - 40 - 10 * 36;
-    const comp = (c) => ({ componentId: `ui-component-${makeId()}`, ...c });
-    const counters = [
-      ["rupee", H.rupees],
-      ["bomb", H.bombs],
-      ["arrow", H.arrows],
-      ["key", H.keys],
-    ].flatMap(([icon, id], i) => [
-      comp({ type: "image", imageId: `zelda-ui-${icon}-4x`, scalingMode: "fit", opacity: 100, ...at(160 + i * 110, 10, 40, 40) }),
-      comp({ type: "text", label: { type: "variable", variableId: id }, opacity: 100, backgroundEnabled: false, background: noBackground, textStyles: textStyles(36, "#F8E0A0", "center", 4), ...at(140 + i * 110, 54, 80, 44) }),
-    ]);
-    return {
-      id: makeId(),
-      name: "Add UI",
-      type: "addUiComponentsAction",
-      uiName: "HUD",
-      inGameUiId: `in-game-ui-${makeId()}`,
-      fadeEnabled: false,
-      fadeDurationMs: 750,
-      waitForCompletion: true,
-      components: [
-        comp({ type: "text", label: "- LIFE -", opacity: 100, backgroundEnabled: false, background: noBackground, textStyles: textStyles(28, "#F8E0A0", "left", 4), ...at(heartX + 120, 6, 160, 34) }),
-        comp({ type: "rectangle", background: picture("zelda-ui-heart-empty-4x", "tile"), ...at(heartX, 44, { type: "expression", source: `${v(H.max)} * 36` }, 32) }),
-        comp({ type: "rectangle", background: picture("zelda-ui-heart-full-4x", "tile"), ...at(heartX, 44, { type: "expression", source: `${v(H.full)} * 36` }, 32), zIndex: 1 }),
-        comp({ type: "rectangle", background: picture("zelda-ui-heart-half-4x", "stretch", { type: "expression", source: `${v(H.half)} * 100` }), ...at({ type: "expression", source: `${heartX} + ${v(H.full)} * 36` }, 44, 36, 32), zIndex: 1 }),
-        ...counters,
-      ],
-    };
-  };
   // The toolkit HUD and message box in the demo's own UI pictures and dialogue layout.
   const hudStyle = {
     heartFull: "zelda-ui-heart-full",
@@ -187,10 +150,10 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     magicFrame: "zelda-ui-magic-frame",
     magicFill: "zelda-ui-magic-fill",
     bar: "zelda-ui-hud-bar",
-    // Hearts and counters are Add UI components (hudUi); the toolkit draws the item box and magic.
-    parts: ["item", "magic"],
     barSlice: 4,
-    font: uiFont?.id ?? "",
+    // Scale 0: one HUD pixel per map pixel, like the map.
+    scale: 0,
+    font: uiFont.id,
     textColor: "#f8e0a0",
   };
   const mapIds = Object.fromEntries(Object.keys(maps).map((key) => [key, `zelda-demo-${key}`]));
@@ -325,7 +288,6 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         zelda.push(pluginAction("Zelda: HUD Style", hudStyle));
-        zelda.push(pluginAction("Zelda: HUD Variables", { fullHearts: HUD_VARIABLES_IDS.full, halfHeart: HUD_VARIABLES_IDS.half, maxHearts: HUD_VARIABLES_IDS.max, rupees: HUD_VARIABLES_IDS.rupees, bombs: HUD_VARIABLES_IDS.bombs, arrows: HUD_VARIABLES_IDS.arrows, key: HUD_VARIABLES_IDS.keys }));
         zelda.push(pluginAction("Zelda: Message Style", { display: "dialogue", layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
@@ -344,7 +306,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       mapCollisions,
       setupActions,
       // "When map first starts": the Toolkit, objects and enemies, and the transfer triggers.
-      initialActions: [...zelda, hudUi(), ...extra, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
+      initialActions: [...zelda, ...extra, ...(m.triggers ?? []).map((t) => transferTrigger(t.rect, t.transfer))],
       enterActions: [],
       leaveActions: [],
       storyEvents: [],
@@ -427,7 +389,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     characters: structuredClone(source.characters ?? []),
     animationStrips: structuredClone(source.animationStrips ?? []),
     spritesheetAnimations: structuredClone(source.spritesheetAnimations ?? []),
-    variables: [structuredClone(PROGRESS_VARIABLE), ...Object.entries(HUD_VARIABLES_IDS).map(([k, id]) => ({ id, name: `HUD ${k}`, type: "number", defaultValue: 0 }))],
+    variables: [structuredClone(PROGRESS_VARIABLE)],
     videos: [],
     globalStoryEvents: [],
     ownedStoryEvents,
@@ -447,24 +409,32 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
 /**
  * The project's Game UI in the demo's pictures: a dialogue layout (also the toolkit's message box
  * and the default for PS Maker's Dialogue), a button style for the main menu, and the options,
- * load and choice menus on the same panel. The source's own styles stay in the lists.
+ * load and choice menus on the same panel. The source's own styles stay in the lists. Every text
+ * style uses the demo's font (DEMO_FONT).
  */
 export function demoGameUi(source) {
   const g = structuredClone(source ?? {});
+  g.fonts = [...(g.fonts ?? []).filter((f) => f.id !== DEMO_FONT.id), { ...DEMO_FONT }];
+  const useFont = (v) => {
+    if (!v || typeof v !== "object") return;
+    if ("fontAssetId" in v) Object.assign(v, { fontAssetId: DEMO_FONT.id, fontFamily: DEMO_FONT.name });
+    Object.values(v).forEach(useFont);
+  };
+  useFont(g);
   const base = g.dialogLayouts?.find((l) => l.id === g.defaultDialogLayoutId) ?? g.dialogLayouts?.[0];
   if (base) {
     const layout = structuredClone(base);
     Object.assign(layout, { id: DIALOG_LAYOUT_ID, key: "zelda_dialogue_layout", name: "Zelda dialogue" });
     layout.textBox.background = nineSlice("zelda-ui-panel", 7);
     layout.textBox.padding = { top: 40, right: 44, bottom: 40, left: 44 };
-    layout.textBox.textStyles = { ...layout.textBox.textStyles, color: CREAM, fontSize: 48 };
+    layout.textBox.textStyles = { ...layout.textBox.textStyles, fontFamily: DEMO_FONT.name, fontAssetId: DEMO_FONT.id, color: CREAM, fontSize: 48 };
     if (layout.nameBox) layout.nameBox.background = nineSlice("zelda-ui-panel", 7);
     g.dialogLayouts = [...g.dialogLayouts.filter((l) => l.id !== DIALOG_LAYOUT_ID), layout];
     g.defaultDialogLayoutId = DIALOG_LAYOUT_ID;
   }
   const button = structuredClone(g.buttonStyles?.[0] ?? {});
   Object.assign(button, { id: BUTTON_STYLE_ID, name: "Zelda button", backgroundEnabled: true, background: nineSlice("zelda-ui-button", 6) });
-  button.textStyles = { ...(button.textStyles ?? {}), color: CREAM, fontSize: 48 };
+  button.textStyles = { ...(button.textStyles ?? {}), fontFamily: DEMO_FONT.name, fontAssetId: DEMO_FONT.id, color: CREAM, fontSize: 48 };
   g.buttonStyles = [...(g.buttonStyles ?? []).filter((b) => b.id !== BUTTON_STYLE_ID), button];
   for (const menu of [g.optionsMenu, g.loadGameMenu]) if (menu) menu.background = nineSlice("zelda-ui-panel", 7);
   for (const c of g.choiceLayouts ?? []) c.background = nineSlice("zelda-ui-panel", 7);

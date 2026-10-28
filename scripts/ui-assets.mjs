@@ -80,11 +80,6 @@ function magicFill(w, h) {
   return frame(w, h, [".", "."], "m").map((row) => row.replace(/^(\.\.)m/, "$1M"));
 }
 
-/** A grid with every pixel drawn n×n (PS Maker UI shows pictures at their own size). */
-export function scaleGrid(grid, n) {
-  return grid.flatMap((row) => Array(n).fill([...row].map((c) => c.repeat(n)).join("")));
-}
-
 /** Every picture: file name (asset key), display name in PS Maker, grid. */
 export const UI_ASSETS = [
   { key: "zelda-ui-panel.png", name: "Zelda UI Panel", grid: frame(24, 24, ["k", "w", "L", "W", "k", "C"], "n"), slice: 7 },
@@ -118,16 +113,6 @@ export const UI_ASSETS = [
   { key: "zelda-ui-magic-frame.png", name: "Zelda Magic Frame", grid: frame(8, 30, ["k", "c"], "n") },
   { key: "zelda-ui-magic-fill.png", name: "Zelda Magic Fill", grid: magicFill(8, 30) },
 ];
-
-/**
- * The HUD pictures again at 4× for a HUD built with Add UI: PS Maker's UI layer works in the game's
- * logical pixels (1280×720), four of them per map pixel at the demo's zoom.
- */
-for (const name of ["heart-full", "heart-half", "heart-empty", "rupee", "bomb", "arrow", "key"]) {
-  const a = UI_ASSETS.find((x) => x.key === `zelda-ui-${name}.png`);
-  UI_ASSETS.push({ key: `zelda-ui-${name}-4x.png`, name: `${a.name} 4x`, grid: scaleGrid(a.grid, 4) });
-}
-
 
 function rgba(hex) {
   const v = hex.slice(1);

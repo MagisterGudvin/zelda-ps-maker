@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.18.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.19.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
@@ -417,6 +417,14 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `parts` (Toolkit HUD parts) | string-enum-multi | `["hearts","counters","item","magic"]` | What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit. Варианты: Hearts, Counters (rupees, bombs, arrows, keys), Item box, Magic meter. |
+| `heartsX` (Hearts X) | number | `-1` | Left edge of the hearts in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `heartsY` (Hearts Y) | number | `-1` | Top edge of the hearts in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `countersX` (Counters X) | number | `-1` | Left edge of the counters in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `countersY` (Counters Y) | number | `-1` | Top edge of the counters in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `itemX` (Item box X) | number | `-1` | Left edge of the item box in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `itemY` (Item box Y) | number | `-1` | Top edge of the item box in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `magicX` (Magic meter X) | number | `-1` | Left edge of the magic meter in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
+| `magicY` (Magic meter Y) | number | `-1` | Top edge of the magic meter in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
 | `heartFull` (Heart: full) | image | — | Picture of a full heart (its size sets the size of all hearts). / Полное сердце. |
 | `heartHalf` (Heart: half) | image | — | Half a heart. Empty = the full heart. / Половина сердца. |
 | `heartEmpty` (Heart: empty) | image | — | An empty heart container. / Пустое сердце. |
@@ -433,7 +441,7 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | `lifeLabel` (LIFE label) | boolean | `true` | Show the LIFE label above the hearts. / Надпись над сердцами. |
 | `font` (Font) | string-enum | `""` | A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта. Варианты: Default. |
 | `textColor` (Text color) | string-enum | `"#f8e0a0"` | Colour of the HUD texts. / Цвет текста. Варианты: Cream, White, Gold, Dark. |
-| `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = automatic (largest that fits), 4 = four screen pixels. / Масштаб. |
+| `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = like the map (one HUD pixel = one map pixel), 4 = four screen pixels. / Масштаб: 0 — как у карты. |
 
 ## Zelda: HUD Variables
 

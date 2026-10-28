@@ -225,7 +225,7 @@ export interface ToolkitConfig {
     counters: string[];
     /** Classic bar at the top or bottom of the screen ("top-left" etc. are read as top/bottom). */
     position: "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
-    /** HUD pixel scale; 0 = automatic (largest whole scale that fits 256x224). */
+    /** HUD pixel scale; 0 = like the map (its camera zoom), or the largest whole scale that fits 256x224 where unknown. */
     scale: number;
     /** Space kept free for PS Maker's own UI, in HUD pixels (the settings gear sits top-right). */
     safeArea: { top: number; right: number; bottom: number; left: number };
@@ -244,6 +244,8 @@ export interface ToolkitConfig {
     showLifeLabel: boolean;
     /** Colour of the HUD texts ("LIFE", inventory title). */
     textColor: string;
+    /** Parts placed by the author (HUD Style positions): part → top-left in HUD pixels; x/y < 0 = classic place. */
+    places: Record<string, { x: number; y: number }>;
   };
   save: {
     enabled: boolean;
@@ -445,6 +447,7 @@ export function createDefaultConfig(): ToolkitConfig {
       barSlice: 4,
       showLifeLabel: true,
       textColor: "#f8e0a0",
+      places: {},
     },
     save: { enabled: true, storageKey: "zelda-maker-toolkit", slot: "default", autoSave: true, autoLoadOnStart: false },
     publicApi: true,
@@ -500,7 +503,7 @@ export function mergeConfig(target: object, patch: unknown, path = "", issues: C
   return issues;
 }
 
-const OPEN_RECORDS = new Set(["ui.skin", "inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
+const OPEN_RECORDS = new Set(["ui.skin", "ui.places", "inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
 
 /** Ready-made balance presets selectable from the editor. */
 export const CONFIG_PRESETS: Record<string, unknown> = {

@@ -7,6 +7,11 @@ Copyright (c) 2026 Pixel Stories. Only the runtime stubs `defineEvent`/`definePl
 
 > Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+## Demo project assets (not in the plugin)
+
+### Pixelify Sans — SIL Open Font License 1.1
+Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans). `scripts/demo-assets/PixelifySans.ttf` (the variable font as published, renamed), license text in `scripts/demo-assets/PixelifySans-OFL.txt`. `make-demo-project.mjs` copies both into the demo project. Used because PixelOperator, the font of a new PS Maker project, has no Cyrillic.
+
 ## Development only (not distributed with the plugin)
 
 | Package | License | Why |

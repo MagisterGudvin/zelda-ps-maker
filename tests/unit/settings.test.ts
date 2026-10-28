@@ -107,3 +107,13 @@ test("HUD Style parts: the toolkit draws only the parts left on", async () => {
   assert.deepEqual([m.showHearts, m.counters.length, m.showItem], [true, 4, true], "an older action without parts: all on");
   resetToolkitForTests();
 });
+
+test("HUD Style positions and scale: shared by the game and the editor preview", async () => {
+  const { hudStyleConfig } = await import("../../src/editor/hudStyleConfig.ts");
+  const ui = hudStyleConfig({ heartsX: 12, heartsY: "40", itemX: -1, scale: 0, parts: ["hearts", "item"] }, null);
+  assert.deepEqual(ui.places!.hearts, { x: 12, y: 40 });
+  assert.deepEqual(ui.places!.item, { x: -1, y: -1 });
+  assert.deepEqual(ui.places!.magic, { x: -1, y: -1 }, "missing = classic place");
+  assert.equal(ui.scale, 0, "0 = like the map");
+  assert.deepEqual([ui.showHearts, ui.counters!.length, ui.showActiveItem, ui.showMagic], [true, 0, true, false]);
+});

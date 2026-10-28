@@ -91,7 +91,8 @@ const server = http
   })
   .listen(0, "127.0.0.1");
 const browser = await chromium.launch(opts.chrome ? { executablePath: opts.chrome } : {});
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+// Russian browser language, as the author's: Toolkit texts (Start Toolkit → Language: auto) are Russian.
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "ru-RU" });
 const logs = [];
 page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
@@ -104,7 +105,22 @@ const hold = async (key, ms) => {
   await wait(ms);
   await page.keyboard.up(key);
 };
-const tp = (x, y) => ev(([x, y]) => window.game.scene.getScenes(true).find((m) => m.map).player.setPosition(x, y), [x, y]);
+/** Puts the player at (x, y); again if PS Maker moved them back in the same frame (a dialogue closing). */
+const tp = async (x, y) => {
+  for (let i = 0; i < 5; i++) {
+    const at = await ev(([x, y]) => {
+      const p = window.game.scene.getScenes(true).find((m) => m.map).player;
+      p.setPosition(x, y);
+      return [p.x, p.y];
+    }, [x, y]);
+    await wait(100);
+    const now = await ev(() => {
+      const p = window.game.scene.getScenes(true).find((m) => m.map).player;
+      return [p.x, p.y];
+    });
+    if (Math.hypot(now[0] - x, now[1] - y) < 6 && Math.hypot(at[0] - x, at[1] - y) < 1) return;
+  }
+};
 const state = () =>
   ev(() => {
     const z = window.ZeldaMakerToolkit;
@@ -163,51 +179,68 @@ await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start
   await page.screenshot({ path: path.join(OUT, "field.png") });
   return `${s.enemies} enemies`;
 });
-await check("HUD: hearts and counters are PS Maker Add UI bound to HUD Variables; the toolkit draws the item box, magic and bar", async () => {
-  const toolkit = await ev(() => {
-    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
-    return [...new Set(hud.children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort();
-  });
-  // Width of the Add UI rectangles tiled with a heart picture (CSS pixels of the UI layer).
-  const hearts = () =>
+await check("HUD: the toolkit draws hearts, counters, item box, magic and bar in the demo's pictures, one HUD pixel per map pixel", async () => {
+  const hud = () =>
     ev(() => {
-      const width = (pic) => Math.max(0, ...[...document.querySelectorAll(".in-game-ui-layer *")].filter((e) => getComputedStyle(e).backgroundImage.includes(pic)).map((e) => e.offsetWidth));
-      const vars = Object.fromEntries(["full", "half", "max", "rupees"].map((k) => [k, window.game.variables.get(`zelda-hud-${k}`)?.value]));
-      return { full: width("zelda-ui-heart-full-4x"), empty: width("zelda-ui-heart-empty-4x"), vars, rupeeText: document.querySelector(".in-game-ui-layer")?.innerText.includes(String(vars.rupees)) };
+      const scene = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+      const zoom = window.game.scene.getScenes(true).find((m) => m.map).cameras.main.zoom;
+      const pics = scene.children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-"));
+      const count = (key) => pics.filter((o) => o.texture.key === key).length;
+      const heart = pics.find((o) => o.texture.key.startsWith("zelda-ui-heart-"));
+      return {
+        keys: [...new Set(pics.map((o) => o.texture.key))].sort(),
+        full: count("zelda-ui-heart-full"),
+        half: count("zelda-ui-heart-half"),
+        empty: count("zelda-ui-heart-empty"),
+        // Screen pixels per picture pixel against screen pixels per map pixel.
+        heartScale: heart ? heart.displayWidth / heart.frame.width : 0,
+        zoom,
+      };
     });
-  const before = await hearts();
+  const before = await hud();
+  // One and a half hearts (the HUD is redrawn on toolkit events, as setHealth sends).
   await ev(() => {
     const tk = window.ZeldaMakerToolkit.toolkit;
-    window.ZeldaMakerToolkit.session.setPaused("check", true); // no enemy hit while measuring
-    tk.state.player.hp = 3; // one and a half hearts
-    tk.inventory.give("rupees", 37, { silent: true });
+    tk.state.player.hp = 3;
+    tk.bus.emit("zelda:player:healthChanged", { hp: 3, maxHp: tk.state.player.maxHp, delta: 0 });
   });
-  await wait(600);
-  const after = await hearts();
+  await wait(300);
+  const after = await hud();
   await ev(() => {
     // The checks spend a while near the start (sign, villager) while the field's enemies roam: a
     // larger health reserve keeps the player from dying and respawning in the middle of a check.
     const tk = window.ZeldaMakerToolkit.toolkit;
     tk.state.player.maxHp = tk.state.player.hp = 40;
-    window.ZeldaMakerToolkit.session.setPaused("check", false);
   });
   await page.screenshot({ path: path.join(OUT, "hud.png") });
-  for (const k of ["zelda-ui-item-box", "zelda-ui-hud-bar"]) expect(toolkit.includes(k), `toolkit: ${k} not drawn (${toolkit.join(", ")})`);
-  expect(!toolkit.includes("zelda-ui-heart-full"), "the toolkit still draws hearts");
-  expect(before.full === 3 * 36 && before.empty === 3 * 36, `start: ${JSON.stringify(before)}`);
-  expect(after.vars.full === 1 && after.vars.half === 1 && after.full === 36 && after.vars.rupees === 37 && after.rupeeText, `after: ${JSON.stringify(after)}`);
-  return `hearts ${before.full}px → ${after.full}px + half, rupees ${after.vars.rupees}`;
+  for (const k of ["zelda-ui-heart-full", "zelda-ui-rupee", "zelda-ui-digits", "zelda-ui-item-box", "zelda-ui-magic-frame", "zelda-ui-hud-bar"]) expect(before.keys.includes(k), `${k} not drawn (${before.keys.join(", ")})`);
+  expect(before.heartScale === before.zoom, `a heart pixel is ${before.heartScale} screen px, a map pixel ${before.zoom}`);
+  expect(before.full === 3 && after.full === 1 && after.half === 1 && after.empty === 1, `hearts ${JSON.stringify([before, after].map((h) => [h.full, h.half, h.empty]))}`);
+  return `heart pixel = map pixel = ${before.zoom} screen px; 3 hearts → 1 + half`;
 });
-await check("the toolkit loads the project font itself when PS Maker has not (a playtest started on a game map)", async () => {
+/** Whether a font draws Cyrillic itself: its width of "Жыщ" differs from that of the fallback alone. */
+const cyrillicIn = (family) =>
+  ev((family) => {
+    const c = document.createElement("canvas").getContext("2d");
+    const width = (font) => ((c.font = font), c.measureText("ЖыщЮя").width);
+    return width(`32px "${family}", monospace`) !== width("32px monospace");
+  }, family);
+await check("the toolkit loads the project font itself when PS Maker has not; the demo font has Cyrillic, PixelOperator has not", async () => {
   const r = await ev(async () => {
-    const family = "ps-maker-font-font-pixel-operator";
+    const family = "ps-maker-font-zelda-font-pixelify-sans";
     for (const f of [...document.fonts]) if (f.family.replace(/["']/g, "") === family) document.fonts.delete(f);
+    window.ZeldaMakerToolkit.session.host.loadProjectFont("zelda-font-pixelify-sans");
     window.ZeldaMakerToolkit.session.host.loadProjectFont("font-pixel-operator");
-    for (let i = 0; i < 20 && ![...document.fonts].some((f) => f.family.replace(/["']/g, "") === family && f.status === "loaded"); i++) await new Promise((ok) => setTimeout(ok, 100));
-    return [...document.fonts].filter((f) => f.family.replace(/["']/g, "") === family).map((f) => f.status);
+    const loaded = (fam) => [...document.fonts].some((f) => f.family.replace(/["']/g, "") === fam && f.status === "loaded");
+    for (let i = 0; i < 30 && !(loaded(family) && loaded("ps-maker-font-font-pixel-operator")); i++) await new Promise((ok) => setTimeout(ok, 100));
+    return { demo: loaded(family), operator: loaded("ps-maker-font-font-pixel-operator") };
   });
-  expect(r.includes("loaded"), `font faces: ${JSON.stringify(r)}`);
-  return "PixelOperator loaded from game-assets";
+  expect(r.demo && r.operator, `loaded: ${JSON.stringify(r)}`);
+  const demo = await cyrillicIn("ps-maker-font-zelda-font-pixelify-sans");
+  const operator = await cyrillicIn("ps-maker-font-font-pixel-operator");
+  expect(demo, "Pixelify Sans draws no Cyrillic");
+  expect(!operator, "PixelOperator draws Cyrillic (the cause of the wrong font is elsewhere)");
+  return "Pixelify Sans loaded from game-assets, has Cyrillic; PixelOperator has none (falls back to another font)";
 });
 await check("Message Style: reading the sign shows its text as a PS Maker Dialogue (the project's layout); Z closes it, and the sign is not read again", async () => {
   await tp(32, 142);
@@ -249,14 +282,40 @@ await check("the villager talks with PS Maker's own Dialogue (styled panel); the
   expect(during.text && during.name && during.dialogue && during.paused, JSON.stringify(during));
   expect(!after, "dialogue still open");
 });
-await check("a chest opens with Z", async () => {
+/** The leaf element of the page that shows a text, with its font. */
+const textOnPage = (part) =>
+  ev((part) => {
+    const el = [...document.querySelectorAll("body *")].find((e) => e.children.length === 0 && e.textContent.includes(part));
+    return el ? { text: el.textContent.trim(), font: getComputedStyle(el).fontFamily } : null;
+  }, part);
+await check("a chest opens with Z; the small note \"Получено: Бомбы ×5\" is drawn by the toolkit in the demo font", async () => {
   await tp(140, 218);
   await hold("ArrowUp", 250);
   await page.keyboard.press("z");
-  await wait(1500);
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.includes("Получено")), null, { timeout: 6000 }).catch(() => {});
+  const note = await ev(() => {
+    const t = window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.find((o) => o.type === "Text" && o.visible && o.text.includes("Получено"));
+    return t ? { text: t.text, font: t.style.fontFamily } : null;
+  });
+  await page.screenshot({ path: path.join(OUT, "chest-note.png") });
   await dismiss();
   const s = await state();
   expect(s.chest === "opened", JSON.stringify(s));
+  expect(note && /zelda-font-pixelify-sans/.test(note.font), `note: ${JSON.stringify(note)}`);
+  return `"${note.text}" in ${note.font.split(",")[0]}`;
+});
+await check("the boomerang chest: \"Получено: Бумеранг!\" is a PS Maker dialogue in the demo font, which draws its Cyrillic", async () => {
+  await tp(200, 60);
+  await hold("ArrowUp", 250);
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => document.body.innerText.includes("Получено"), null, { timeout: 6000 }).catch(() => {});
+  await wait(800);
+  const box = await textOnPage("Получено");
+  await page.screenshot({ path: path.join(OUT, "chest-dialogue.png") });
+  await dismiss();
+  expect(box && /zelda-font-pixelify-sans/.test(box.font), `dialogue text: ${JSON.stringify(box)}`);
+  expect(await cyrillicIn("ps-maker-font-zelda-font-pixelify-sans"), "the dialogue font has no Cyrillic");
+  return `"${box.text}" in ${box.font.split(",")[0]}`;
 });
 await check("Escape opens the PS Maker options menu (game paused); Save game keeps the Toolkit's progress in the save", async () => {
   await page.keyboard.press("Escape");

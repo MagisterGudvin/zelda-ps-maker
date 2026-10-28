@@ -2,6 +2,8 @@ import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { isObjectType, resolveObjectConfig } from "../interactions/objectTypes.ts";
 import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
 import { characterFromParam, findStory, isStory, mapObjectLook, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
+import { HudPreview, hudPreviewSetup, placeFieldValues, writeFormNumbers } from "./hudPreview.ts";
+import type { HudPart } from "../ui/hudLayout.ts";
 import { areaOf, fillDialogLayoutOptions, fillFontOptions, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
 
 /**
@@ -241,6 +243,7 @@ export function startEditorPreview(win: any = globalThis): void {
   if (!win || typeof win.document === "undefined" || typeof win.setInterval !== "function") return;
   win[REGISTRY_KEY]?.stop?.();
   let overlay: Overlay | null = null;
+  let hud: HudPreview | null = null;
   let failed = false;
   let selected = "";
   let lastClick = { id: "", at: 0 };
@@ -253,6 +256,25 @@ export function startEditorPreview(win: any = globalThis): void {
       }
     }
     overlay = null;
+    try {
+      hud?.destroy();
+    } catch {
+      /* the scene is gone */
+    }
+    hud = null;
+  };
+  /** A HUD part dropped on the map: its place goes into the HUD Style form (opened if needed). */
+  const dropHudPart = (part: HudPart, x: number, y: number) => {
+    const scene = hud?.scene;
+    const setup = scene ? hudPreviewSetup(scene.map, storyOf(scene), Number(scene.CAMERA_ZOOM) || 0) : null;
+    if (!scene || !setup?.style) return;
+    const values = placeFieldValues(part, x, y);
+    if (writeFormNumbers(win.document, "Zelda: HUD Style", values)) return;
+    openAction(win, scene.map.id, setup.style);
+    let tries = 0;
+    const retry = win.setInterval(() => {
+      if (writeFormNumbers(win.document, "Zelda: HUD Style", values) || ++tries > 30) win.clearInterval(retry);
+    }, 100);
   };
   const select = (id: string) => {
     selected = id;
@@ -285,6 +307,13 @@ export function startEditorPreview(win: any = globalThis): void {
       outline(overlay, selected);
     }
     overlay.collisions.setVisible(editorShowsCollisions(scene));
+    // The HUD in the game window frame (one HUD pixel per map pixel, as in the game).
+    if (hud && hud.scene !== scene) {
+      hud.destroy();
+      hud = null;
+    }
+    hud ??= new HudPreview(scene, dropHudPart);
+    hud.update(hudPreviewSetup(scene.map, storyOf(scene), Number(scene.CAMERA_ZOOM) || 0));
   };
   const timer = win.setInterval(() => {
     try {

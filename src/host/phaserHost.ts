@@ -739,10 +739,12 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
   }
 
-  /**
-   * PS Maker project data (characters and their sprite-sheet animations), if the
-   * game keeps it somewhere reachable. Found once per map; null when absent.
-   */
+  /** PS Maker's map zoom (GameMap.CAMERA_ZOOM: map.zoom or gameConfig.zoom), else the camera's. */
+  mapZoom(): number {
+    const z = Number(this.scene?.CAMERA_ZOOM ?? this.scene?.cameras?.main?.zoom ?? 0);
+    return Number.isFinite(z) && z > 0 ? z : 0;
+  }
+
   private dialogueSeq = 0;
 
   /**

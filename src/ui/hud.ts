@@ -115,6 +115,8 @@ export class HudSystem {
       showLifeLabel: ui.showLifeLabel,
       textColor: ui.textColor,
       box: s.messageBox?.model() ?? null,
+      places: { ...ui.places },
+      mapZoom: s.host.mapZoom?.() ?? 0,
     };
   }
 

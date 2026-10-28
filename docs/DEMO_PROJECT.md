@@ -28,7 +28,8 @@ node scripts/make-demo-project.mjs --from "Istina"
 | Карта **Title** (стартовая): главное меню — название и кнопки *New game*, *Continue* (меню загрузки), *Settings* (меню опций), *Exit*; игрок спрятан | «Map setup» и «Map start» карты Title: *Add UI*, события кнопок |
 | Свои картинки интерфейса (рамка окна, кнопка, полоса HUD, сердца, значки, цифры, рамка предмета, шкала магии) — нарисованы `scripts/ui-assets.mjs` | Библиотека *Images* («Zelda UI …») |
 | Макет диалога «Zelda dialogue» (по умолчанию), стиль кнопок «Zelda button», меню опций, загрузки и выбора — на этих картинках | Game UI |
-| HUD: сердца и счётчики — компоненты Add UI «HUD», привязанные к переменным «HUD …» (ширина ряда сердец — `@{HUD full} * 36`, половинка — прозрачностью); фон полосы, рамку предмета и шкалу магии рисует Toolkit | «Map start»: `Zelda: HUD Variables`, `Zelda: HUD Style` (части *Item box*, *Magic meter*), *Add UI* «HUD» |
+| HUD Toolkit на картинках демо, в пикселях карты (*Scale* 0); в редакторе — в жёлтой рамке *Game window* на карте, части перетаскиваются мышью | «Map start»: `Zelda: HUD Style` |
+| Шрифт Pixelify Sans с кириллицей (SIL OFL 1.1, лицензия — `PixelifySans-OFL.txt` в папке проекта) в диалогах, кнопках, меню и HUD | Game UI → Fonts |
 | Таблички и полученные предметы — диалогом PS Maker на макете «Zelda dialogue» | `Zelda: Message Style` → *PS Maker Dialogue* |
 | Житель у старта (персонаж *New Female*) говорит штатным диалогом | «Map setup» поля; «Map start»: *Add event trigger* (взаимодействие) → *Dialogue* |
 | Прогресс Toolkit в сохранениях PS Maker | переменная «Zelda progress»; `Start Toolkit` → *Progress variable* |
@@ -84,7 +85,7 @@ npm run harness
 
 ## Проверка в настоящем рантайме PS Maker
 
-`scripts/runtime-check.mjs` запускает созданный проект в рантайме PS Maker из **вашего** веб-экспорта (Export → HTML5, распакованный) и проходит демо: главное меню и *New game*, HUD на картинках проекта, табличка в окне Toolkit, разговор с жителем (диалог PS Maker), сундук, меню опций и *Save game*, переход, блок и плита, ключ и дверь, волны и страж, возврат на поле, перезагрузка страницы, *Continue* и загрузка сохранения.
+`scripts/runtime-check.mjs` запускает созданный проект в рантайме PS Maker из **вашего** веб-экспорта (Export → HTML5, распакованный) и проходит демо: главное меню и *New game*, HUD на картинках проекта в пикселях карты, шрифт с кириллицей, табличка диалогом PS Maker, разговор с жителем, сундуки («Получено: Бумеранг!» — диалогом PS Maker в шрифте демо), меню опций и *Save game*, переход, блок и плита, ключ и дверь, волны и страж, возврат на поле, перезагрузка страницы, *Continue* и загрузка сохранения.
 
 ```bash
 node scripts/runtime-check.mjs --export ~/istina-web --project "$HOME/.local/share/PS Maker/projects/Zelda Toolkit Demo" --chrome /usr/bin/chromium

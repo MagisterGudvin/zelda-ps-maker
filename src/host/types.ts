@@ -24,6 +24,8 @@ export interface HostAdapter {
    * player closed it. Null when the engine cannot.
    */
   playDialogue?(source: string): Promise<void> | null;
+  /** Optional: screen pixels per map pixel (the map camera's zoom). */
+  mapZoom?(): number;
   /** Optional: registers a project font (Game UI → Fonts) if PS Maker has not loaded it yet. */
   loadProjectFont?(fontId: string): void;
   /** Optional: makes these toolkit solids stop the player in the engine's physics (called every tick). */
@@ -210,6 +212,10 @@ export interface HudModel {
   textColor: string;
   /** The open dialogue box (Zelda: Message Style), or null. */
   box: MessageBoxModel | null;
+  /** Parts placed by the author (config.ui.places). */
+  places: Record<string, { x: number; y: number }>;
+  /** The map's zoom (screen pixels per map pixel): HUD scale 0 draws HUD pixels this size. */
+  mapZoom: number;
 }
 
 /** Sheet shown full-screen with frame numbers (Zelda: Preview Sprite Sheet). */

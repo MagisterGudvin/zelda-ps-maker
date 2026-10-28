@@ -93,3 +93,23 @@ test("HUD layout without own pictures is unchanged (built-in sizes)", () => {
     { x: L.viewW - 24 - 6 - 80 + 8, y: 13, w: 7, h: 7 },
   ]);
 });
+
+test("parts placed by the author move as a whole, stay on screen, each on its own background panel", () => {
+  const base = { screenW: 1280, screenH: 720, scale: 4, position: "top" as const, safeArea: { top: 0, right: 0, bottom: 0, left: 0 }, showMagic: true, showItem: true, showHearts: true, counters: [3, 2], hearts: 3 };
+  const classic = computeHudLayout(base);
+  const L = computeHudLayout({ ...base, places: { hearts: { x: 10, y: 150 }, item: { x: 300, y: 2 }, magic: { x: -1, y: -1 } } });
+  assert.equal(L.k, 4, "HUD pixel = map pixel at zoom 4");
+  assert.deepEqual([L.parts.hearts!.x, L.parts.hearts!.y], [10, 150]);
+  assert.equal(L.hearts[1].x - L.hearts[0].x, classic.hearts[1].x - classic.hearts[0].x, "hearts keep their spacing");
+  assert.equal(L.lifeLabel!.y, 150, "the LIFE label moves with the hearts");
+  // 300 is beyond the 320-pixel-wide view minus the box: kept on screen.
+  assert.ok(L.item!.x + L.item!.w <= L.viewW && L.item!.y === 2);
+  assert.deepEqual(L.magic, classic.magic, "-1 = the classic place");
+  const inside = (r: { x: number; y: number; w: number; h: number }, o: { x: number; y: number; w: number; h: number }) => r.x >= o.x && r.y >= o.y && r.x + r.w <= o.x + o.w && r.y + r.h <= o.y + o.h;
+  const parts = [L.parts.hearts!, L.parts.item!, L.parts.counters!, L.parts.magic!];
+  assert.equal(L.panels.length, 4, "one panel per part");
+  for (const r of parts) assert.ok(L.panels.some((p) => inside(r, p) && p.w <= r.w + 6 && p.h <= r.h + 6), `a snug panel around ${JSON.stringify(r)}`);
+  for (const r of parts) assert.ok(inside(r, L.bar), "the bar (where the HUD is) holds every part");
+  const none = computeHudLayout({ ...base, places: {} });
+  assert.deepEqual([none.bar, none.panels], [classic.bar, [classic.bar]], "nothing placed: the classic band");
+});

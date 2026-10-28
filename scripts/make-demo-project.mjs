@@ -8,8 +8,9 @@
  *         must contain the built-in "Tiles 'N Such Assets" pack. It is only read.
  * --name: folder name of the new project (default "Zelda Toolkit Demo"); it must not exist yet.
  *
- * The new project gets story.json, copies of the asset files it uses and plugins/ with the
- * Toolkit build (run `npm run build` first). Nothing is overwritten or deleted.
+ * The new project gets story.json, copies of the asset files it uses, the demo's UI pictures and
+ * font (scripts/demo-assets) and plugins/ with the Toolkit build (run `npm run build` first).
+ * Nothing is overwritten or deleted.
  */
 import { existsSync } from "node:fs";
 import { writeUiAssets } from "./ui-assets.mjs";
@@ -18,7 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { MAPS } from "../examples/harness/demo-maps.js";
-import { assetKeysOf, buildDemoStory } from "./demo-project.mjs";
+import { assetKeysOf, buildDemoStory, DEMO_FONT } from "./demo-project.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_FILE = "zelda-maker-toolkit.ps-maker.js";
@@ -77,6 +78,9 @@ async function main() {
   for (const f of files) await copyFile(path.join(assetsFrom, f), path.join(dest, "assets", f));
   // The demo's own UI pictures (drawn by scripts/ui-assets.mjs), referenced by story.images.
   const ui = writeUiAssets(path.join(dest, "assets"));
+  // The demo's font (Pixelify Sans, SIL OFL 1.1), with its license next to the project.
+  await copyFile(path.join(ROOT, "scripts", "demo-assets", DEMO_FONT.key), path.join(dest, "assets", DEMO_FONT.key));
+  await copyFile(path.join(ROOT, "scripts", "demo-assets", "PixelifySans-OFL.txt"), path.join(dest, "PixelifySans-OFL.txt"));
   await copyFile(pluginPath, path.join(dest, "plugins", PLUGIN_FILE));
   await writeFile(path.join(dest, "story.json"), JSON.stringify(story), "utf8");
 

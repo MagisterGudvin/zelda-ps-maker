@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assetKeysOf, buildDemoStory, DEMO_ASSETS, sanitizeName } from "../../scripts/demo-project.mjs";
+import { assetKeysOf, buildDemoStory, DEMO_ASSETS, DEMO_FONT, sanitizeName } from "../../scripts/demo-project.mjs";
 import { MAPS } from "../../examples/harness/demo-maps.js";
 
 type Any = any;
@@ -112,7 +112,7 @@ test("demo story: a new project id, library kept, old maps and events dropped, u
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(JSON.stringify(buildDemoStory({ source, plugin: await plugin(), maps: MAPS, seed: 3, name: "My Demo", now: 1 }).story.maps), JSON.stringify(buildDemoStory({ source, plugin: await plugin(), maps: MAPS, seed: 3, name: "My Demo", now: 2 }).story.maps), "same seed, same project");
   const keys = assetKeysOf(story);
-  for (const f of ["PixelOperator.ttf", "animation-a-Sword_attack_full.png", "autotile-gen-0", "map-object-0.png"]) assert.ok(keys.includes(f), f);
+  for (const f of ["PixelifySans.ttf", "animation-a-Sword_attack_full.png", "autotile-gen-0", "map-object-0.png"]) assert.ok(keys.includes(f), f);
   // The source is not changed.
   assert.deepEqual(source, sourceStory());
 });
@@ -178,30 +178,38 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   assert.ok(!/^[^@\n]*: /m.test(ev.actions[0].dialogueSource), "no text line reads as \"Name: text\"");
 });
 
-test("demo HUD built with Add UI: components bound to the variables HUD Variables keeps up to date", async () => {
+test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI HUD; one font with Cyrillic everywhere", async () => {
   const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
-  const varIds = new Set(story.variables.map((v: Any) => v.id));
-  const images = new Set(story.images.map((i: Any) => i.id));
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
-    const hud = m.initialActions.find((a: Any) => a.type === "addUiComponentsAction" && a.uiName === "HUD");
-    assert.ok(hud, `${m.name}: Add UI HUD`);
-    const linked = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Variables").pluginParams;
-    // Every variable a component refers to exists and is filled by HUD Variables.
-    const refs = JSON.stringify(hud.components).match(/@\{([^}]+)\}|"variableId":"([^"]+)"/g) ?? [];
-    assert.ok(refs.length >= 8);
-    for (const r of refs) {
-      const id = r.startsWith("@") ? r.slice(2, -1) : r.split('"')[3];
-      assert.ok(varIds.has(id), `${id} is a project variable`);
-      assert.ok(Object.values(linked).includes(id), `${id} is kept up to date by HUD Variables`);
-    }
-    for (const c of hud.components) {
-      const img = c.imageId ?? c.background?.imageId;
-      if (img) assert.ok(images.has(img), `${img} in Images`);
-    }
+    assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
+    assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
     const style = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
-    assert.deepEqual(style.parts, ["item", "magic"], "the toolkit draws only the item box and magic");
+    assert.deepEqual(style.parts, ["hearts", "counters", "item", "magic"]);
+    assert.equal(style.scale, 0);
+    assert.equal(style.font, DEMO_FONT.id);
     assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.display, "dialogue");
   }
+  assert.deepEqual(story.variables.map((v: Any) => v.id), ["zelda-progress"]);
+  const ui = story.gameUI;
+  assert.ok(ui.fonts.some((f: Any) => f.id === DEMO_FONT.id && f.key === "PixelifySans.ttf"));
+  assert.ok(ui.fonts.some((f: Any) => f.id === "font-pixel-operator"), "the project's own font stays in the list");
+  const styles: Any[] = [];
+  const walk = (v: Any) => {
+    if (!v || typeof v !== "object") return;
+    if ("fontAssetId" in v) styles.push(v);
+    Object.values(v).forEach(walk);
+  };
+  walk(ui);
+  walk(story.maps.find((m: Any) => m.id === story.player.startingMap).initialActions);
+  assert.ok(styles.length >= 6);
+  for (const st of styles) assert.deepEqual([st.fontAssetId, st.fontFamily], [DEMO_FONT.id, "Pixelify Sans"]);
+});
+
+test("demo font: the TTF and its OFL license are in scripts/demo-assets", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ttf = readFileSync(new URL("../../scripts/demo-assets/PixelifySans.ttf", import.meta.url));
+  assert.equal(ttf.readUInt32BE(0), 0x00010000, "a TrueType font");
+  assert.match(readFileSync(new URL("../../scripts/demo-assets/PixelifySans-OFL.txt", import.meta.url), "utf8"), /SIL Open Font License, Version 1\.1/);
 });
 
 test("demo UI pictures: valid PNGs of the drawn size", async () => {
