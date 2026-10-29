@@ -292,7 +292,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         zelda.push(pluginAction("Zelda: HUD Style", hudStyle));
-        zelda.push(pluginAction("Zelda: Message Style", { display: "dialogue", layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
+        zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }

@@ -113,11 +113,10 @@ export interface ToolkitConfig {
       chargeWalk: string;
       /** Holding the shield up (shield on a button). */
       shield: string;
-      /** Using items: bow, boomerang, placing a bomb, hookshot; `item` = any other item and the fallback. */
+      /** Using items: bow, boomerang, placing a bomb; `item` = any other item and the fallback. */
       bow: string;
       boomerang: string;
       bomb: string;
-      hookshot: string;
       item: string;
       /** Lifting, carrying (walking with an object overhead), throwing, pushing a block. */
       lift: string;
@@ -186,7 +185,6 @@ export interface ToolkitConfig {
     bomb: { fuseMs: number; radius: number; damage: number; playerDamage: number; maxActive: number; knockback: number };
     boomerang: { speed: number; range: number; damage: number; stunMs: number; maxActive: number };
     bow: { speed: number; range: number; damage: number; maxActive: number };
-    hookshot: { enabled: boolean; speed: number; range: number; damage: number; stunMs: number; pullSpeed: number };
     fireRod: { speed: number; range: number; damage: number; magicCost: number };
     healingSpell: { magicCost: number; heal: number };
     thrown: { speed: number; range: number; damage: number };
@@ -248,13 +246,6 @@ export interface ToolkitConfig {
     /** Parts placed by the author (HUD Style positions): part → top-left in HUD pixels; x/y < 0 = classic place. */
     places: Record<string, { x: number; y: number }>;
   };
-  save: {
-    enabled: boolean;
-    storageKey: string;
-    slot: string;
-    autoSave: boolean;
-    autoLoadOnStart: boolean;
-  };
   /** Exposes `globalThis.ZeldaMakerToolkit` for extension plugins. */
   publicApi: boolean;
 }
@@ -268,7 +259,6 @@ export type FeatureId =
   | "puzzles"
   | "dungeons"
   | "ui"
-  | "save"
   | "debugTools";
 
 export type FeatureFlags = Record<FeatureId, boolean>;
@@ -282,7 +272,6 @@ export const FEATURE_IDS: readonly FeatureId[] = [
   "puzzles",
   "dungeons",
   "ui",
-  "save",
   "debugTools",
 ];
 
@@ -298,7 +287,6 @@ export function createDefaultConfig(): ToolkitConfig {
       puzzles: true,
       dungeons: true,
       ui: true,
-      save: true,
       debugTools: true,
     },
     debug: { hitboxes: false, toggleKey: "F9", logLevel: "warn", rethrowErrors: false, diagnostics: false, diagnosticsKey: "F10" },
@@ -348,7 +336,7 @@ export function createDefaultConfig(): ToolkitConfig {
       magicRegenPerSecond: 0,
       startItems: ["sword", "shield"],
       startCounts: {},
-      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", hookshot: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
+      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
     },
     sword: {
       enabled: true,
@@ -387,14 +375,13 @@ export function createDefaultConfig(): ToolkitConfig {
       bomb: { fuseMs: 2600, radius: 26, damage: 4, playerDamage: 2, maxActive: 2, knockback: 260 },
       boomerang: { speed: 220, range: 110, damage: 0, stunMs: 2000, maxActive: 1 },
       bow: { speed: 300, range: 220, damage: 2, maxActive: 3 },
-      hookshot: { enabled: false, speed: 260, range: 120, damage: 0, stunMs: 1500, pullSpeed: 240 },
       fireRod: { speed: 200, range: 160, damage: 4, magicCost: 4 },
       healingSpell: { magicCost: 8, heal: 2 },
       thrown: { speed: 200, range: 64, damage: 2 },
     },
     inventory: {
       capacities: { bombs: 10, arrows: 30, rupees: 999 },
-      order: ["bow", "boomerang", "hookshot", "bomb", "fire_rod", "healing_spell"],
+      order: ["bow", "boomerang", "bomb", "fire_rod", "healing_spell"],
       autoEquipFirst: true,
     },
     enemies: {
@@ -450,7 +437,6 @@ export function createDefaultConfig(): ToolkitConfig {
       textColor: "#f8e0a0",
       places: {},
     },
-    save: { enabled: true, storageKey: "zelda-maker-toolkit", slot: "default", autoSave: true, autoLoadOnStart: false },
     publicApi: true,
   };
 }

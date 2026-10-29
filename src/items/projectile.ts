@@ -30,7 +30,7 @@ export interface ProjectileOptions {
 
 /**
  * Straight-flying projectile shared by arrows, fireballs, enemy shots and
- * thrown objects. Subclasses (boomerang, hookshot) override `onRangeEnd`,
+ * thrown objects. Subclasses (boomerang) override `onRangeEnd`,
  * `onWall` and `onTargetHit`.
  */
 export class Projectile extends Entity {

@@ -6,14 +6,14 @@
 
 | Где | Поля |
 |---|---|
-| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Autosave, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Progress variable, Language, Positions in tiles, Show hitboxes, Show diagnostics |
 | `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря — штатным выбором клавиш PS Maker (можно выбрать и управление проекта, например Interact) |
 | `Zelda: Set Player Sprites` | анимации атаки из PS Maker, слой оружия, центр взмаха |
 | `Zelda: Set Sound` | звуки моментов |
 
 Поля *Hearts* и *Sword damage* применяются поверх сложности. Если действие `Start Toolkit` сохранено старой версией плагина и новых полей у него нет, они не применяются — ничего не сбрасывается.
 
-**Из кода** доступна любая настройка ниже: `ZeldaMakerToolkit.configure({...})` (расширение-плагин или событие PS Maker с JavaScript, если оно есть в вашей версии). Действия, сохранённые до 0.5.0 с полем *Config JSON*, продолжают его применять, но показывают предупреждение — откройте их в редакторе и заполните новые поля.
+**Из кода** доступна любая настройка ниже: `ZeldaMakerToolkit.configure({...})` (расширение-плагин или событие PS Maker с JavaScript, если оно есть в вашей версии).
 
 Неизвестные ключи и значения неверного типа **игнорируются** с предупреждением в консоли (`[ZeldaMakerToolkit] Configure: sword.dammage: unknown option (ignored)`), поэтому опечатка не ломает остальные настройки. Время — в миллисекундах, расстояния — в пикселях, скорости — пиксели/с.
 
@@ -65,13 +65,12 @@
 ### `combat`
 `enemyHitCooldownMs 250, flashMs 250, bombsHurtPlayer true, pauseDuringDialogue true` (враги и снаряды замирают, пока открыт диалог PS Maker), `damageTable {}` — глобальные множители по типам урона, например `{"arrow":1.5,"fire":0.5}`.
 
-Типы урона: `sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script`.
+Типы урона: `sword, spin, poke, arrow, bomb, boomerang, fire, ice, magic, thrown, contact, projectile, hazard, fall, script`.
 
 ### `items`
 - `bomb: { fuseMs 2600, radius 26, damage 4, playerDamage 2, maxActive 2, knockback 260 }`
 - `boomerang: { speed 220, range 110, damage 0, stunMs 2000, maxActive 1 }`
 - `bow: { speed 300, range 220, damage 2, maxActive 3 }`
-- `hookshot: { enabled false, speed 260, range 120, damage 0, stunMs 1500, pullSpeed 240 }` — экспериментально
 - `fireRod: { speed 200, range 160, damage 4, magicCost 4 }`
 - `healingSpell: { magicCost 8, heal 2 }`
 - `thrown: { speed 200, range 64, damage 2 }` — брошенные горшки/кусты/камни
@@ -90,9 +89,6 @@
 ### `ui`
 Классическая полоса: шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд).
 `enabled, showHearts, showMagic, showActiveItem, counters ["rupees","bombs","arrows","keys"], position "top" | "bottom"` (старые `top-left` и т.п. читаются как top/bottom), `scale 0` (0 = наибольший целый масштаб, при котором 256×224 помещается на экран), `safeArea { top 0, right 24, bottom 0, left 0 }` (место под собственный UI PS Maker — шестерёнку настроек справа сверху; в пикселях HUD), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true, fontFamily "monospace"`. Сообщения выводятся рамками внизу свободной области и не перекрывают полосу HUD.
-
-### `save`
-`enabled true, storageKey "zelda-maker-toolkit", slot "default", autoSave true` (сундуки, двери, новые предметы, завершение подземелья), `autoLoadOnStart false`.
 
 ### `audio`
 `enabled true, volume 1, sounds {}` — звуки моментов (`Zelda: Set Sound`): `{"audio":{"sounds":{"swordSwing":{"src":"sfx/swing.ogg","volume":0.8}}}}`. Список моментов — в [PS_MAKER_INTEGRATION.md](PS_MAKER_INTEGRATION.md#звук).

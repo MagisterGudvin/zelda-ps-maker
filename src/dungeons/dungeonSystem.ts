@@ -93,7 +93,6 @@ export class DungeonSystem {
     d.completed = true;
     this.s.bus.emit("zelda:dungeon:completed", { dungeonId: id });
     this.s.bus.emit("zelda:message", { text: this.s.i18n.t("msg.dungeon_completed"), durationMs: this.s.config.ui.messageMs });
-    if (this.s.config.save.autoSave) this.s.toolkit.saves.autoSave("dungeon");
   }
 
   addWaveRoom(spec: WaveRoomSpec): void {

@@ -15,7 +15,7 @@ const MOVE_MS = 250;
 
 /**
  * Interactive map object driven entirely by `ObjectConfig`. One class covers
- * every preset type so new combinations (a torch that is also hookable, a
+ * every preset type so new combinations (a torch that is also breakable, a
  * button that only reacts to arrows) need configuration, not code.
  */
 export class Interactable extends Entity implements Damageable {
@@ -26,7 +26,6 @@ export class Interactable extends Entity implements Damageable {
   pushes = 0;
   /** Block movement animation. */
   moving = false;
-  hookable: boolean;
   /** Pressure plate: currently held down. */
   pressed = false;
   readonly persistentKey: string | null;
@@ -47,7 +46,6 @@ export class Interactable extends Entity implements Damageable {
     this.cfg = cfg;
     this.initial = { x, y };
     this.durability = Math.max(1, cfg.durability);
-    this.hookable = cfg.hookable;
     this.visible = !cfg.hidden;
     this.solid = cfg.solid && this.visible;
     this.objState = this.initialState();
@@ -144,7 +142,6 @@ export class Interactable extends Entity implements Damageable {
     switch (state) {
       case "destroyed":
         this.solid = false;
-        this.hookable = false;
         if (this.cfg.type !== "bombable_wall" && this.cfg.type !== "breakable" && !this.cfg.keepWhenDestroyed) this.visible = false;
         break;
       case "opened":
@@ -287,7 +284,6 @@ export class Interactable extends Entity implements Damageable {
       s.bus.emit("zelda:chest:opened", { chestId: this.id, itemId: c?.item ?? null, count: c?.count ?? 0 });
       if (c && c.item) s.toolkit.inventory.give(c.item, c.count ?? 1);
       else s.bus.emit("zelda:message", { text: s.i18n.t("msg.chest_empty"), durationMs: 1500, kind: "hint" });
-      if (s.config.save.autoSave) s.toolkit.saves.autoSave("chest");
       return;
     }
     if (this.cfg.type === "door") {
@@ -323,7 +319,6 @@ export class Interactable extends Entity implements Damageable {
     this.setState("unlocked");
     s.bus.emit("zelda:door:unlocked", { doorId: this.id, lock });
     s.bus.emit("zelda:door:opened", { doorId: this.id });
-    if (s.config.save.autoSave) s.toolkit.saves.autoSave("door");
     return true;
   }
 
@@ -408,7 +403,6 @@ export class Interactable extends Entity implements Damageable {
     this.pushes = 0;
     this.pressed = false;
     this.durability = Math.max(1, this.cfg.durability);
-    this.hookable = this.cfg.hookable;
     this.visible = !this.cfg.hidden;
     this.solid = this.cfg.solid && this.visible;
     this.objState = this.initialState();

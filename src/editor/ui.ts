@@ -120,7 +120,7 @@ const STATS_UI: Record<string, FieldUi> = {
 // ---- per action ---------------------------------------------------------------------------
 
 /** Set Player Sprites fields that pick an animation. */
-const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "death", "shield", "bow", "boomerang", "bomb", "hookshot", "item", "lift", "carry", "throw", "push", "itemGet"];
+const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "death", "shield", "bow", "boomerang", "bomb", "item", "lift", "carry", "throw", "push", "itemGet"];
 
 export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Start Toolkit": {
@@ -134,7 +134,6 @@ export const ACTION_UI: Record<string, ActionUi> = {
       hudBottom: { group: "Interface" },
       language: { group: "Interface", ui: "radio" },
       shieldButton: { group: "Game" },
-      autosave: { group: "Game" },
       progressVariable: { group: "Game" },
       tileUnits: { group: "Debug" },
       debugHitboxes: { group: "Debug" },
@@ -313,11 +312,6 @@ export const ACTION_UI: Record<string, ActionUi> = {
     keywords: ["ability", "disable", "enable"],
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
   },
-  "Zelda: HUD Variables": {
-    keywords: ["hud", "ui", "variables", "add ui", "hearts", "rupees", "interface", "custom"],
-    fields: { itemName: { group: "Item" }, itemCount: { group: "Item" } },
-    preview: (p) => `${["fullHearts", "halfHeart", "maxHearts", "magicPercent", "rupees", "bombs", "arrows", "key", "itemName", "itemCount"].filter((k) => set(p[k])).length} variables`,
-  },
   "Zelda: HUD Style": {
     keywords: ["hud", "ui", "interface", "hearts", "icons", "skin", "style", "digits", "font"],
     fields: {
@@ -349,10 +343,8 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p) => join(["heartFull", "rupees", "digits", "itemBox", "magicFrame", "bar"].filter((k) => set(p[k])).map((k) => k.replace(/[A-Z].*/, ""))) || "built-in pictures",
   },
   "Zelda: Message Style": {
-    keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign", "typewriter"],
-    fields: { display: { ui: "radio" }, position: { ui: "radio" } },
-    visible: { typing: (p) => p.display === "toolkit", waitForKey: (p) => p.display === "toolkit", position: (p) => p.display === "toolkit" },
-    preview: (p, show) => join([p.display === "toolkit" ? "toolkit box" : "PS Maker dialogue", set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
+    keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign"],
+    preview: (p, show) => join([set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
   },
   "Zelda: Show Message": {
     keywords: ["message", "text", "toast", "notification", "say"],
@@ -366,9 +358,6 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => (isPoint(p.position) ? show("position") : "current position"),
   },
   "Zelda: Respawn Player": { keywords: ["respawn", "revive", "death", "restart"] },
-  "Zelda: Save Progress": { keywords: ["save", "progress", "slot"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
-  "Zelda: Load Progress": { keywords: ["load", "progress", "continue"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
-  "Zelda: Reset Progress": { keywords: ["reset", "new game", "clear", "progress"], fields: { slot: { ui: "radio" } }, preview: (_p, show) => show("slot") },
   "Zelda: Define Item": {
     keywords: ["item", "custom", "weapon", "magic", "rod", "wand", "define item"],
     fields: { cost: { min: 0, step: 1 }, damage: { min: 0, step: 1 }, stunMs: { min: 0, step: 100 }, heal: { min: 0, step: 1 } },
@@ -398,7 +387,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Set Player Sprites": {
     keywords: ["sprite", "animation", "attack", "mana seed", "shield", "bow", "lift", "carry", "push", "death"],
     fields: {
-      ...Object.fromEntries(["shield", "bow", "boomerang", "bomb", "hookshot", "item"].map((k) => [k, { group: "Items and shield" }])),
+      ...Object.fromEntries(["shield", "bow", "boomerang", "bomb", "item"].map((k) => [k, { group: "Items and shield" }])),
       ...Object.fromEntries(["lift", "carry", "throw", "push", "itemGet"].map((k) => [k, { group: "Lifting, pushing, chests" }])),
       weaponAttack: { group: "Weapon layer" },
       weaponSpin: { group: "Weapon layer" },

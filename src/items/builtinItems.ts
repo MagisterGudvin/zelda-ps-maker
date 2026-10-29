@@ -6,7 +6,6 @@ import { boxCircleOverlap, makeBox } from "../core/math.ts";
 import type { Entity } from "../core/entity.ts";
 import { Bomb } from "./bomb.ts";
 import { Boomerang } from "./boomerang.ts";
-import { Hookshot } from "./hookshot.ts";
 import { Projectile } from "./projectile.ts";
 import { spawnEffect } from "./effect.ts";
 import type { ItemDefinition, ItemRegistry, ItemUseContext } from "./registry.ts";
@@ -59,19 +58,6 @@ export function registerBuiltinItems(reg: ItemRegistry): void {
     },
   });
 
-  reg.register({
-    id: "hookshot",
-    icon: "icon_hookshot",
-    quickUse: true,
-    maxActive: 1,
-    use: (ctx) => {
-      if (!ctx.session.config.items.hookshot.enabled) {
-        ctx.session.logger.warnOnce("hookshot-disabled", "Hookshot is experimental and disabled; set items.hookshot.enabled = true to use it.");
-        return false;
-      }
-      return ctx.session.world.add(new Hookshot(ctx.session, ctx.frontX, ctx.frontY, ctx.dirX, ctx.dirY));
-    },
-  });
 
   reg.register({
     id: "fire_rod",

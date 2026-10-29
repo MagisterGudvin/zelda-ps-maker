@@ -19,8 +19,6 @@ export const ru: Record<string, string> = {
   "item.boomerang.desc": "Оглушает врагов, нажимает переключатели и приносит предметы.",
   "item.bow.name": "Лук",
   "item.bow.desc": "Стреляет стрелами. Одна стрела на выстрел.",
-  "item.hookshot.name": "Крюк",
-  "item.hookshot.desc": "Цепляется за подходящие объекты и подтягивает вас к ним.",
   "item.fire_rod.name": "Огненный жезл",
   "item.fire_rod.desc": "Выпускает огненный шар, зажигающий факелы. Тратит магию.",
   "item.healing_spell.name": "Лечебное заклинание",
@@ -54,8 +52,4 @@ export const ru: Record<string, string> = {
   "msg.puzzle_solved": "Где-то что-то открылось...",
   "msg.puzzle_failed": "Неверный порядок! Переключатели сброшены.",
   "msg.dungeon_completed": "Подземелье пройдено!",
-  "msg.saved": "Прогресс сохранён.",
-  "msg.loaded": "Прогресс загружен.",
-  "msg.reset": "Прогресс сброшен.",
-  "msg.save_unavailable": "Сохранение недоступно в этом браузере."
 };

@@ -34,7 +34,7 @@ export class Pickup extends Entity {
   private ageMs = 0;
   private readonly persistentId: string | null;
   private readonly silent: boolean;
-  /** Entity currently carrying this pickup (boomerang/hookshot). */
+  /** Entity currently carrying this pickup (boomerang). */
   carrier: Entity | null = null;
 
   constructor(session: Session, x: number, y: number, opts: PickupOptions) {

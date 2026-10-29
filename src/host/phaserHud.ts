@@ -1,6 +1,6 @@
 import type { ToolkitConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
-import type { HudModel, HudSink, MessageBoxModel, SheetPreview } from "./types.ts";
+import type { HudModel, HudSink, SheetPreview } from "./types.ts";
 import { resolveTexture } from "./textures.ts";
 import type { HudLayout } from "../ui/hudLayout.ts";
 import { HudPainter, Pool } from "./hudPainter.ts";
@@ -42,13 +42,8 @@ export class PhaserHud implements HudSink {
   private previewG: any = null;
   private previewImg: any = null;
   private previewLabels!: Pool;
-  /** The dialogue box (Zelda: Message Style): background, picture slices, text. */
-  private boxG: any = null;
-  private boxText: any = null;
-  private boxPics!: Pool;
   private panelPics!: Pool;
   private cursorImg: any = null;
-  private boxWrap: { key: string; lines: string[] } | null = null;
 
   /** Use getHud(); direct construction would duplicate the HUD scene. */
   constructor(game: any, cfg: ToolkitConfig, logger: Logger) {
@@ -107,13 +102,10 @@ export class PhaserHud implements HudSink {
     this.previewG = s.add.graphics().setDepth(20);
     this.previewImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(21).setVisible(false);
     this.previewLabels = new Pool(() => s.add.text(0, 0, "", { fontFamily: "monospace", color: "#ffff66", backgroundColor: "#000000aa" }).setOrigin(0, 0).setDepth(22));
-    this.boxG = s.add.graphics().setDepth(15);
-    this.boxPics = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(15));
     // Inventory panel picture: over the HUD bar, under the HUD's graphics and item icons.
     this.panelPics = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(-0.05));
     // Inventory cursor picture: under the item icons (a highlight or a frame with an open middle).
     this.cursorImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(0.15).setVisible(false);
-    this.boxText = s.add.text(0, 0, "", { fontFamily: "monospace" }).setOrigin(0, 0).setDepth(16).setVisible(false);
   }
 
   private screen(): { W: number; H: number } {
@@ -138,7 +130,6 @@ export class PhaserHud implements HudSink {
     const k = L.k;
 
     this.drawMessages(model, L);
-    this.drawBox(model.box, model, L);
     if (model.dead) {
       const t = this.text(model.deathText, 0, 0, 10 * k, "#ffffff");
       t.setPosition(Math.round(W / 2 - t.width / 2), Math.round(H / 2 - t.height / 2));
@@ -177,106 +168,21 @@ export class PhaserHud implements HudSink {
   }
 
   /**
-   * The toolkit's dialogue box, drawn like a PS Maker dialogue layout: its size and padding in the
-   * game's logical UI pixels scaled to the screen, a colour background with border and rounded
-   * corners or a picture (9-slice: the corners drawn at the border width, as NineSliceBackground),
-   * the layout's text style. The text is wrapped once, so typing never moves words between lines.
+   * A picture as a 9-slice over a screen rectangle: corners `slice` picture pixels big drawn at
+   * `border` screen pixels (smaller when the rectangle is), sides and middle stretched.
    */
-  private drawBox(box: MessageBoxModel | null, model: HudModel, L: HudLayout): void {
-    const g = this.boxG;
-    if (!g) return;
-    g.clear();
-    this.boxPics.begin();
-    if (!box) {
-      this.boxPics.end();
-      this.boxText.setVisible(false);
-      return;
-    }
-    const st = box.style;
-    const { W, H } = this.screen();
-    const f = Math.min(W / st.logicalW, H / st.logicalH);
-    const w = Math.round(Math.min(st.width * f, W - 16));
-    const h = Math.round(st.height * f);
-    const x = Math.round((W - w) / 2);
-    const k = L.k;
-    const barTop = L.bar.y * k;
-    const barBottom = (L.bar.y + L.bar.h) * k;
-    const y = Math.round(box.position === "top" ? (model.position === "top" ? barBottom : 0) + st.gap * f : (model.position === "bottom" ? barTop : H) - st.gap * f - h);
-
-    const bg = st.background;
-    if (bg.type === "plain") {
-      const fill = hexColor(bg.color);
-      const r = Math.min(bg.borderRadius * f, h / 2, w / 2);
-      g.fillStyle(fill.color, fill.alpha * (bg.opacity / 100)).fillRoundedRect(x, y, w, h, r);
-      const bw = bg.borderWidth * f;
-      if (bw > 0) {
-        const line = hexColor(bg.borderColor);
-        g.lineStyle(bw, line.color, line.alpha).strokeRoundedRect(x + bw / 2, y + bw / 2, w - bw, h - bw, Math.max(0, r - bw / 2));
-      }
-    } else if (this.painter!.picSize(bg.imageId)) {
-      this.drawBoxPicture(this.boxPics, bg, x, y, w, h, f);
-    }
-
-    const t = st.text;
-    const pad = st.padding;
-    const wrapW = Math.max(10, w - (pad.left + pad.right) * f);
-    const px = Math.max(6, Math.round(t.size * f));
-    this.boxText.setStyle({ fontFamily: t.fontFamily, fontSize: `${px}px`, color: t.color, align: t.align, fontStyle: "normal", wordWrap: { width: wrapW, useAdvancedWrap: true } });
-    this.boxText.setLineSpacing?.(Math.round(px * (t.lineHeight / 100 - 1)));
-    this.boxText.setStroke?.(t.strokeColor, t.strokeWidth * f);
-    const key = `${box.text}|${wrapW}|${px}|${t.fontFamily}`;
-    if (this.boxWrap?.key !== key) {
-      const wrapped = typeof this.boxText.getWrappedText === "function" ? this.boxText.getWrappedText(box.text) : null;
-      this.boxWrap = { key, lines: Array.isArray(wrapped) ? wrapped : [box.text] };
-    }
-    let left = box.shown;
-    const shown: string[] = [];
-    for (const line of this.boxWrap.lines) {
-      if (left <= 0) break;
-      shown.push(line.slice(0, left));
-      left -= line.length + 1;
-    }
-    this.boxText.setText(shown.join("\n"));
-    this.boxText.setPosition(x + pad.left * f, y + pad.top * f).setVisible(true);
-
-    // "More" caret, blinking, while the box waits for the action key.
-    if (box.waiting && Math.floor(Date.now() / 400) % 2 === 0) {
-      const c = hexColor(st.caretColor);
-      const size = Math.max(4, px * 0.45);
-      const cx = x + w - pad.right * f - size;
-      const cy = y + h - pad.bottom * f - size * 0.8;
-      g.fillStyle(c.color, c.alpha).fillTriangle(cx, cy, cx + size, cy, cx + size / 2, cy + size * 0.8);
-    }
-    this.boxPics.end();
-  }
-
-  private drawBoxPicture(pics: Pool, bg: Extract<MessageBoxModel["style"]["background"], { type: "image" }>, x: number, y: number, w: number, h: number, f: number): void {
-    const key = bg.imageId;
+  private nineSlice(pics: Pool, key: string, slice: number, x: number, y: number, w: number, h: number, border: number): void {
     const size = this.painter!.picSize(key)!;
-    const alpha = Math.max(0, Math.min(1, bg.opacity / 100));
-    const put = (frame: string | undefined, dx: number, dy: number, dw: number, dh: number) => {
+    const put = (frame: string, dx: number, dy: number, dw: number, dh: number) => {
       if (dw <= 0 || dh <= 0) return;
-      const img = pics.next();
-      if (frame) img.setTexture(key, frame);
-      else img.setTexture(key);
-      img.setScale(1).setPosition(Math.round(dx), Math.round(dy)).setDisplaySize(Math.round(dw), Math.round(dh)).setAlpha(alpha);
+      pics.next().setTexture(key, frame).setScale(1).setPosition(Math.round(dx), Math.round(dy)).setDisplaySize(Math.round(dw), Math.round(dh)).setAlpha(1);
     };
-    if (bg.mode === "stretch") return put(undefined, x, y, w, h);
-    if (bg.mode === "fit") {
-      const s = Math.min(w / size.w, h / size.h);
-      return put(undefined, x + (w - size.w * s) / 2, y + (h - size.h * s) / 2, size.w * s, size.h * s);
-    }
-    const sl = bg.slice;
-    const L = Math.max(0, Math.min(sl.left, size.w));
-    const R = Math.max(0, Math.min(sl.right, size.w - L));
-    const T = Math.max(0, Math.min(sl.top, size.h));
-    const B = Math.max(0, Math.min(sl.bottom, size.h - T));
-    const want = Math.max(0, bg.borderWidth * f);
-    const b = Math.round(want * Math.min(1, want > 0 ? w / (want * 2) : 1, want > 0 ? h / (want * 2) : 1));
-    const sx = [0, L, size.w - R];
-    const sw = [L, size.w - L - R, R];
-    const sy = [0, T, size.h - B];
-    const sh = [T, size.h - T - B, B];
+    const sl = Math.max(0, Math.min(slice, Math.floor(size.w / 2), Math.floor(size.h / 2)));
+    const b = Math.round(Math.min(border, w / 2, h / 2));
+    const sx = [0, sl, size.w - sl];
+    const sw = [sl, size.w - 2 * sl, sl];
+    const sy = [0, sl, size.h - sl];
+    const sh = [sl, size.h - 2 * sl, sl];
     const dx = [x, x + b, x + w - b];
     const dw = [b, w - 2 * b, b];
     const dy = [y, y + b, y + h - b];
@@ -285,7 +191,7 @@ export class PhaserHud implements HudSink {
     for (let row = 0; row < 3; row++) {
       for (let col = 0; col < 3; col++) {
         if (sw[col] <= 0 || sh[row] <= 0) continue;
-        const name = `zmt9_${L}_${T}_${R}_${B}_${row * 3 + col}`;
+        const name = `zmt9_${sl}_${row * 3 + col}`;
         if (!tex.has?.(name)) tex.add?.(name, 0, sx[col], sy[row], sw[col], sh[row]);
         put(name, dx[col], dy[row], dw[col], dh[row]);
       }
@@ -307,7 +213,7 @@ export class PhaserHud implements HudSink {
     if (ownPanel) {
       // Own panel picture (HUD Style → Inventory panel): a 9-slice whose border is drawn in HUD pixels.
       const sl = model.panelSlice;
-      this.drawBoxPicture(this.panelPics, { type: "image", imageId: skin.inventoryPanel, opacity: 100, mode: "nine-slice", borderWidth: sl, slice: { top: sl, right: sl, bottom: sl, left: sl } }, px, py, pw, ph, k);
+      this.nineSlice(this.panelPics, skin.inventoryPanel, sl, px, py, pw, ph, sl * k);
     } else {
       g.fillStyle(MSG_FILL, 0.95).fillRect(px, py, pw, ph);
       g.lineStyle(k, MSG_BORDER, 1).strokeRect(px + k / 2, py + k / 2, pw - k, ph - k);
@@ -410,13 +316,4 @@ export class PhaserHud implements HudSink {
   private applyVisible(): void {
     this.scene?.sys?.setVisible?.(this.visible);
   }
-}
-
-/** "#rgb", "#rrggbb" or "#rrggbbaa" → Phaser colour and alpha (white when unreadable). */
-export function hexColor(value: string): { color: number; alpha: number } {
-  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec((value ?? "").trim());
-  if (!m) return { color: 0xffffff, alpha: 1 };
-  let hex = m[1];
-  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
-  return { color: parseInt(hex.slice(0, 6), 16), alpha: hex.length === 8 ? parseInt(hex.slice(6), 16) / 255 : 1 };
 }

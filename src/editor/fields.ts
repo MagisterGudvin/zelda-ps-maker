@@ -122,14 +122,13 @@ export const ITEM_OPTIONS = [
   ["bomb", "Bomb bag (use bombs)"],
   ["boomerang", "Boomerang"],
   ["bow", "Bow"],
-  ["hookshot", "Hookshot"],
   ["fire_rod", "Fire rod"],
   ["healing_spell", "Healing spell"],
   ...CUSTOM_ITEM_SLOTS,
 ] as const;
 
 /** Items the player equips or that can be switched off (abilities). */
-export const ABILITY_OPTIONS = [["sword", "Sword"], ["shield", "Shield"], ["glove", "Power glove"], ["bomb", "Bombs"], ["boomerang", "Boomerang"], ["bow", "Bow"], ["hookshot", "Hookshot"], ["fire_rod", "Fire rod"], ["healing_spell", "Healing spell"], ...CUSTOM_ITEM_SLOTS] as const;
+export const ABILITY_OPTIONS = [["sword", "Sword"], ["shield", "Shield"], ["glove", "Power glove"], ["bomb", "Bombs"], ["boomerang", "Boomerang"], ["bow", "Bow"], ["fire_rod", "Fire rod"], ["healing_spell", "Healing spell"], ...CUSTOM_ITEM_SLOTS] as const;
 
 export const RESOURCE_OPTIONS = [["rupees", "Rupees"], ["bombs", "Bombs"], ["arrows", "Arrows"], ["magic", "Magic"], ["key", "Small keys"]] as const;
 
@@ -138,7 +137,6 @@ export const GROUP_OPTIONS = [["", "No group"], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].m
 
 export const DUNGEON_OPTIONS = [["", "Overworld (no dungeon)"], ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => [`dungeon_${n}`, `Dungeon ${n}`] as const)] as const;
 
-export const SLOT_OPTIONS = [["default", "Slot 1"], ["2", "Slot 2"], ["3", "Slot 3"]] as const;
 
 /** Template dropdown. */
 export function templateOf(p: Record<string, unknown>, fallback: string): string {

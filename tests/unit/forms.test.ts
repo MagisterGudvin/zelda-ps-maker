@@ -26,7 +26,7 @@ async function setup(startParams: Record<string, unknown>) {
   };
   run("Zelda: Start Toolkit", { mapId: "forms", language: "en", debugHitboxes: false, diagnostics: false, ...startParams });
   const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" }, save: { autoSave: false } });
+  tk.configure({ debug: { logLevel: "silent" } });
   return { run, tk, s: tk.session!, actions, vars, done: resetToolkitForTests };
 }
 
@@ -55,13 +55,14 @@ test("action names stay stable (PS Maker saves actions under a key derived from 
   const { default: plugin } = await import("../../src/index.ts");
   const names = new Set((plugin.events as unknown as AnyAction[]).map((e) => e.name));
   // As saved in a PS Maker 1.2.1 project: "plugin:zelda-maker-toolkit:zelda-create-enemy".
-  const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Show Stat In Variable", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Save Progress", "Load Progress", "Reset Progress", "Define Item", "Define Enemy", "Set Player Sprites", "Set Sound"];
+  const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Show Stat In Variable", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Define Item", "Define Enemy", "Set Player Sprites", "Set Sound"];
   // Removed in 0.7.0 (PS Maker does it itself): Place Marker, Start Waves, Set Flag, Define Sprite Sheet, Define Animation, Preview Sprite Sheet.
+  // Removed in 0.22.0 (PS Maker saves and the progress variable do it): Save Progress, Load Progress, Reset Progress; HUD Variables.
   for (const n of saved) assert.ok(names.has(`Zelda: ${n}`), `"Zelda: ${n}" was renamed or removed — saved projects would lose it`);
 });
 
 test("Start Toolkit: game settings from numbers and checkboxes", async () => {
-  const { tk, done } = await setup({ difficulty: 3, hearts: 5, swordDamage: 3, magicBar: false, shieldButton: true, hudBottom: true, autosave: false });
+  const { tk, done } = await setup({ difficulty: 3, hearts: 5, swordDamage: 3, magicBar: false, shieldButton: true, hudBottom: true });
   assert.equal(tk.config.player.invulnerableMs, 600, "difficulty 3 = hard");
   assert.equal(tk.config.player.maxHealth, 10);
   assert.equal(tk.state.player.maxHp, 10, "new game starts with 5 hearts");

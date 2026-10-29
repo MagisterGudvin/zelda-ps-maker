@@ -19,8 +19,6 @@ export const en: Record<string, string> = {
   "item.boomerang.desc": "Stuns enemies, hits switches and brings back items.",
   "item.bow.name": "Bow",
   "item.bow.desc": "Shoots arrows. Uses one arrow per shot.",
-  "item.hookshot.name": "Hookshot",
-  "item.hookshot.desc": "Grabs hookable objects and pulls you to them.",
   "item.fire_rod.name": "Fire Rod",
   "item.fire_rod.desc": "Casts a fireball that lights torches. Uses magic.",
   "item.healing_spell.name": "Healing Spell",
@@ -54,8 +52,4 @@ export const en: Record<string, string> = {
   "msg.puzzle_solved": "Something opened somewhere...",
   "msg.puzzle_failed": "Wrong order! The switches reset.",
   "msg.dungeon_completed": "Dungeon cleared!",
-  "msg.saved": "Progress saved.",
-  "msg.loaded": "Progress loaded.",
-  "msg.reset": "Progress reset.",
-  "msg.save_unavailable": "Saving is not available in this browser."
 };

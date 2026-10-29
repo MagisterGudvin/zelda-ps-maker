@@ -43,6 +43,8 @@ class GameMap extends Phaser.Scene {
     this.mapId = mapId;
     // As GameMap.init: the PS Maker map of this scene (the toolkit takes its id as the map id).
     this.map = { id: mapId };
+    // As GameMap.storyRunner: runs actions as an event; a "Dialogue" waits until the page closes it.
+    this.storyRunner = { playActions: (actions) => new Promise((done) => (window.__dialogues ??= []).push({ actions, close: done })) };
   }
 
   init() {
@@ -189,17 +191,6 @@ const game = new Phaser.Game({
 
 /** The map scene being played. */
 const activeMap = () => game.scene.getScenes(true).find((s) => s instanceof GameMap);
-
-// Harness-only shortcuts that an author would wire to PS Maker menu events.
-window.addEventListener("keydown", (e) => {
-  const scene = activeMap();
-  if (!scene?.player) return;
-  if (e.code === "F5") scene.playEvent([["Zelda: Save Progress", { slot: "default" }]]);
-  else if (e.code === "F8") scene.playEvent([["Zelda: Load Progress", { slot: "default" }]]);
-  else if (e.code === "F6") scene.playEvent([["Zelda: Reset Progress", { slot: "default", newGame: true }]]);
-  else return;
-  e.preventDefault();
-});
 
 window.__harness = {
   game,

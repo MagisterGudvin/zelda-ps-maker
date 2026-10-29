@@ -21,7 +21,6 @@ export type ObjectType =
   | "reactive"
   | "spikes"
   | "pit"
-  | "hook_post"
   | "sign";
 
 export const OBJECT_TYPES: readonly ObjectType[] = [
@@ -43,7 +42,6 @@ export const OBJECT_TYPES: readonly ObjectType[] = [
   "reactive",
   "spikes",
   "pit",
-  "hook_post",
   "sign",
 ];
 
@@ -82,7 +80,6 @@ export interface ObjectConfig {
   actionable: boolean;
   requires: ObjectRequirements;
   persistent: boolean;
-  hookable: boolean;
   /** Drop table when destroyed; null = none, undefined = the global default. */
   drops: DropTable | null | "default";
   /** Chest contents. */
@@ -134,7 +131,6 @@ const BASE: ObjectConfig = {
   actionable: false,
   requires: {},
   persistent: false,
-  hookable: false,
   drops: null,
   contents: null,
   lock: "none",
@@ -168,17 +164,16 @@ const PRESETS: Record<ObjectType, Partial<ObjectConfig>> = {
   breakable: { sprite: "obj_cracked", activeSprite: "obj_rubble", tools: ["bomb"], persistent: true },
   bombable_wall: { sprite: "obj_wall_cracked", activeSprite: "obj_wall_hole", tools: ["bomb"], persistent: true },
   lever: { sprite: "obj_lever_off", activeSprite: "obj_lever_on", actionable: true, toggle: true, persistent: true },
-  button: { sprite: "obj_switch_off", activeSprite: "obj_switch_on", tools: ["sword", "spin", "arrow", "boomerang", "bomb", "hookshot", "fire", "magic"], toggle: true, persistent: true },
+  button: { sprite: "obj_switch_off", activeSprite: "obj_switch_on", tools: ["sword", "spin", "arrow", "boomerang", "bomb", "fire", "magic"], toggle: true, persistent: true },
   pressure_plate: { sprite: "obj_plate_up", activeSprite: "obj_plate_down", solid: false, plateMode: "hold" },
-  block: { sprite: "obj_block", activeSprite: "obj_block", hookable: false, persistent: true },
-  chest: { sprite: "obj_chest", activeSprite: "obj_chest_open", actionable: true, persistent: true, hookable: true },
+  block: { sprite: "obj_block", activeSprite: "obj_block", persistent: true },
+  chest: { sprite: "obj_chest", activeSprite: "obj_chest_open", actionable: true, persistent: true },
   door: { sprite: "obj_door", activeSprite: "obj_door_open", lock: "small_key", actionable: true, persistent: true },
   hidden_passage: { sprite: "obj_stairs", activeSprite: "obj_stairs", solid: false, hidden: true, persistent: true },
   torch: { sprite: "obj_torch", activeSprite: "obj_torch_lit", tools: ["fire"], persistent: false },
   reactive: {},
   spikes: { sprite: "obj_spikes", activeSprite: "obj_spikes", solid: false, hazardDamage: 1 },
   pit: { sprite: "obj_pit", activeSprite: "obj_pit", solid: false, hazardDamage: 1 },
-  hook_post: { sprite: "obj_post", activeSprite: "obj_post", hookable: true },
   sign: { sprite: "obj_sign", activeSprite: "obj_sign", actionable: true },
 };
 

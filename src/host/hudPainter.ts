@@ -285,7 +285,9 @@ export class HudPainter {
   /** A text at scene pixels (font size px). */
   text(value: string, x: number, y: number, px: number, color: string, opts: Record<string, unknown> = {}): any {
     const t = this.texts.next();
-    t.setStyle({ fontFamily: this.fontFamily, fontSize: `${Math.max(1, Math.round(px))}px`, color, fontStyle: "bold", ...opts });
+    // A project font is drawn as designed; only the plain fallback is made bold to stay readable.
+    const fontStyle = this.fontFamily === "monospace" ? "bold" : "normal";
+    t.setStyle({ fontFamily: this.fontFamily, fontSize: `${Math.max(1, Math.round(px))}px`, color, fontStyle, ...opts });
     t.setShadow(1, 1, "#000000", 0, false, true);
     // Pooled texts: a fading message may have left its alpha on this one.
     t.setAlpha(1);

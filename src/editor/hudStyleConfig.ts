@@ -14,7 +14,6 @@ export const HUD_ITEM_ICONS: [string, string, string][] = [
   ["iconBomb", "bomb", "Bomb item"],
   ["iconBoomerang", "boomerang", "Boomerang"],
   ["iconBow", "bow", "Bow"],
-  ["iconHookshot", "hookshot", "Hookshot"],
   ["iconFireRod", "fire_rod", "Fire rod"],
   ["iconHealingSpell", "healing_spell", "Healing spell"],
 ];

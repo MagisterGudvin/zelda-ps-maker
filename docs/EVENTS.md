@@ -54,7 +54,6 @@ API плагинов PS Maker 0.0.3 позволяет регистрирова�
 | `zelda:dungeon:entered` / `zelda:dungeon:completed` | `{ dungeonId }` |
 | `zelda:message` | `{ text, durationMs }` |
 | `zelda:inventory:toggled` | `{ open }` |
-| `zelda:save:written` / `zelda:save:loaded` / `zelda:save:reset` | `{ slot }` |
 | `zelda:custom:<имя>` | произвольный объект — из действия правил `emit` или поля объекта `emit` |
 
 Обработчики вызываются синхронно в порядке подписки; исключение в одном обработчике логируется и не мешает остальным. Рекурсия глубже 32 уровней обрывается с ошибкой в логе (защита от правил, вызывающих друг друга).

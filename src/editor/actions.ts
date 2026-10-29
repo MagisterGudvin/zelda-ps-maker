@@ -14,7 +14,6 @@ import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/he
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { HUD_ITEM_ICONS, HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
-import { styleFromLayout } from "../ui/messageBox.ts";
 import type { MessageKind } from "../core/events.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
@@ -22,7 +21,7 @@ import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import type { Facing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SLOT_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -237,7 +236,6 @@ const startToolkit = defineEvent({
     magicBar: bool("Magic bar", "Show the magic meter (needed for magic items). / Шкала магии.", true),
     shieldButton: bool("Shield on a button", "Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке.", false),
     hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
-    autosave: bool("Autosave", "Save after chests, doors, new items and dungeons. / Автосохранение.", true),
     progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
     tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
@@ -269,7 +267,6 @@ const startToolkit = defineEvent({
             ...(has("magicBar") ? { showMagic: boolOr(params.magicBar, true) } : {}),
             ...(has("hudBottom") ? { position: boolOr(params.hudBottom, false) ? "bottom" : "top" } : {}),
           },
-          save: has("autosave") ? { autoSave: boolOr(params.autosave, true) } : {},
           world: has("tileUnits") ? { positionUnits: boolOr(params.tileUnits, false) ? "tiles" : "pixels" } : {},
           debug: { hitboxes: boolOr(params.debugHitboxes, false), diagnostics: boolOr(params.diagnostics, false) },
         },
@@ -772,7 +769,6 @@ const setPlayerSprites = defineEvent({
     bow: playerAnim("Bow", "Optional: shooting an arrow; empty = Use item. / Лук."),
     boomerang: playerAnim("Boomerang", "Optional: throwing the boomerang; empty = Use item. / Бумеранг."),
     bomb: playerAnim("Bomb", "Optional: placing a bomb; empty = Use item. / Бомба."),
-    hookshot: playerAnim("Hookshot", "Optional: firing the hookshot; empty = Use item. / Крюк."),
     item: playerAnim("Use item", "Optional: any other item (rods, magic, your own items) and the fallback for the four above. / Использование предмета."),
     lift: playerAnim("Lift", "Optional: picking up a pot, bush or rock. / Поднять."),
     carry: playerAnim("Carry", "Optional: walking with the object overhead; stands on the first frame. / Нести над головой."),
@@ -817,7 +813,6 @@ const setPlayerSprites = defineEvent({
               bow: pick(params.bow),
               boomerang: pick(params.boomerang),
               bomb: pick(params.bomb),
-              hookshot: pick(params.hookshot),
               item: pick(params.item),
               lift: pick(params.lift),
               throw: pick(params.throw),
@@ -1026,15 +1021,10 @@ const MESSAGE_KINDS = [["sign", "Signs and object texts"], ["item", "Item receiv
 
 const messageStyle = defineEvent({
   name: "Zelda: Message Style",
-  description: "Shows toolkit messages (signs, \"You got...\") as PS Maker dialogues (or a toolkit box drawn like one): set them up in Game UI → Dialogue layouts like any dialogue. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.",
+  description: "Shows toolkit messages (signs, \"You got...\") as PS Maker dialogues, with everything their dialogue layout has (Game UI → Dialogue layouts: background, font, name box, portrait, typing sound). The game waits while one is open. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.",
   parameterDefs: {
-    display: choice("Show with", "PS Maker Dialogue: the message is a real PS Maker dialogue, with everything its dialogue layout has (Game UI: background, font, name box, portrait, typing sound, animations). Toolkit box: the toolkit draws a box like the layout. / Чем показывать.", [["dialogue", "PS Maker Dialogue"], ["toolkit", "Toolkit box"]], "dialogue"),
-    layout: dialogLayoutField("Dialogue layout", "Which dialogue layout of the project the box looks like. / Макет диалога PS Maker."),
-    kinds: { ...multi("Messages in the box", "Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне.", MESSAGE_KINDS), defaultValue: ["sign", "item"] },
-    typing: bool("Type letter by letter", "At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам.", true),
-    waitForKey: bool("Wait for the action key", "The box stays until the player presses the action key; off: it closes by itself. / Ждать клавишу.", true),
-    pause: bool("Pause the game", "Enemies and the player wait while the box is open. / Пауза, пока открыто окно.", true),
-    position: choice("Position", "Where the box is shown. / Где показывать.", [["bottom", "Bottom"], ["top", "Top"]], "bottom"),
+    layout: dialogLayoutField("Dialogue layout", "Which dialogue layout of the project the messages use. / Макет диалога PS Maker."),
+    kinds: { ...multi("Messages as dialogues", "Which toolkit messages are dialogues; the others stay short HUD notes. / Какие сообщения показывать диалогом.", MESSAGE_KINDS), defaultValue: ["sign", "item"] },
   },
   execute(params, ctx) {
     run("Zelda: Message Style", ctx, params, (s, tk) => {
@@ -1045,29 +1035,18 @@ const messageStyle = defineEvent({
       const layout = textOf(p.layout);
       const layouts = (story?.gameUI?.dialogLayouts ?? []) as { id?: string }[];
       if (layout && !layouts.some((l) => l?.id === layout)) s.logger.warn(`Message Style: dialogue layout "${layout}" is not in the project; the default one is used.`);
-      const style = styleFromLayout(story, layout);
-      if (style.text.fontId) s.host.loadProjectFont?.(style.text.fontId);
-      tk.messageBox = {
-        display: textOf(p.display) === "toolkit" ? "toolkit" : "dialogue",
-        layoutId: layout,
-        kinds,
-        typing: boolOr(p.typing, true),
-        waitForKey: boolOr(p.waitForKey, true),
-        pause: boolOr(p.pause, true),
-        position: textOf(p.position) === "top" ? "top" : "bottom",
-        style,
-      };
+      tk.messageBox = { layoutId: layout, kinds };
     });
   },
 });
 
 const showMessage = defineEvent({
   name: "Zelda: Show Message",
-  description: "Shows a toolkit message: a short HUD note, or the toolkit's dialogue box (see Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.",
+  description: "Shows a toolkit message: a short HUD note, or a PS Maker dialogue (layout from Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.",
   parameterDefs: {
     text: str("Text", "Message to show. / Текст сообщения.", ""),
     durationMs: num("Duration (ms)", "How long a short note stays: 1000 = one second. / Сколько показывать.", 2200),
-    box: bool("In a dialogue box", "Show it in the toolkit's dialogue box (typed out, closed with the action key), styled by Message Style. / В окне диалога.", false),
+    box: bool("As a dialogue", "Show it as a PS Maker dialogue (closed with the action key) instead of a note. / Диалогом.", false),
   },
   execute(params, ctx) {
     run("Zelda: Show Message", ctx, params, (s) => s.bus.emit("zelda:message", { text: s.i18n.text(params.text), durationMs: params.durationMs, ...(boolOr(params.box, false) ? { kind: "box" as const } : {}) }));
@@ -1094,20 +1073,6 @@ const STAT_OPTIONS = [
   ["enemies", "Enemies left on the map"],
 ] as const;
 
-/** Values of Zelda: HUD Variables, in form order: field → stat. */
-const HUD_VARIABLES = [
-  ["fullHearts", "Full hearts", "Whole hearts (bind a row's width: @{var} * heart width)."],
-  ["halfHeart", "Half heart", "1 while there is a half heart, else 0 (bind its opacity: @{var} * 100)."],
-  ["maxHearts", "Heart containers", "All hearts, full or empty (the row of empty hearts behind)."],
-  ["magicPercent", "Magic %", "0-100 (bind the meter's height or width)."],
-  ["rupees", "Rupees", "Rupee count (a text's value)."],
-  ["bombs", "Bombs", "Bomb count."],
-  ["arrows", "Arrows", "Arrow count."],
-  ["key", "Small keys", "Small keys of this dungeon."],
-  ["itemName", "Selected item name", "A Text variable: the selected item's name."],
-  ["itemCount", "Selected item ammo", "Bombs or arrows of the selected item (0 for others)."],
-] as const;
-
 const linkVariable = defineEvent({
   name: "Zelda: Show Stat In Variable",
   description: "Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use it in PS Maker conditions (a shop: if Rupees ≥ 50) or in UI components. Stays on for the whole game. / Значение Toolkit в переменной проекта.",
@@ -1130,26 +1095,6 @@ const linkVariable = defineEvent({
   },
 });
 
-const hudVariables = defineEvent({
-  name: "Zelda: HUD Variables",
-  description: "Build your own HUD with PS Maker's Add UI: the toolkit keeps these project variables up to date (hearts, magic, counters, selected item), and Add UI components show them (a text's value, or a size, position or opacity as an expression like @{Full hearts} * 36). Turn the toolkit's own HUD parts off in HUD Style. / Значения Toolkit в переменных для своего HUD на Add UI.",
-  parameterDefs: Object.fromEntries(HUD_VARIABLES.map(([key, label, hint]) => [key, variable(label, `${hint} Empty = not needed. / Переменная проекта.`)])) as Record<(typeof HUD_VARIABLES)[number][0], ReturnType<typeof variable>>,
-  execute(params, ctx) {
-    run("Zelda: HUD Variables", ctx, params, (s, tk) => {
-      const p = params as Record<string, unknown>;
-      let n = 0;
-      for (const [key] of HUD_VARIABLES) {
-        const id = textOf(p[key]);
-        if (!id) continue;
-        if (s.host.getVariable && s.host.getVariable(id) === undefined) s.logger.warn(`HUD Variables: project variable "${id}" not found.`);
-        tk.variableLinks.set(id, key);
-        n++;
-      }
-      if (n === 0) s.logger.warn("HUD Variables: choose at least one variable.");
-    });
-  },
-});
-
 const setRespawn = defineEvent({
   name: "Zelda: Set Respawn Point",
   description: "Where the player revives after falling in battle on this map (empty = current position). / Точка возрождения.",
@@ -1168,46 +1113,6 @@ const respawnPlayer = defineEvent({
   parameterDefs: {},
   execute(params, ctx) {
     run("Zelda: Respawn Player", ctx, params, (s) => s.player.respawn());
-  },
-});
-
-// ---- saves ------------------------------------------------------------------------------------
-
-const saveProgress = defineEvent({
-  name: "Zelda: Save Progress",
-  description: "Saves toolkit progress (health, items, chests, doors, switches, dungeons) to the browser. / Сохраняет прогресс.",
-  parameterDefs: { slot: choice("Slot", "Save slot. / Ячейка сохранения.", SLOT_OPTIONS, "default") },
-  execute(params, ctx) {
-    run("Zelda: Save Progress", ctx, params, (_s, tk) => {
-      tk.saves.save(params.slot || undefined);
-    });
-  },
-});
-
-const loadProgress = defineEvent({
-  name: "Zelda: Load Progress",
-  description: "Loads toolkit progress saved earlier. / Загружает прогресс.",
-  parameterDefs: { slot: choice("Slot", "Save slot. / Ячейка сохранения.", SLOT_OPTIONS, "default") },
-  execute(params, ctx) {
-    run("Zelda: Load Progress", ctx, params, (s, tk) => {
-      if (!tk.saves.load({ slot: params.slot || undefined })) s.logger.info("Load Progress: no save found.");
-    });
-  },
-});
-
-const resetProgress = defineEvent({
-  name: "Zelda: Reset Progress",
-  description: "Deletes a save slot and optionally starts a new game. / Удаляет сохранение.",
-  parameterDefs: { slot: choice("Slot", "Save slot. / Ячейка сохранения.", SLOT_OPTIONS, "default"), newGame: bool("New game", "Also reset current progress.", true) },
-  execute(params, ctx) {
-    run("Zelda: Reset Progress", ctx, params, (s, tk) => {
-      tk.saves.delete(params.slot || undefined);
-      if (params.newGame) {
-        tk.newGame();
-        s.onStateReplaced();
-      }
-      s.bus.emit("zelda:message", { text: s.i18n.t("msg.reset"), durationMs: 1200 });
-    });
   },
 });
 
@@ -1341,13 +1246,9 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   showMessage,
   messageStyle,
   hudStyle,
-  hudVariables,
   linkVariable,
   setRespawn,
   respawnPlayer,
-  saveProgress,
-  loadProgress,
-  resetProgress,
   defineItem,
   defineEnemy,
   setPlayerSprites,

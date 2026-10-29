@@ -9,7 +9,6 @@
     "puzzles": true,
     "dungeons": true,
     "ui": true,
-    "save": true,
     "debugTools": true
   },
   "debug": {
@@ -33,6 +32,7 @@
     "positionUnits": "pixels",
     "tileSize": 16,
     "useArcadeStaticBodies": true,
+    "solidBodies": true,
     "npcsBlock": true,
     "depthMode": "auto",
     "depthBase": 0,
@@ -123,6 +123,18 @@
       "weaponAttack": "",
       "weaponSpin": "",
       "weaponCharge": "",
+      "chargeWalk": "",
+      "shield": "",
+      "bow": "",
+      "boomerang": "",
+      "bomb": "",
+      "item": "",
+      "lift": "",
+      "carry": "",
+      "throw": "",
+      "push": "",
+      "itemGet": "",
+      "death": "",
       "weaponBehind": [
         "up"
       ],
@@ -195,14 +207,6 @@
       "damage": 2,
       "maxActive": 3
     },
-    "hookshot": {
-      "enabled": false,
-      "speed": 260,
-      "range": 120,
-      "damage": 0,
-      "stunMs": 1500,
-      "pullSpeed": 240
-    },
     "fireRod": {
       "speed": 200,
       "range": 160,
@@ -228,7 +232,6 @@
     "order": [
       "bow",
       "boomerang",
-      "hookshot",
       "bomb",
       "fire_rod",
       "healing_spell"
@@ -324,14 +327,13 @@
     "messageMs": 2200,
     "inventoryPanel": true,
     "pauseWhileInventoryOpen": true,
-    "fontFamily": "monospace"
-  },
-  "save": {
-    "enabled": true,
-    "storageKey": "zelda-maker-toolkit",
-    "slot": "default",
-    "autoSave": true,
-    "autoLoadOnStart": false
+    "fontFamily": "monospace",
+    "skin": {},
+    "barSlice": 4,
+    "panelSlice": 4,
+    "showLifeLabel": true,
+    "textColor": "#f8e0a0",
+    "places": {}
   },
   "publicApi": true
 }

@@ -21,7 +21,7 @@ const DEATH_ANIM_MS = 1000;
  */
 const WALK_GRACE_MS = 120;
 /** Item ids with their own animation slot (others use `item`). */
-const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb" | "hookshot"> = { bow: "bow", boomerang: "boomerang", bomb: "bomb", hookshot: "hookshot" };
+const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb"> = { bow: "bow", boomerang: "boomerang", bomb: "bomb" };
 
 /**
  * Wraps the PS Maker player Actor. Movement stays under PS Maker's control;

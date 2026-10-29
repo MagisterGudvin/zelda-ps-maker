@@ -187,7 +187,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     assert.deepEqual(style.parts, ["hearts", "counters", "item", "magic"]);
     assert.equal(style.scale, 0);
     assert.equal(style.font, DEMO_FONT.id);
-    assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.display, "dialogue");
+    assert.deepEqual(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.kinds, ["sign", "item"]);
   }
   assert.deepEqual(story.variables.map((v: Any) => v.id), ["zelda-progress"]);
   const ui = story.gameUI;

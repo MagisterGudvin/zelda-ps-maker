@@ -97,12 +97,6 @@ export function createPublicApi(tk: Toolkit) {
     runActions(actions: RuleAction[]) {
       tk.session?.rules?.execute(actions, "api");
     },
-    save(slot?: string) {
-      return tk.saves.save(slot);
-    },
-    load(slot?: string) {
-      return tk.saves.load({ slot });
-    },
   };
 }
 

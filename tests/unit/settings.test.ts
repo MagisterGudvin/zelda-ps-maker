@@ -83,7 +83,7 @@ test("the Font dropdown lists the project's fonts (filled from the open project)
   assert.deepEqual(FONT_OPTIONS, [{ label: "Default", value: "" }]);
 });
 
-test("HUD Variables: toolkit values in project variables for an Add UI HUD (whole hearts, half heart 0/1, item)", async () => {
+test("Show Stat In Variable: toolkit values in project variables (whole hearts, half heart 0/1, item)", async () => {
   const { default: plugin } = await import("../../src/index.ts");
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   resetToolkitForTests();
@@ -95,7 +95,7 @@ test("HUD Variables: toolkit values in project variables for an Add UI HUD (whol
   run("Zelda: Start Toolkit", { language: "en", hearts: 3 });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: HUD Variables", { fullHearts: "v_full", halfHeart: "v_half", maxHearts: "v_max", rupees: "v_rup", itemName: "v_name" });
+  for (const [stat, variableId] of [["fullHearts", "v_full"], ["halfHeart", "v_half"], ["maxHearts", "v_max"], ["rupees", "v_rup"], ["itemName", "v_name"]]) run("Zelda: Show Stat In Variable", { stat, variableId });
   run("Zelda: Show Stat In Variable", { stat: "selected", item: "bow", variableId: "v_bow" });
   const s = tk.session!;
   const step = () => {

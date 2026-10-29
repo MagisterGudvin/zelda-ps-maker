@@ -267,9 +267,6 @@ export function registerBuiltinRules(reg: RuleRegistry): void {
   reg.registerAction("enterDungeon", (arg, ctx) => ctx.session.dungeons?.enter(String(arg)));
   reg.registerAction("completeDungeon", (arg, ctx) => ctx.session.dungeons?.complete(typeof arg === "string" ? arg : null));
   reg.registerAction("startWaves", (arg, ctx) => ctx.session.dungeons?.startWaves(String(arg)));
-  reg.registerAction("save", (_arg, ctx) => {
-    ctx.session.toolkit.saves.save();
-  });
   reg.registerAction("if", (arg, ctx) => {
     const o = asObj(arg);
     const ok = ctx.evaluate(asObj(o.when));

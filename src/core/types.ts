@@ -8,7 +8,6 @@ export type DamageType =
   | "arrow"
   | "bomb"
   | "boomerang"
-  | "hookshot"
   | "fire"
   | "ice"
   | "magic"
@@ -26,7 +25,6 @@ export const DAMAGE_TYPES: readonly DamageType[] = [
   "arrow",
   "bomb",
   "boomerang",
-  "hookshot",
   "fire",
   "ice",
   "magic",
@@ -54,7 +52,7 @@ export interface DamageInfo {
   originY: number;
   /** Knockback speed in px/s; 0 disables knockback. */
   knockback: number;
-  /** Stun duration in ms (boomerang, hookshot). */
+  /** Stun duration in ms (boomerang). */
   stunMs: number;
   /** Projectiles and similar can be blocked by shields. */
   blockable: boolean;

@@ -10,11 +10,10 @@ import { ItemRegistry } from "../items/registry.ts";
 import { registerBuiltinItems } from "../items/builtinItems.ts";
 import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { RuleRegistry } from "../puzzles/ruleRegistry.ts";
-import { SaveManager, type SaveStorage, createBrowserStorage } from "../save/save.ts";
+import { parseProgress, serializeProgress } from "../save/save.ts";
 import type { MessageBoxSettings } from "../ui/messageBox.ts";
 
 export interface ToolkitOptions {
-  storage?: SaveStorage | null;
   logSink?: LogSink;
 }
 
@@ -31,7 +30,6 @@ export class Toolkit {
   readonly enemyTemplates = new EnemyTemplateRegistry();
   readonly ruleRegistry = new RuleRegistry();
   readonly inventory: Inventory;
-  readonly saves: SaveManager;
 
   state: GameState;
   session: Session | null = null;
@@ -56,7 +54,6 @@ export class Toolkit {
     this.bus = new EventBus(this.logger);
     this.state = createDefaultState(this.config);
     this.inventory = new Inventory(this);
-    this.saves = new SaveManager(this, options.storage === undefined ? createBrowserStorage() : options.storage);
     registerBuiltinItems(this.items);
     this.applyRuntimeSettings();
   }
@@ -115,12 +112,7 @@ export class Toolkit {
   /** Binds the toolkit to a map; stops the previous session first. */
   start(host: HostAdapter, mapId: string, options: SessionOptions = {}): Session {
     this.stop("restart");
-    if (!this.gameInitialized) {
-      if (this.config.features.save && this.config.save.autoLoadOnStart && this.saves.exists()) {
-        this.saves.load({ silent: true });
-      }
-      if (!this.gameInitialized) this.newGame();
-    }
+    if (!this.gameInitialized) this.newGame();
     const session = new Session(this, host, mapId, options);
     this.session = session;
     session.player.captureStartPosition();
@@ -152,13 +144,24 @@ export class Toolkit {
         this.newGame();
         this.session?.onStateReplaced();
         this.bus.emit("zelda:player:healthChanged", { hp: this.state.player.hp, maxHp: this.state.player.maxHp, delta: 0 });
-      } else if (this.saves.restore(value)) {
+      } else if (this.restoreProgress(value)) {
         this.logger.info("Toolkit progress restored from the progress variable (PS Maker loaded a save).");
       }
     }
-    const now = this.saves.serialize({ stamp: false });
+    const now = serializeProgress(this.state);
     if (now !== value) host.setVariable(id, now);
     this.progressWritten = now;
+  }
+
+  /** Replaces the progress with saved text (the progress variable). */
+  restoreProgress(raw: string): boolean {
+    const state = parseProgress(raw, this.config, this.logger);
+    if (!state) return false;
+    this.state = state;
+    this.markGameInitialized();
+    this.session?.onStateReplaced();
+    this.bus.emit("zelda:player:healthChanged", { hp: state.player.hp, maxHp: state.player.maxHp, delta: 0 });
+    return true;
   }
 
   noteAction(name: string): void {

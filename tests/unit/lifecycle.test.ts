@@ -40,7 +40,7 @@ test("editor actions drive a full session on a Phaser-like scene and shutdown re
   const action = (name: string) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!;
   const baselineScene = f.events.count();
 
-  action("Zelda: Start Toolkit").execute({ mapId: "field", difficulty: 2, hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, autosave: true, language: "ru", debugHitboxes: true, diagnostics: false }, ctx);
+  action("Zelda: Start Toolkit").execute({ mapId: "field", difficulty: 2, hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, language: "ru", debugHitboxes: true, diagnostics: false }, ctx);
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
   assert.equal(tk.session?.mapId, "field");
@@ -125,7 +125,6 @@ for (const feature of FEATURE_IDS) {
       rig.host.walk(i % 2 ? 0.5 : -0.5, 0);
       rig.step();
     }
-    rig.tk.saves.save(undefined, { silent: true });
     rig.tk.stop("end");
     assert.deepEqual(errors(rig), [], "no errors logged");
   });

@@ -14,7 +14,7 @@ test("consolidated editor actions work end to end", async () => {
     assert.ok(a, `action ${name} exists`);
     a.execute(params, ctx);
   };
-  run("Zelda: Start Toolkit", { mapId: "m", language: "en", autosave: false, debugHitboxes: false, diagnostics: false });
+  run("Zelda: Start Toolkit", { mapId: "m", language: "en", debugHitboxes: false, diagnostics: false });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
   const s = tk.session!;

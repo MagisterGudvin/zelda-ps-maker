@@ -43,14 +43,14 @@ src/
     psmakerAssets.ts        данные проекта PS Maker: персонажи и их листы → анимации Toolkit (экспериментально)
   player/                   PlayerSystem (направление, урон, щит, смерть, оверлей анимаций), health.ts, overlay.ts
   combat/                   AttackInstance, resolveHit, scaleDamage; SwordSystem
-  items/                    реестр предметов, ItemSystem, бомба, бумеранг, крюк, снаряды, подбираемое
+  items/                    реестр предметов, ItemSystem, бомба, бумеранг, снаряды, подбираемое
   inventory/                модель инвентаря (на GameState) и InventorySystem (ввод, панель)
   enemies/                  Enemy, поведения, шаблоны, spawn
   interactions/             Interactable (все типы объектов), InteractionSystem, пресеты
   puzzles/                  RuleRegistry, RulesEngine, встроенные условия/действия, последовательности
   dungeons/                 DungeonSystem: подземелья, ключи, боссы, волны
   ui/                       HudSystem (модель HUD), hudLayout (раскладка без наложений), sound (звуки моментов), i18n
-  save/                     SaveManager: формат, версии, миграции, санитизация
+  save/                     прогресс текстом (переменная прогресса): формат, версии, миграции, санитизация
   debug/                    DebugSystem: оверлей хитбоксов
 locales/{en,ru}/strings.ts  строки интерфейса
 ```
@@ -89,8 +89,8 @@ sync views → hud.tick (только при изменениях) → debug.tic
 
 ## Сохранения
 
-- Ключ: `<save.storageKey>:<slot>` в `localStorage`; данные PS Maker не затрагиваются.
-- Конверт: `{ format: "zelda-maker-toolkit-save", version: 1, savedAt, toolkitVersion, state }`.
+- Прогресс хранится текстом в переменной проекта (`Start Toolkit` → *Progress variable*), поэтому его сохраняет и загружает PS Maker вместе со своими сохранениями.
+- Конверт: `{ format: "zelda-maker-toolkit-save", version: 1, toolkitVersion, state }`.
 - Загрузка: проверка формата → отказ от более новой версии → цепочка миграций `MIGRATIONS[v]` → `sanitizeState` (каждое поле проверяется, некорректное заменяется значением по умолчанию; здоровье 0 не загружается, чтобы не попасть в цикл смертей).
 - После загрузки `Session.onStateReplaced()` пересинхронизирует объекты текущей карты (сундуки, двери, блоки, побеждённые боссы).
 - Постоянные объекты сохраняются, только если у них задан явный `id` (ключ `<mapId>/<id>`).

@@ -230,7 +230,7 @@ export class Session {
 
     this.debug?.handleInput();
     this.inventoryUi?.tick(dtMs);
-    this.messageBox?.tick(dtMs);
+    this.messageBox?.tick();
 
     if (!this.isPaused()) {
       for (let i = 0; i < this.systems.length; i++) this.systems[i].tick(dtMs);

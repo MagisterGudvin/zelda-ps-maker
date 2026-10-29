@@ -151,22 +151,3 @@ test("invalid data item JSON is rejected with a clear error", () => {
   assert.throws(() => createDataItem({} as never), /needs an "id"/);
   assert.throws(() => createDataItem({ id: "x", effect: "teleport" } as never), /Unknown item effect/);
 });
-
-test("hookshot (experimental, opt-in) pulls the player to a hookable post", () => {
-  const rig = createRig({ items: { hookshot: { enabled: true } } });
-  face(rig, 1, 0);
-  const p = rig.host.player!;
-  const x0 = p.x;
-  createObject(rig.session, "hook_post", p.x + 70, p.y, { id: "post" });
-  rig.tk.inventory.give("hookshot", 1, { silent: true });
-  useItem(rig, "hookshot");
-  rig.run(1500);
-  assert.ok(p.x > x0 + 40, `player pulled from ${x0} to ${p.x.toFixed(1)}`);
-  assert.equal(rig.host.locked, false, "lock released after the pull");
-});
-
-test("hookshot is refused while disabled (default)", () => {
-  const rig = createRig();
-  rig.tk.inventory.give("hookshot", 1, { silent: true });
-  assert.equal(rig.session.items!.use("hookshot").ok, false);
-});

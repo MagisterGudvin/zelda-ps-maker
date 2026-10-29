@@ -34,7 +34,6 @@ export const MAP_BUILDING_ACTIONS = new Set([
   "Zelda: Set Sound",
   "Zelda: HUD Style",
   "Zelda: Message Style",
-  "Zelda: HUD Variables",
 ]);
 
 type Execute = (params: unknown, ctx: PluginContextLike) => void;

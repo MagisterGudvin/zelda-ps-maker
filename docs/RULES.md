@@ -159,7 +159,6 @@ ZeldaMakerToolkit.runActions([{ spawnPickup: { item: "heart", at: "m2" } }]);
 | `emit` | `"cutscene_done"` → событие `zelda:custom:cutscene_done` |
 | `enterDungeon` / `completeDungeon` | id |
 | `startWaves` | id комнаты волн |
-| `save` | `true` |
 | `if` | `{"when":{...},"then":[...],"else":[...]}` |
 
 Точка в действиях — `"at": "<маркер>"`; запасной вариант — `"x"`, `"y"` в пикселях или тайлах (`world.positionUnits`).

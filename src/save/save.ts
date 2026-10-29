@@ -1,14 +1,14 @@
-import type { Toolkit } from "../core/toolkit.ts";
+import type { ToolkitConfig } from "../core/config.ts";
+import type { Logger } from "../core/logger.ts";
 import { createDefaultState, createDungeonProgress, type DungeonProgress, type GameState } from "../core/state.ts";
 import type { FlagValue } from "../core/events.ts";
 import { TOOLKIT_VERSION } from "../core/version.ts";
 
-/** Storage backend (localStorage in the browser, a Map in tests). */
-export interface SaveStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
+/**
+ * Toolkit progress as text: what Start Toolkit → Progress variable keeps in a PS Maker text
+ * variable, so PS Maker's own save and load menus carry it. Versioned so a save made by an older
+ * toolkit still loads with safe defaults for missing fields.
+ */
 
 export const SAVE_FORMAT = "zelda-maker-toolkit-save";
 export const SAVE_VERSION = 1;
@@ -16,164 +16,46 @@ export const SAVE_VERSION = 1;
 export interface SaveEnvelope {
   format: typeof SAVE_FORMAT;
   version: number;
-  savedAt: string;
   toolkitVersion: string;
   state: GameState;
 }
 
 /**
- * Migrations from version N to N+1. Version 1 is the first public format; the
- * pipeline exists so future changes never break old saves. Each step receives
- * the raw (untrusted) state object of version N.
+ * Migrations from version N to N+1. Version 1 is the first public format; each step receives the
+ * raw (untrusted) state object of version N.
  */
 const MIGRATIONS: Record<number, (state: Record<string, unknown>) => Record<string, unknown>> = {};
 
-export function createBrowserStorage(): SaveStorage | null {
+/** The progress as text; unchanged progress gives the same text. */
+export function serializeProgress(state: GameState): string {
+  const env: SaveEnvelope = { format: SAVE_FORMAT, version: SAVE_VERSION, toolkitVersion: TOOLKIT_VERSION, state };
+  return JSON.stringify(env);
+}
+
+/** Parses, migrates and sanitizes saved progress; null (logged) for unusable text. */
+export function parseProgress(raw: string, config: ToolkitConfig, logger: Logger): GameState | null {
+  let data: unknown;
   try {
-    if (typeof localStorage === "undefined") return null;
-    const probe = "__zmt_probe__";
-    localStorage.setItem(probe, "1");
-    localStorage.removeItem(probe);
-    return localStorage;
-  } catch {
-    // Private mode / disabled storage: saving is reported as unavailable.
+    data = JSON.parse(raw);
+  } catch (err) {
+    logger.error("Saved progress is not valid JSON; ignoring it.", err);
     return null;
   }
-}
-
-export function createMemoryStorage(): SaveStorage & { data: Map<string, string> } {
-  const data = new Map<string, string>();
-  return {
-    data,
-    getItem: (k) => (data.has(k) ? data.get(k)! : null),
-    setItem: (k, v) => {
-      data.set(k, v);
-    },
-    removeItem: (k) => {
-      data.delete(k);
-    },
-  };
-}
-
-/**
- * Serializes toolkit progress into its own versioned key. It never touches
- * PS Maker's data, so projects without the plugin are unaffected and old
- * toolkit saves load with safe defaults for missing fields.
- */
-export class SaveManager {
-  private readonly tk: Toolkit;
-  private readonly storage: SaveStorage | null;
-
-  constructor(tk: Toolkit, storage: SaveStorage | null) {
-    this.tk = tk;
-    this.storage = storage;
+  const env = data as Partial<SaveEnvelope>;
+  if (!env || env.format !== SAVE_FORMAT || typeof env.version !== "number") {
+    logger.error("Saved progress has an unknown format; ignoring it.");
+    return null;
   }
-
-  get available(): boolean {
-    return this.storage !== null;
+  if (env.version > SAVE_VERSION) {
+    logger.error(`Saved progress version ${env.version} is newer than this toolkit supports (${SAVE_VERSION}); ignoring it.`);
+    return null;
   }
-
-  key(slot = this.tk.config.save.slot): string {
-    return `${this.tk.config.save.storageKey}:${slot}`;
+  let state = (env.state ?? {}) as Record<string, unknown>;
+  for (let v = env.version; v < SAVE_VERSION; v++) {
+    const step = MIGRATIONS[v];
+    if (step) state = step(state);
   }
-
-  exists(slot?: string): boolean {
-    return !!this.storage?.getItem(this.key(slot));
-  }
-
-  /** `stamp: false` leaves the time out, so unchanged progress gives the same text. */
-  serialize(options: { stamp?: boolean } = {}): string {
-    const env: SaveEnvelope = {
-      format: SAVE_FORMAT,
-      version: SAVE_VERSION,
-      savedAt: options.stamp === false ? "" : new Date().toISOString(),
-      toolkitVersion: TOOLKIT_VERSION,
-      state: this.tk.state,
-    };
-    return JSON.stringify(env);
-  }
-
-  save(slot?: string, options: { silent?: boolean } = {}): boolean {
-    const tk = this.tk;
-    if (!tk.config.features.save || !tk.config.save.enabled) return false;
-    if (!this.storage) {
-      tk.logger.warnOnce("save-unavailable", "Saving unavailable: no localStorage in this environment.");
-      if (!options.silent) tk.bus.emit("zelda:message", { text: tk.i18n.t("msg.save_unavailable"), durationMs: 1500 });
-      return false;
-    }
-    const name = slot ?? tk.config.save.slot;
-    try {
-      this.storage.setItem(this.key(name), this.serialize());
-    } catch (err) {
-      tk.logger.error("Saving failed (storage full or blocked):", err);
-      return false;
-    }
-    tk.bus.emit("zelda:save:written", { slot: name });
-    if (!options.silent) tk.bus.emit("zelda:message", { text: tk.i18n.t("msg.saved"), durationMs: 1200 });
-    return true;
-  }
-
-  /** Called by gameplay milestones (chest, door, dungeon) when auto-save is on. */
-  autoSave(reason: string): void {
-    if (!this.tk.config.save.autoSave) return;
-    if (this.save(undefined, { silent: true })) this.tk.logger.debug(`Auto-saved (${reason}).`);
-  }
-
-  load(options: { slot?: string; silent?: boolean } = {}): boolean {
-    const tk = this.tk;
-    if (!this.storage || !tk.config.features.save) return false;
-    const name = options.slot ?? tk.config.save.slot;
-    const raw = this.storage.getItem(this.key(name));
-    if (!raw) return false;
-    if (!this.restore(raw)) return false;
-    tk.bus.emit("zelda:save:loaded", { slot: name });
-    if (!options.silent) tk.bus.emit("zelda:message", { text: tk.i18n.t("msg.loaded"), durationMs: 1200 });
-    return true;
-  }
-
-  /** Replaces the progress with saved text (from storage or the progress variable). */
-  restore(raw: string): boolean {
-    const tk = this.tk;
-    const state = this.parse(raw);
-    if (!state) return false;
-    tk.state = state;
-    tk.markGameInitialized();
-    tk.session?.onStateReplaced();
-    tk.bus.emit("zelda:player:healthChanged", { hp: state.player.hp, maxHp: state.player.maxHp, delta: 0 });
-    return true;
-  }
-
-  delete(slot?: string): void {
-    const name = slot ?? this.tk.config.save.slot;
-    this.storage?.removeItem(this.key(name));
-    this.tk.bus.emit("zelda:save:reset", { slot: name });
-  }
-
-  /** Parses, migrates and sanitizes; returns null (logged) for unusable data. */
-  parse(raw: string): GameState | null {
-    let data: unknown;
-    try {
-      data = JSON.parse(raw);
-    } catch (err) {
-      this.tk.logger.error("Save data is not valid JSON; ignoring it.", err);
-      return null;
-    }
-    const env = data as Partial<SaveEnvelope>;
-    if (!env || env.format !== SAVE_FORMAT || typeof env.version !== "number") {
-      this.tk.logger.error("Save data has an unknown format; ignoring it.");
-      return null;
-    }
-    if (env.version > SAVE_VERSION) {
-      this.tk.logger.error(`Save version ${env.version} is newer than this toolkit supports (${SAVE_VERSION}); ignoring it.`);
-      return null;
-    }
-    let state = (env.state ?? {}) as Record<string, unknown>;
-    for (let v = env.version; v < SAVE_VERSION; v++) {
-      const step = MIGRATIONS[v];
-      if (step) state = step(state);
-    }
-    return sanitizeState(state, createDefaultState(this.tk.config));
-  }
+  return sanitizeState(state, createDefaultState(config));
 }
 
 // ---- sanitizing: every field is validated and falls back to the default ---------------

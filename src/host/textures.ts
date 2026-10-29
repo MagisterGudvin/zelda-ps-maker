@@ -221,7 +221,6 @@ const DEFS: Record<string, SpriteDef> = {
     },
   },
   fireball: { w: 10, h: 10, paint: (c) => (circle(c, 5, 5, 5, "#d1361a"), circle(c, 5, 5, 3, "#ffa32e"), circle(c, 5, 5, 1.5, "#fff3b0")) },
-  hookshot: { w: 8, h: 8, paint: (c) => (poly(c, [0, 2, 5, 2, 8, 4, 5, 6, 0, 6], "#9aa8b8"), rect(c, 0, 3, 3, 2, "#5c6670")) },
   pickup_heart: { w: 14, h: 14, paint: (c) => heart(c, "#e8323c", 1) },
   pickup_rupee: {
     w: 8,
@@ -371,7 +370,6 @@ const DEFS: Record<string, SpriteDef> = {
     },
   },
   obj_pit: { w: 16, h: 16, paint: (c) => (rect(c, 0, 0, 16, 16, "#06060a"), rect(c, 0, 0, 16, 2, "#26262e")) },
-  obj_post: { w: 12, h: 16, paint: (c) => (rect(c, 3, 2, 6, 14, "#6b4423"), rect(c, 2, 0, 8, 3, "#9aa8b8")) },
   obj_sign: { w: 16, h: 16, paint: (c) => (rect(c, 7, 9, 2, 7, "#5b4632"), rect(c, 1, 1, 14, 9, "#a4612a"), rect(c, 3, 4, 10, 1, "#4a2a10"), rect(c, 3, 6, 7, 1, "#4a2a10")) },
   icon_sword: { w: 16, h: 16, paint: (c) => (poly(c, [3, 13, 11, 5, 13, 3, 11, 5, 4, 14], "#e8eef5"), poly(c, [11, 2, 14, 2, 14, 5, 5, 14, 2, 11], "#c8d0da"), rect(c, 2, 11, 3, 3, "#d8b84a")) },
   icon_shield: { w: 16, h: 16, paint: (c) => (poly(c, [2, 2, 14, 2, 14, 8, 8, 15, 2, 8], "#1e3f8f"), poly(c, [4, 4, 12, 4, 12, 8, 8, 12.5, 4, 8], "#d63a3a")) },
@@ -390,7 +388,6 @@ const DEFS: Record<string, SpriteDef> = {
       rect(c, 5, 2, 1, 12, "#e8e8e8");
     },
   },
-  icon_hookshot: { w: 16, h: 16, paint: (c) => (rect(c, 2, 7, 9, 2, "#5c6670"), poly(c, [10, 4, 15, 8, 10, 12], "#9aa8b8")) },
   icon_fire_rod: { w: 16, h: 16, paint: (c) => (poly(c, [3, 14, 11, 6, 12, 7, 4, 15], "#8b2a1a"), circle(c, 12, 4, 3, "#ff7a1a"), circle(c, 12, 4, 1.5, "#ffe066")) },
   icon_healing_spell: { w: 16, h: 16, paint: (c) => (circle(c, 8, 8, 7, "#1d6b3a"), rect(c, 7, 3, 2, 10, "#bfffcf"), rect(c, 3, 7, 10, 2, "#bfffcf")) },
   icon_generic: { w: 16, h: 16, paint: (c) => (rect(c, 1, 1, 14, 14, "#444466"), rect(c, 5, 4, 6, 2, "#ddd"), rect(c, 9, 6, 2, 3, "#ddd"), rect(c, 7, 9, 2, 2, "#ddd"), rect(c, 7, 12, 2, 2, "#ddd")) },

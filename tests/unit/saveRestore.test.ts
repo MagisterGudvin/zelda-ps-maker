@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { serializeProgress } from "../../src/save/save.ts";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
 import { isRestoredMap, mapBuildingActions, startRestoreWatcher } from "../../src/editor/saveRestore.ts";
 
@@ -25,7 +26,7 @@ test("progress variable: holds the toolkit's progress; a loaded save restores it
   const { vars, run, getToolkit, done } = await setup();
   run("Zelda: Start Toolkit", { language: "en", progressVariable: "var_progress" });
   const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" }, save: { autoSave: false } });
+  tk.configure({ debug: { logLevel: "silent" } });
   tk.inventory.give("rupees", 30, { silent: true });
   step(tk.session!);
   const saved = vars.get("var_progress")!.value as string;
@@ -90,9 +91,9 @@ test("progress variable: already filled when the toolkit starts (a save loaded o
   const { vars, run, getToolkit, done } = await setup();
   run("Zelda: Start Toolkit", { language: "en", progressVariable: "var_progress" });
   const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" }, save: { autoSave: false } });
+  tk.configure({ debug: { logLevel: "silent" } });
   tk.inventory.give("rupees", 77, { silent: true });
-  const saved = tk.saves.serialize({ stamp: false });
+  const saved = serializeProgress(tk.state);
   done();
   const again = await setup();
   again.vars.get("var_progress")!.value = saved;

@@ -283,20 +283,6 @@ await check("progress persists across maps (opened chests stay open)", async () 
   return JSON.stringify(r);
 });
 
-await check("save (F5) and load (F8) restore progress from localStorage", async () => {
-  await page.keyboard.press("F5");
-  await sleep(100);
-  const saved = await ev(() => !!localStorage.getItem("zelda-maker-toolkit:default"));
-  const r0 = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.count("rupees"));
-  await ev(() => window.ZeldaMakerToolkit.give("rupees", 77, true));
-  await page.keyboard.press("F8");
-  await sleep(100);
-  const r1 = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.count("rupees"));
-  assert(saved, "nothing in localStorage");
-  assert(r1 === r0, `rupees ${r1}, expected ${r0}`);
-  return `rupees restored to ${r0}`;
-});
-
 await check("PS Maker animations: picked player attack overlays the swing, picked walk animates an enemy", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
@@ -459,13 +445,14 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
     const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
     const shown = hud.children.list.filter((o) => o.visible);
     const by = (key) => shown.filter((o) => o.texture?.key === key);
-    const heart = by("IMG_HEART")[0];
+    const heart = by("IMG_HEART")[0] ?? by("IMG_HEART_E")[0];
     const out = {
       hearts: by("IMG_HEART").length + by("IMG_HEART_E").length,
       maxHearts: Math.ceil(window.ZeldaMakerToolkit.toolkit.state.player.maxHp / window.ZeldaMakerToolkit.toolkit.config.player.heartValue),
       heartScale: heart?.scaleX,
       rupee: by("IMG_RUPEE").length,
       digits: by("IMG_DIGITS").map((o) => o.frame.name).join(","),
+      rupees: window.ZeldaMakerToolkit.toolkit.inventory.count("rupees"),
       box: by("IMG_BOX").length,
       magic: by("IMG_MFRAME").length + by("IMG_MFILL").length,
       bar: by("IMG_BAR").map((o) => `${o.type}:${o.depth}`).join(","),
@@ -476,7 +463,9 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
   await ev(() => window.__harness.run("Zelda: HUD Style", {}));
   assert(r.hearts === r.maxHearts && r.heartScale === 2, `hearts ${r.hearts}/${r.maxHearts} at ×${r.heartScale}`);
   assert(r.rupee === 1 && r.box === 1 && r.magic === 2, JSON.stringify(r));
-  assert(r.digits.split(",").includes("zmt_digit_7"), `digits ${r.digits}`);
+  // The rupee counter's digits (3 places) come from the digit strip.
+  const want = String(r.rupees).padStart(3, "0").split("").map((d) => `zmt_digit_${d}`);
+  assert(want.every((f) => r.digits.split(",").includes(f)), `digits ${r.digits} for ${r.rupees} rupees`);
   assert(/^(NineSlice|Image):-[0-9.]+$/.test(r.bar), `bar ${r.bar} (must be behind the HUD)`);
   return `${r.hearts} hearts, digits ${r.digits}, bar ${r.bar}`;
 });
@@ -542,64 +531,23 @@ await check("HUD Style: own icons for built-in items (item box, inventory), own 
   return `own icon ×${r.icons}, panel in ${r.panel} pieces, cursor, title visible`;
 });
 
-await check("Message Style: a sign's text in a box drawn like a PS Maker dialogue layout (9-slice picture), typed, closed with Z", async () => {
+await check("Message Style: a toolkit message is a PS Maker Dialogue (storyRunner) in the chosen layout; the game waits until it closes", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
-    const scene = H.scene();
-    const c = document.createElement("canvas");
-    c.width = 24;
-    c.height = 24;
-    const g = c.getContext("2d");
-    g.fillStyle = "#6b4a2a";
-    g.fillRect(0, 0, 24, 24);
-    g.fillStyle = "#f0e0b0";
-    g.fillRect(6, 6, 12, 12);
-    scene.textures.addCanvas("IMG_PANEL", c);
-    const data = scene.sys.settings.data ?? (scene.sys.settings.data = {});
-    // The project data object stays the same in PS Maker (the toolkit keeps a reference to it).
-    data.story = Object.assign(data.story ?? { characters: [], spritesheetAnimations: [] }, {
-      gameConfig: { width: 1280, height: 720 },
-      gameUI: {
-        fonts: [],
-        defaultDialogLayoutId: "wood",
-        dialogLayouts: [{ id: "wood", name: "Wood", bottomGap: 14, typingSpeed: 60, textBox: { width: 896, height: 220, padding: { top: 24, right: 30, bottom: 24, left: 30 }, background: { type: "image", imageId: "IMG_PANEL", backgroundOpacity: 100, scalingMode: "nine-slice", borderWidth: 24, slice: { top: 6, right: 6, bottom: 6, left: 6 } }, textStyles: { fontFamily: "serif", fontAssetId: null, fontSize: 44, lineHeightPercent: 120, color: "#3a2a1a", textAlign: "left" } } }],
-      },
-    });
-    H.run("Zelda: Message Style", { layout: "", kinds: ["sign", "item"] });
-    H.run("Zelda: Show Message", { text: "It's dangerous to go alone! Take this.", box: true });
+    window.__dialogues = [];
+    H.run("Zelda: Message Style", { layout: "wood", kinds: ["sign", "item"] });
+    H.run("Zelda: Show Message", { text: "Arrows: move. It's dangerous to go alone!", box: true });
     await new Promise((ok) => setTimeout(ok, 200));
-    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
-    const texts = () => hud.children.list.filter((o) => o.type === "Text" && o.visible && o.depth === 16);
-    const early = texts()[0]?.text ?? "";
-    const pics = hud.children.list.filter((o) => o.visible && o.texture?.key === "IMG_PANEL").length;
+    const played = window.__dialogues.map((d) => d.actions.map((a) => `${a.type}|${a.dialogueSource}`).join(";"));
     const paused = window.ZeldaMakerToolkit.session.isPaused("message");
-    const press = async () => {
-      scene.input.keyboard.emit("keydown", { code: "KeyZ", timeStamp: performance.now() });
-      await new Promise((ok) => setTimeout(ok, 60));
-      scene.input.keyboard.emit("keyup", { code: "KeyZ", timeStamp: performance.now() });
-      await new Promise((ok) => setTimeout(ok, 120));
-    };
-    await press();
-    const full = texts()[0]?.text ?? "";
-    return { early, full, pics, paused, press: true };
-  });
-  await page.screenshot({ path: `${ARTIFACTS}message-box.png` });
-  const closed = await ev(async () => {
-    const scene = window.__harness.scene();
-    scene.input.keyboard.emit("keydown", { code: "KeyZ", timeStamp: performance.now() });
-    await new Promise((ok) => setTimeout(ok, 60));
-    scene.input.keyboard.emit("keyup", { code: "KeyZ", timeStamp: performance.now() });
-    await new Promise((ok) => setTimeout(ok, 150));
-    const hud = window.__harness.game.scene.getScene("ZeldaMakerToolkitHUD");
-    return { open: hud.children.list.some((o) => o.type === "Text" && o.visible && o.depth === 16), paused: window.ZeldaMakerToolkit.session.isPaused("message") };
+    window.__dialogues[0]?.close();
+    await new Promise((ok) => setTimeout(ok, 200));
+    return { played, paused, after: window.ZeldaMakerToolkit.session.isPaused("message") };
   });
   await ev(() => (window.ZeldaMakerToolkit.toolkit.messageBox = null));
-  assert(r.paused, "the game waits while the box is open");
-  assert(r.pics === 9, `9-slice picture: ${r.pics} pieces`);
-  assert(r.early.length > 0 && r.early.replace(/\n/g, " ").length < 38, `typing: "${r.early}"`);
-  assert(r.full.replace(/\n/g, " ") === "It's dangerous to go alone! Take this.", `Z shows all: "${r.full}"`);
-  assert(!closed.open && !closed.paused, `Z again closes: ${JSON.stringify(closed)}`);
-  return `typed "${r.early.replace(/\n/g, " ")}" → all, 9 picture pieces`;
+  assert(r.played.length === 1 && r.played[0] === "dialogueAction|@dialogue_layout wood\n\\Arrows: move. It's dangerous to go alone!", JSON.stringify(r.played));
+  assert(r.paused && !r.after, `paused ${r.paused} → ${r.after}`);
+  return "played as dialogueAction, the game waited";
 });
 
 await check("no page errors or console errors", async () => {

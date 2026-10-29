@@ -34,7 +34,7 @@ async function setup() {
   const run = (name: string, params: Record<string, unknown>) => (plugin.events as unknown as AnyAction[]).find((e) => e.name === name)!.execute(params, ctx);
   run("Zelda: Start Toolkit", { mapId: "looks", language: "en" });
   const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" }, save: { autoSave: false } });
+  tk.configure({ debug: { logLevel: "silent" } });
   return { run, s: tk.session!, done: resetToolkitForTests, plugin };
 }
 const cfgOf = (s: any, id: string) => s.world.get(id)?.cfg;

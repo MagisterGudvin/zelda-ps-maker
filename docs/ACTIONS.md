@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.21.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.22.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **40**. Все имена начинаются с `Zelda: `.
+Всего действий: **36**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -35,13 +35,9 @@
 - [Zelda: Show Message](#zelda-show-message)
 - [Zelda: Message Style](#zelda-message-style)
 - [Zelda: HUD Style](#zelda-hud-style)
-- [Zelda: HUD Variables](#zelda-hud-variables)
 - [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
 - [Zelda: Set Respawn Point](#zelda-set-respawn-point)
 - [Zelda: Respawn Player](#zelda-respawn-player)
-- [Zelda: Save Progress](#zelda-save-progress)
-- [Zelda: Load Progress](#zelda-load-progress)
-- [Zelda: Reset Progress](#zelda-reset-progress)
 - [Zelda: Define Item](#zelda-define-item)
 - [Zelda: Define Enemy](#zelda-define-enemy)
 - [Zelda: Set Player Sprites](#zelda-set-player-sprites)
@@ -60,7 +56,6 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `magicBar` (Magic bar) | boolean | `true` | Show the magic meter (needed for magic items). / Шкала магии. |
 | `shieldButton` (Shield on a button) | boolean | `false` | Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке. |
 | `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
-| `autosave` (Autosave) | boolean | `true` | Save after chests, doors, new items and dungeons. / Автосохранение. |
 | `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
@@ -145,12 +140,12 @@ Creates an interactive object: bushes, pots, rocks, walls to bomb, levers, butto
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. Варианты: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, hook_post, sign. |
+| `type` (Type) | string-enum | `"bush"` | Object type. / Тип объекта. Варианты: bush, grass, pot, rock, heavy_rock, breakable, bombable_wall, lever, button, pressure_plate, block, chest, door, hidden_passage, torch, reactive, spikes, pit, sign. |
 | `position` (Position) | map-position | — | Object center: pick it on the map. / Центр объекта. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it later. / Скрыт до открытия. |
 | `staysOn` (Stays on) | boolean | `false` | Plates stay pressed and levers/buttons cannot be switched back. / Остаётся включённым. |
 | `text` (Text) | string | `""` | Sign text, or a message shown when the object is used. / Текст таблички или сообщение. |
-| `reactsTo` (Reacts to) | string-enum-multi | `[]` | For eye switches, crystals and breakables: what hits it. / Реагирует на. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `reactsTo` (Reacts to) | string-enum-multi | `[]` | For eye switches, crystals and breakables: what hits it. / Реагирует на. Варианты: sword, spin, poke, arrow, bomb, boomerang, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 | `look` (Look (map object)) | string-enum | `""` | A map object of your library (e.g. a Mana Seed bush): its picture and collision box. Built-in = the toolkit's sprite. / Вид — объект карты из библиотеки. Варианты: Built-in. |
 | `lookUsed` (Look when used) | string-enum | `""` | Picture after use: cut bush, broken pot, lever on, plate pressed, torch lit, chest open... Built-in = the toolkit's sprite. / Вид после использования. Варианты: Built-in. |
 | `sprite` (Sprite (image)) | image | — | Or an image of your library instead of a map object. / Или картинка из библиотеки. |
@@ -167,7 +162,7 @@ Places a treasure chest with an item inside. Opened chests stay open. / Сунд
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `position` (Position) | map-position | — | Chest center. |
-| `item` (Item) | string-enum | `"key"` | What is inside. / Что внутри. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"key"` | What is inside. / Что внутри. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `requiresBigKey` (Needs Big Key) | boolean | `false` | Big chest that needs the dungeon's Big Key. |
 | `hidden` (Hidden) | boolean | `false` | Starts invisible; reveal it with a rule or Zelda: Change Object (reveal). |
@@ -194,7 +189,7 @@ Puts a collectible on the ground (key, heart, rupees, bombs...). / Предме�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string-enum | `"key"` | What lies there. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"key"` | What lies there. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `position` (Position) | map-position | — | Where it lies: pick it on the map. / Где лежит. |
 | `once` (Only once) | boolean | `true` | Once taken it never comes back (keys, heart containers). / Не появляется снова. |
@@ -229,7 +224,7 @@ Deals damage to the player, to every enemy of a group, or to an object picked on
 | `group` (Enemy group) | string-enum | `""` | Damage every enemy of this group. / Урон группе врагов. Варианты: No group, Group 1, Group 2, Group 3, Group 4, Group 5, Group 6, Group 7, Group 8, Group 9. |
 | `objectAt` (Object at) | map-position | — | Or an object picked on the map. / Или объект на карте. |
 | `amount` (Amount) | number | `1` | Damage points (2 = one heart for the player). / Урон. |
-| `damageType` (Damage type) | string-enum | `"script"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `damageType` (Damage type) | string-enum | `"script"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 
 ## Zelda: Add Rule
 
@@ -242,12 +237,12 @@ When the conditions become true (every filled When field), do the filled actions
 | `whenObjectAt` (When object at) | map-position | — | Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт. |
 | `whenObjectAt2` (…and object at) | map-position | — | Optional second object. / Второй объект. |
 | `whenVariable` (When variable is on) | variable | `""` | A project variable that must be true (or not 0). / Переменная проекта включена. |
-| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `whenBoss` (When boss defeated) | boolean | `false` | The boss of the current dungeon (Enter Dungeon) is beaten. / Побеждён босс подземелья. |
 | `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
 | `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
 | `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
-| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
 | `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
@@ -263,12 +258,12 @@ Does several things at once, optionally only when a toolkit condition holds (PS 
 | `whenObjectAt` (When object at) | map-position | — | Pick a switch, plate, lever, torch, chest or door on the map: it must be on / open / lit. / Объект включён или открыт. |
 | `whenObjectAt2` (…and object at) | map-position | — | Optional second object. / Второй объект. |
 | `whenVariable` (When variable is on) | variable | `""` | A project variable that must be true (or not 0). / Переменная проекта включена. |
-| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `whenItem` (When player has) | string-enum | `""` | Item the player must have. / У игрока есть предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `whenBoss` (When boss defeated) | boolean | `false` | The boss of the current dungeon (Enter Dungeon) is beaten. / Побеждён босс подземелья. |
 | `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
 | `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
 | `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
-| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
 | `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
@@ -285,7 +280,7 @@ Switches must be activated in this order; a wrong one resets them. When solved, 
 | `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
 | `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
 | `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
-| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
 | `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
@@ -303,7 +298,7 @@ A room with enemy waves: draw its area on the map. Doors inside the area stay sh
 | `openDoorAt` (Open door at) | map-position | — | Pick a door on the map. / Открыть дверь. |
 | `revealAt` (Reveal object at) | map-position | — | Pick a hidden chest or passage on the map. / Показать скрытый объект. |
 | `turnOnVariable` (Turn on variable) | variable | `""` | Set a project variable to true (or 1): PS Maker conditions can check it. / Включить переменную проекта. |
-| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `giveItem` (Give item) | string-enum | `""` | Item to give. / Выдать предмет. Варианты: —, Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `giveCount` (Item count) | number | `1` | How many to give (rupees, bombs, arrows...). / Сколько. |
 | `message` (Message) | string | `""` | Text to show. / Показать сообщение. |
 | `spawnEnemy` (Spawn enemy) | string-enum | `""` | Enemy to create. / Создать врага. Варианты: —, slime, soldier, spitter, knight, sentry, ogre, Custom enemy 1, Custom enemy 2, Custom enemy 3, Custom enemy 4, Custom enemy 5, Custom enemy 6. |
@@ -337,7 +332,7 @@ Gives an item or resource. / Выдаёт предмет.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string-enum | `"bombs"` | What to give. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"bombs"` | What to give. / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `count` (Count) | number | `1` | How many (rupees, bombs, arrows...). / Сколько. |
 | `silent` (Silent) | boolean | `false` | Do not show the 'You got...' message. |
 
@@ -356,7 +351,7 @@ Takes an owned item away. / Забирает предмет.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 
 ## Zelda: Equip Item
 
@@ -364,7 +359,7 @@ Puts an owned item into the quick-use slot. / Ставит предмет в б�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"boomerang"` | Which item. / Предмет. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 
 ## Zelda: Change Player Stats
 
@@ -383,32 +378,27 @@ Enables or disables an ability/item (sword, shield, bow, bomb...). / Включ�
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `ability` (Ability) | string-enum | `"sword"` | Which item or ability. / Способность. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `ability` (Ability) | string-enum | `"sword"` | Which item or ability. / Способность. Варианты: Sword, Shield, Power glove, Bombs, Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `enabled` (Enabled) | boolean | `true` | Allow using it. / Разрешить. |
 
 ## Zelda: Show Message
 
-Shows a toolkit message: a short HUD note, or the toolkit's dialogue box (see Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.
+Shows a toolkit message: a short HUD note, or a PS Maker dialogue (layout from Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `text` (Text) | string | `""` | Message to show. / Текст сообщения. |
 | `durationMs` (Duration (ms)) | number | `2200` | How long a short note stays: 1000 = one second. / Сколько показывать. |
-| `box` (In a dialogue box) | boolean | `false` | Show it in the toolkit's dialogue box (typed out, closed with the action key), styled by Message Style. / В окне диалога. |
+| `box` (As a dialogue) | boolean | `false` | Show it as a PS Maker dialogue (closed with the action key) instead of a note. / Диалогом. |
 
 ## Zelda: Message Style
 
-Shows toolkit messages (signs, "You got...") as PS Maker dialogues (or a toolkit box drawn like one): set them up in Game UI → Dialogue layouts like any dialogue. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.
+Shows toolkit messages (signs, "You got...") as PS Maker dialogues, with everything their dialogue layout has (Game UI → Dialogue layouts: background, font, name box, portrait, typing sound). The game waits while one is open. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `display` (Show with) | string-enum | `"dialogue"` | PS Maker Dialogue: the message is a real PS Maker dialogue, with everything its dialogue layout has (Game UI: background, font, name box, portrait, typing sound, animations). Toolkit box: the toolkit draws a box like the layout. / Чем показывать. Варианты: PS Maker Dialogue, Toolkit box. |
-| `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the box looks like. / Макет диалога PS Maker. Варианты: Default layout. |
-| `kinds` (Messages in the box) | string-enum-multi | `["sign","item"]` | Which toolkit messages open the box; the others stay short HUD notes. / Какие сообщения показывать в окне. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
-| `typing` (Type letter by letter) | boolean | `true` | At the layout's typing speed; the action key shows the rest at once. / Печатать по буквам. |
-| `waitForKey` (Wait for the action key) | boolean | `true` | The box stays until the player presses the action key; off: it closes by itself. / Ждать клавишу. |
-| `pause` (Pause the game) | boolean | `true` | Enemies and the player wait while the box is open. / Пауза, пока открыто окно. |
-| `position` (Position) | string-enum | `"bottom"` | Where the box is shown. / Где показывать. Варианты: Bottom, Top. |
+| `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the messages use. / Макет диалога PS Maker. Варианты: Default layout. |
+| `kinds` (Messages as dialogues) | string-enum-multi | `["sign","item"]` | Which toolkit messages are dialogues; the others stay short HUD notes. / Какие сообщения показывать диалогом. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
 
 ## Zelda: HUD Style
 
@@ -436,7 +426,6 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | `iconBomb` (Icon: bomb item) | image | — | Icon of the bomb item in the item box and the inventory. / Иконка предмета. |
 | `iconBoomerang` (Icon: boomerang) | image | — | Icon of the boomerang in the item box and the inventory. / Иконка предмета. |
 | `iconBow` (Icon: bow) | image | — | Icon of the bow in the item box and the inventory. / Иконка предмета. |
-| `iconHookshot` (Icon: hookshot) | image | — | Icon of the hookshot in the item box and the inventory. / Иконка предмета. |
 | `iconFireRod` (Icon: fire rod) | image | — | Icon of the fire rod in the item box and the inventory. / Иконка предмета. |
 | `iconHealingSpell` (Icon: healing spell) | image | — | Icon of the healing spell in the item box and the inventory. / Иконка предмета. |
 | `inventoryPanel` (Inventory panel) | image | — | Background of the inventory panel (I), stretched; its border keeps its size (9-slice). / Фон панели предметов. |
@@ -455,23 +444,6 @@ Your own HUD pictures from the project's Images (for example a Mana Seed UI pack
 | `magicX` (Magic meter X) | number | `-1` | Left edge of the magic meter in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
 | `magicY` (Magic meter Y) | number | `-1` | Top edge of the magic meter in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
 
-## Zelda: HUD Variables
-
-Build your own HUD with PS Maker's Add UI: the toolkit keeps these project variables up to date (hearts, magic, counters, selected item), and Add UI components show them (a text's value, or a size, position or opacity as an expression like @{Full hearts} * 36). Turn the toolkit's own HUD parts off in HUD Style. / Значения Toolkit в переменных для своего HUD на Add UI.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `fullHearts` (Full hearts) | variable | `""` | Whole hearts (bind a row's width: @{var} * heart width). Empty = not needed. / Переменная проекта. |
-| `halfHeart` (Half heart) | variable | `""` | 1 while there is a half heart, else 0 (bind its opacity: @{var} * 100). Empty = not needed. / Переменная проекта. |
-| `maxHearts` (Heart containers) | variable | `""` | All hearts, full or empty (the row of empty hearts behind). Empty = not needed. / Переменная проекта. |
-| `magicPercent` (Magic %) | variable | `""` | 0-100 (bind the meter's height or width). Empty = not needed. / Переменная проекта. |
-| `rupees` (Rupees) | variable | `""` | Rupee count (a text's value). Empty = not needed. / Переменная проекта. |
-| `bombs` (Bombs) | variable | `""` | Bomb count. Empty = not needed. / Переменная проекта. |
-| `arrows` (Arrows) | variable | `""` | Arrow count. Empty = not needed. / Переменная проекта. |
-| `key` (Small keys) | variable | `""` | Small keys of this dungeon. Empty = not needed. / Переменная проекта. |
-| `itemName` (Selected item name) | variable | `""` | A Text variable: the selected item's name. Empty = not needed. / Переменная проекта. |
-| `itemCount` (Selected item ammo) | variable | `""` | Bombs or arrows of the selected item (0 for others). Empty = not needed. / Переменная проекта. |
-
 ## Zelda: Show Stat In Variable
 
 Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use it in PS Maker conditions (a shop: if Rupees ≥ 50) or in UI components. Stays on for the whole game. / Значение Toolkit в переменной проекта.
@@ -479,7 +451,7 @@ Keeps a project variable equal to a toolkit value (rupees, keys, hearts...). Use
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `stat` (Value) | string-enum | `"rupees"` | What to copy. / Что показывать. Варианты: Rupees, Bombs, Arrows, Small keys (this dungeon), Hearts, Max hearts (heart containers), Full hearts (whole number), Half heart (1 or 0), Health points, Max health points, Magic, Magic in % (0-100), Selected item: name (Text variable), Selected item: ammo (bombs, arrows), Item is selected (1 or 0), Item is owned (1 or 0), Enemies left on the map. |
-| `item` (Item) | string-enum | `"bow"` | For "Item is selected / owned". / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Hookshot, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
+| `item` (Item) | string-enum | `"bow"` | For "Item is selected / owned". / Предмет. Варианты: Rupees, Heart (refill), Heart container (+1 max), Magic (refill), Bombs, Arrows, Small key, Big Key, Dungeon map, Compass, Sword, Shield, Power glove (lift rocks), Bomb bag (use bombs), Boomerang, Bow, Fire rod, Healing spell, Custom item 1, Custom item 2, Custom item 3, Custom item 4. |
 | `variableId` (Variable) | variable | `""` | A number variable of the project (true/false for 0 / not 0; a Text variable for the item name). / Переменная проекта. |
 
 ## Zelda: Set Respawn Point
@@ -496,31 +468,6 @@ Revives the player at the respawn point (for deathBehavior 'none'). / Возро
 
 _Без параметров._
 
-## Zelda: Save Progress
-
-Saves toolkit progress (health, items, chests, doors, switches, dungeons) to the browser. / Сохраняет прогресс.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
-
-## Zelda: Load Progress
-
-Loads toolkit progress saved earlier. / Загружает прогресс.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
-
-## Zelda: Reset Progress
-
-Deletes a save slot and optionally starts a new game. / Удаляет сохранение.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `slot` (Slot) | string-enum | `"default"` | Save slot. / Ячейка сохранения. Варианты: Slot 1, Slot 2, Slot 3. |
-| `newGame` (New game) | boolean | `true` | Also reset current progress. |
-
 ## Zelda: Define Item
 
 Adds a usable item without code: a shot (Damage > 0), a burst around the player (Area attack) or a healing item (Heal > 0). With none of these it is a quest item. / Свой предмет без кода.
@@ -533,7 +480,7 @@ Adds a usable item without code: a shot (Damage > 0), a burst around the player 
 | `resource` (Uses) | string-enum | `"magic"` | What one use costs. / Что расходует. Варианты: Nothing, Rupees, Bombs, Arrows, Magic, Small keys. |
 | `cost` (Cost) | number | `4` | How much of it per use (magic meter: 32 points). / Стоимость. |
 | `damage` (Damage) | number | `3` | Damage of the shot or burst; 0 = no attack. / Урон. |
-| `damageType` (Damage type) | string-enum | `"magic"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `damageType` (Damage type) | string-enum | `"magic"` | Enemies may resist some types. / Тип урона. Варианты: sword, spin, poke, arrow, bomb, boomerang, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 | `area` (Area attack) | boolean | `false` | Hit everything around the player instead of shooting. / Удар вокруг игрока. |
 | `stunMs` (Stun (ms)) | number | `0` | Freeze hit enemies; 1000 = one second. |
 | `heal` (Heal) | number | `0` | Half-hearts restored per use (makes it a healing item). / Лечение. |
@@ -553,7 +500,7 @@ Makes your own enemy type from an existing one: other stats and a PS Maker chara
 | `speed` (Speed) | number | `0` | Pixels per second; 0 = template value. / Скорость (0 — как в шаблоне). |
 | `detectRange` (Sight range) | number | `0` | Pixels at which it notices the player; 0 = template value. / Дальность обзора. |
 | `boss` (Boss) | boolean | `false` | Defeating it completes the dungeon (with Enter Dungeon). / Босс. |
-| `immuneTo` (Immune to) | string-enum-multi | `[]` | Damage types that do nothing to it. / Неуязвим к. Варианты: sword, spin, poke, arrow, bomb, boomerang, hookshot, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
+| `immuneTo` (Immune to) | string-enum-multi | `[]` | Damage types that do nothing to it. / Неуязвим к. Варианты: sword, spin, poke, arrow, bomb, boomerang, fire, ice, magic, thrown, contact, projectile, hazard, fall, script. |
 | `spriteOffsetX` (Sprite offset X) | number | `0` | Move the picture relative to the hitbox, pixels. / Сдвиг картинки по X. |
 | `spriteOffsetY` (Sprite offset Y) | number | `0` | e.g. -16 when the feet are low in a 64x64 frame. / Сдвиг картинки по Y. |
 | `spriteScale` (Sprite scale) | number | `0` | 0 = template value (1). / Масштаб картинки. |
@@ -574,7 +521,6 @@ Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, 
 | `bow` (Bow) | player-animation-picker | `""` | Optional: shooting an arrow; empty = Use item. / Лук. |
 | `boomerang` (Boomerang) | player-animation-picker | `""` | Optional: throwing the boomerang; empty = Use item. / Бумеранг. |
 | `bomb` (Bomb) | player-animation-picker | `""` | Optional: placing a bomb; empty = Use item. / Бомба. |
-| `hookshot` (Hookshot) | player-animation-picker | `""` | Optional: firing the hookshot; empty = Use item. / Крюк. |
 | `item` (Use item) | player-animation-picker | `""` | Optional: any other item (rods, magic, your own items) and the fallback for the four above. / Использование предмета. |
 | `lift` (Lift) | player-animation-picker | `""` | Optional: picking up a pot, bush or rock. / Поднять. |
 | `carry` (Carry) | player-animation-picker | `""` | Optional: walking with the object overhead; stands on the first frame. / Нести над головой. |

@@ -10,9 +10,6 @@ export interface GiveOptions {
 /** Stackable resources and the item that becomes owned with them. */
 const RESOURCE_UNLOCKS: Record<string, string> = { bombs: "bomb" };
 
-/** Ids with special meaning; everything else is an owned item or a custom resource. */
-const SPECIAL = new Set(["heart", "heart_container", "magic", "key", "big_key", "map", "compass", "rupees", "bombs", "arrows"]);
-
 /**
  * Inventory model operating on the persistent `GameState`. Works without a
  * bound map (chests rewarded from rules, save loading, scripts).
@@ -129,7 +126,6 @@ export class Inventory {
       const text = n > 1 ? tk.i18n.t("msg.got_item_count", { item: name, count: n }) : tk.i18n.t("msg.got_item", { item: name });
       tk.bus.emit("zelda:message", { text, durationMs: tk.config.ui.messageMs, kind: this.isResource(id) ? "info" : "item" });
     }
-    if (tk.config.save.autoSave && !SPECIAL.has(id) && !this.isResource(id)) tk.saves.autoSave("item");
     return applied;
   }
 

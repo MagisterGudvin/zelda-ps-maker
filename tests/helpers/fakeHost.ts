@@ -3,7 +3,6 @@ import { overlaps } from "../../src/core/math.ts";
 import type { DebugDraw, EntityView, HostAdapter, HudModel, HudSink, InputAction, InputSource, OverlayLayer, Renderer, ViewSpec } from "../../src/host/types.ts";
 import { Toolkit } from "../../src/core/toolkit.ts";
 import type { Session } from "../../src/core/session.ts";
-import { createMemoryStorage } from "../../src/save/save.ts";
 
 /** Scriptable input: tests press/hold/release actions between ticks. */
 export class FakeInput implements InputSource {
@@ -250,7 +249,6 @@ export interface TestRig {
   tk: Toolkit;
   host: FakeHost;
   session: Session;
-  storage: ReturnType<typeof createMemoryStorage>;
   logs: { level: string; args: unknown[] }[];
   /** Runs n fixed ticks (16.67 ms each). */
   step(n?: number): void;
@@ -258,7 +256,7 @@ export interface TestRig {
   run(ms: number): void;
 }
 
-export function createRig(config: unknown = {}, opts: { mapId?: string; storage?: ReturnType<typeof createMemoryStorage> } = {}): TestRig {
+export function createRig(config: unknown = {}, opts: { mapId?: string } = {}): TestRig {
   const logs: { level: string; args: unknown[] }[] = [];
   const sink = {
     debug: (...args: unknown[]) => logs.push({ level: "debug", args }),
@@ -266,10 +264,9 @@ export function createRig(config: unknown = {}, opts: { mapId?: string; storage?
     warn: (...args: unknown[]) => logs.push({ level: "warn", args }),
     error: (...args: unknown[]) => logs.push({ level: "error", args }),
   };
-  const storage = opts.storage ?? createMemoryStorage();
-  const tk = new Toolkit({ storage, logSink: sink });
+  const tk = new Toolkit({ logSink: sink });
   // Deterministic baseline for tests: no random drops unless a test enables them.
-  tk.configure({ publicApi: false, debug: { logLevel: "debug" }, enemies: { defaultDrops: { chance: 0 } }, interactions: { defaultDrops: { chance: 0 } }, save: { autoSave: false } });
+  tk.configure({ publicApi: false, debug: { logLevel: "debug" }, enemies: { defaultDrops: { chance: 0 } }, interactions: { defaultDrops: { chance: 0 } } });
   tk.configure(config);
   const host = new FakeHost();
   const session = tk.start(host, opts.mapId ?? "test_map", { seed: 1234 });
@@ -278,7 +275,6 @@ export function createRig(config: unknown = {}, opts: { mapId?: string; storage?
     tk,
     host,
     session,
-    storage,
     logs,
     step(n = 1) {
       for (let i = 0; i < n; i++) session.step(dt);
