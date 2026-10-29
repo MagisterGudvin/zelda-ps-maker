@@ -303,7 +303,8 @@ export function startEditorPreview(win: any = globalThis): void {
       hud = null;
     }
     hud ??= new UiDesigner(scene, win, { story: () => storyOfScene(scene), openAction: (ref) => openAction(win, scene.map.id, ref) });
-    hud.update(designerSetup(scene.map, storyOfScene(scene), Number(scene.CAMERA_ZOOM) || 0), !!openPanel(win.document, UI_LAYOUT_ACTION));
+    const editing = !!openPanel(win.document, UI_LAYOUT_ACTION);
+    hud.update(designerSetup(scene.map, storyOfScene(scene), Number(scene.CAMERA_ZOOM) || 0, editing && opened ? decodeURIComponent(opened) : ""), editing);
   };
   const timer = win.setInterval(() => {
     try {

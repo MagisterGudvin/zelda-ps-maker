@@ -14,7 +14,7 @@ export const UI_LAYOUT_ACTION = "Zelda: UI Layout";
 /** Label of the action's data field (the designer writes the layout there). */
 export const LAYOUT_FIELD_LABEL = "Layout data";
 /** PS Maker 1.2.1 plugin text fields keep up to 50000 characters (`maxlength`). */
-export const LAYOUT_MAX_CHARS = 50000;
+const LAYOUT_MAX_CHARS = 50000;
 
 interface ActionLike {
   id?: string;
@@ -52,27 +52,48 @@ export interface DesignerSetup {
   raw: string;
   error: string | null;
   values: LayoutValues;
-  /** The map's UI Layout action (the designer edits it), or null (the classic HUD is shown). */
+  /** The UI Layout action shown (the designer edits it), or null (the classic HUD is shown). */
   action: { id: string; root: string } | null;
+  /** Its screen name ("" = the HUD). */
+  screen: string;
+  /** Screen names of the map's UI Layout actions (for buttons that open one). */
+  screens: string[];
+  /** The map's own events (for buttons that run one). */
+  mapEvents: { id: string; name: string }[];
 }
 
-/** The HUD a map shows at the start of the game, from its Start Toolkit and UI Layout actions. */
-export function designerSetup(map: MapLike, story: (PsStory & Raw) | null, cameraZoom: number): DesignerSetup | null {
+const screenOf = (a: ActionLike) => (typeof a.pluginParams?.name === "string" ? a.pluginParams.name.trim() : "");
+
+/**
+ * What the game window frame of a map shows: the UI Layout action open in the editor (`openId`),
+ * else the map's HUD (its UI Layout without a screen name, or the classic HUD), at the start of
+ * the game. Null when the map shows no HUD and no screen is open.
+ */
+export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name?: string; hidden?: boolean }[] }, story: (PsStory & Raw) | null, cameraZoom: number, openId = ""): DesignerSetup | null {
   let start: ActionLike | null = null;
-  let own: { action: ActionLike; root: string } | null = null;
+  let hud: { action: ActionLike; root: string } | null = null;
+  let opened: { action: ActionLike; root: string } | null = null;
   let spawn: { x: number; y: number } | null = null;
+  const screens: string[] = [];
   for (const [list, root] of LISTS) {
     for (const a of map[list] ?? []) {
       if (a?.actionName === "Zelda: Start Toolkit" && !start) start = a;
-      if (a?.actionName === UI_LAYOUT_ACTION) own = { action: a, root };
+      if (a?.actionName === UI_LAYOUT_ACTION) {
+        if (!screenOf(a)) hud = { action: a, root };
+        else screens.push(screenOf(a));
+        if (openId && a.id === openId) opened = { action: a, root };
+      }
       if (a?.type === "movePlayerAction" && a.moveType === "absolute-position" && !spawn && typeof a.position?.x === "number" && typeof a.position?.y === "number") spawn = { x: a.position.x, y: a.position.y };
     }
   }
   const sp = start?.pluginParams ?? {};
-  if (!start || sp.hud === false) return null;
+  if (!opened && (!start || sp.hud === false)) return null;
+  const own = opened ?? hud;
+  const screen = own ? screenOf(own.action) : "";
   const raw = typeof own?.action.pluginParams?.layout === "string" ? (own.action.pluginParams.layout as string) : "";
   const parsed = parseLayout(raw);
-  const layout = parsed.layout ?? classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true });
+  const empty = { ...classicLayout(), elements: [] };
+  const layout = parsed.layout ?? (screen ? empty : classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true }));
   const zoom = cameraZoom > 0 ? cameraZoom : Number(story?.gameConfig?.zoom) || 1;
   const gw = Number(story?.gameConfig?.width) || 1280;
   const gh = Number(story?.gameConfig?.height) || 720;
@@ -90,6 +111,9 @@ export function designerSetup(map: MapLike, story: (PsStory & Raw) | null, camer
     error: parsed.error,
     values: sampleValues(layout, sp),
     action: own?.action.id ? { id: own.action.id, root: own.root } : null,
+    screen,
+    screens: [...new Set(screens)],
+    mapEvents: (map.storyEvents ?? []).filter((e) => e?.id && !e.hidden).map((e) => ({ id: e.id!, name: e.name || e.id! })),
   };
 }
 
@@ -161,11 +185,12 @@ const NEW: Record<ElementType, Raw> = {
   hearts: { w: 80, h: 16 },
   counter: { w: 18, h: 17, value: "rupees", icon: "hud_rupee", places: 3 },
   item: { w: 22, h: 22 },
+  button: { w: 72, h: 16, text: "Button", anchor: "c", x: -36, y: -8 },
 };
 
 /** A new element of a type with its defaults, its top-left at a point of the game window. */
 export function newElement(layout: UiLayout, type: ElementType, x: number, y: number): UiElement {
-  return readElement({ ...NEW[type], type, id: freeId(layout, type), x: Math.round(x), y: Math.round(y) })!;
+  return readElement({ x: Math.round(x), y: Math.round(y), ...NEW[type], type, id: freeId(layout, type) })!;
 }
 
 /** A copy of the layout (the designer never changes a layout it has handed out). */

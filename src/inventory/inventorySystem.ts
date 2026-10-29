@@ -16,6 +16,8 @@ export class InventorySystem {
   tick(_dtMs: number): void {
     const input = this.s.host.input;
     const inv = this.s.toolkit.inventory;
+    // A UI screen has the keys while it is open.
+    if (this.s.isPaused("screen")) return;
     if (input.pressed("inventory") && this.s.config.ui.inventoryPanel) this.setOpen(!this.open);
     // Cycling is blocked during other pauses (cutscenes) but allowed inside the panel.
     if (this.s.isPaused() && !this.open) return;

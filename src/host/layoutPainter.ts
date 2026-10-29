@@ -75,6 +75,8 @@ function color(value: string, fallback: string): { c: number; a: number } {
 export class LayoutPainter {
   private readonly scene: any;
   private readonly g: any;
+  /** Over the pictures (a selected button's frame). */
+  private readonly fg: any;
   private readonly images: Pool;
   private readonly texts: Pool;
   private ox = 0;
@@ -86,6 +88,7 @@ export class LayoutPainter {
     this.scene = scene;
     const s = scene;
     this.g = s.add.graphics().setDepth(depth);
+    this.fg = s.add.graphics().setDepth(depth + 0.15);
     this.images = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(depth + 0.1));
     this.texts = new Pool(() => {
       const t = s.add.text(0, 0, "", { fontFamily: "monospace" }).setOrigin(0, 0).setDepth(depth + 0.2);
@@ -101,6 +104,7 @@ export class LayoutPainter {
 
   begin(): void {
     this.g.clear();
+    this.fg.clear();
     this.images.begin();
     this.texts.begin();
   }
@@ -112,6 +116,7 @@ export class LayoutPainter {
 
   destroy(): void {
     this.g.destroy?.();
+    this.fg.destroy?.();
     this.images.destroy();
     this.texts.destroy();
   }
@@ -124,7 +129,8 @@ export class LayoutPainter {
     return src && src.width > 0 && src.height > 0 ? { w: src.width, h: src.height } : null;
   }
 
-  paint(layout: UiLayout, values: LayoutValues, fonts: Record<string, string>, area: PaintArea): Painted {
+  /** `focus`: the selected button of a screen (drawn with its selected look). */
+  paint(layout: UiLayout, values: LayoutValues, fonts: Record<string, string>, area: PaintArea, focus = ""): Painted {
     this.ox = area.x;
     this.oy = area.y;
     this.k = area.k;
@@ -134,7 +140,7 @@ export class LayoutPainter {
     for (const e of layout.elements) {
       if (!isShown(e, values)) continue;
       const p = anchorPoint(e.anchor, viewW, viewH);
-      const box = this.element(e, { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h }, values, fonts, layout);
+      const box = this.element(e, { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h }, values, fonts, layout, e.id === focus);
       out.boxes[e.id] = box;
       if (box.y + box.h <= viewH / 2) out.topEdge = Math.max(out.topEdge, box.y + box.h);
       else if (box.y >= viewH / 2) out.bottomEdge = Math.min(out.bottomEdge, box.y);
@@ -142,7 +148,7 @@ export class LayoutPainter {
     return out;
   }
 
-  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout): Box {
+  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean): Box {
     switch (e.type) {
       case "image":
         if (!this.picture(e.image, b, e.mode, e.slice) && e.color) this.rect(b, color(e.color, "#000000"));
@@ -164,7 +170,24 @@ export class LayoutPainter {
       case "item":
         this.item(e, b, values);
         return b;
+      case "button":
+        this.button(e, b, values, fonts, layout, focused);
+        return b;
     }
+  }
+
+  /** A button: its picture (the selected one while focused) or colour, a gold frame when selected without a selected picture, its text centred. */
+  private button(e: Extract<UiElement, { type: "button" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean): void {
+    const pic = focused && e.hover ? e.hover : e.image;
+    const mode = e.slice > 0 ? "nine" : "stretch";
+    const drawn = this.picture(pic, b, mode, e.slice);
+    if (!drawn) this.rect(b, color(focused ? e.hoverColor : e.color, "#1f1a24e6"));
+    // Selected without a picture of its own for it: a gold frame shows the selection.
+    if (focused && !(drawn && e.hover)) this.fg.lineStyle(this.k, 0xffd23a, 1).strokeRect(this.sx(b.x) + this.k / 2, this.sy(b.y) + this.k / 2, b.w * this.k - this.k, b.h * this.k - this.k);
+    if (!e.text) return;
+    const family = fonts[e.font || layout.theme.font] ?? "monospace";
+    const t = this.text(textWithValues(e.text, values), family, e.size, e.textColor || layout.theme.textColor);
+    t.setPosition(Math.round(this.sx(b.x) + (b.w * this.k - t.width) / 2), Math.round(this.sy(b.y) + (b.h * this.k - t.height) / 2));
   }
 
   private sx(x: number): number {

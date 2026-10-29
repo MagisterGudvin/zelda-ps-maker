@@ -111,6 +111,15 @@ export class FakeHud implements HudSink {
   setDiagnostics(lines: string[] | null): void {
     this.diagnostics = lines;
   }
+  /** A 320×180 game window in every layout. */
+  viewSize(): { w: number; h: number } {
+    return { w: 320, h: 180 };
+  }
+  pointer: ((type: "move" | "down", x: number, y: number) => void) | null = null;
+  setScreenPointer(handler: (type: "move" | "down", x: number, y: number) => void): () => void {
+    this.pointer = handler;
+    return () => (this.pointer = null);
+  }
 }
 
 export class FakeDebug implements DebugDraw {
@@ -192,6 +201,21 @@ export class FakeHost implements HostAdapter {
   }
   describe(): string[] {
     return ["fake host"];
+  }
+  /** PS Maker events run by id (Run event). */
+  events: string[] = [];
+  runStoryEvent(id: string): boolean {
+    this.events.push(id);
+    return true;
+  }
+  variables = new Map<string, string | number | boolean>();
+  getVariable(id: string): string | number | boolean | undefined {
+    return this.variables.get(id);
+  }
+  setVariable(id: string, value: string | number | boolean): boolean {
+    if (!this.variables.has(id)) return false;
+    this.variables.set(id, value);
+    return true;
   }
   sounds: { src: string; volume: number }[] = [];
   playSound(src: string, volume: number): void {

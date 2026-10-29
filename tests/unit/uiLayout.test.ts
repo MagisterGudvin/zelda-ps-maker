@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { anchorPoint, classicLayout, isShown, layoutBindings, offsetFrom, parseLayout, pictureKeys, readElement, textWithValues, type Box, type UiLayout } from "../../src/ui/uiLayout.ts";
+import { anchorPoint, classicLayout, isShown, layoutBindings, layoutBoxes, offsetFrom, parseLayout, pictureKeys, readElement, textWithValues, type Box } from "../../src/ui/uiLayout.ts";
 import { layoutScale } from "../../src/host/layoutPainter.ts";
 import { History, boardScale, designerSetup, freeId, newElement, sampleValues, savedText, withField, writeFormText } from "../../src/editor/layoutEdit.ts";
 
@@ -60,16 +60,6 @@ test("pictures of an element: project images only (built-in sprites are not chec
   assert.deepEqual(pictureKeys(readElement({ type: "hearts", full: "H", empty: "icon_x" })!), ["H"]);
 });
 
-/** Element boxes of a layout on a game window (counters and hearts as the painter sizes them). */
-function boxes(layout: UiLayout, viewW: number, viewH: number): Record<string, Box> {
-  const out: Record<string, Box> = {};
-  for (const e of layout.elements) {
-    const p = anchorPoint(e.anchor, viewW, viewH);
-    out[e.id] = { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h };
-  }
-  return out;
-}
-
 for (const [W, H] of [[256, 224], [320, 180], [400, 240], [640, 360], [1280, 720], [1920, 1080]]) {
   for (const bottom of [false, true]) {
     test(`classic HUD: elements on screen and apart, ${W}x${H}, ${bottom ? "bottom" : "top"}`, () => {
@@ -77,7 +67,7 @@ for (const [W, H] of [[256, 224], [320, 180], [400, 240], [640, 360], [1280, 720
       const k = layoutScale(0, 0, W, H);
       const viewW = Math.floor(W / k);
       const viewH = Math.floor(H / k);
-      const b = boxes(L, viewW, viewH);
+      const b = layoutBoxes(L, viewW, viewH);
       const list = Object.entries(b);
       for (const [id, r] of list) assert.ok(r.x >= 0 && r.y >= 0 && r.x + r.w <= viewW && r.y + r.h <= viewH, `${id} on screen`);
       for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) assert.ok(!intersects(list[i][1], list[j][1]), `${list[i][0]} / ${list[j][0]}`);
@@ -120,6 +110,20 @@ test("designer setup: the map's UI Layout action and its scale; a broken one is 
   const broken = designerSetup({ initialActions: [start, { ...own, pluginParams: { layout: "{" } }] }, story as any, 0)!;
   assert.equal(broken.layout.elements.length, 8);
   assert.match(broken.error!, /not valid/);
+});
+
+test("designer setup: the open UI Layout action is edited (a screen, even on a map without the HUD); screens and events for buttons", () => {
+  const hud = { id: "h", actionName: "Zelda: UI Layout", pluginParams: { name: "", layout: "" } };
+  const pause = { id: "p", actionName: "Zelda: UI Layout", pluginParams: { name: " pause ", layout: "" } };
+  const map = { initialActions: [start, hud, pause], storyEvents: [{ id: "e1", name: "Open chest" }, { id: "e2", name: "secret", hidden: true }] };
+  const shown = designerSetup(map, story as any, 0)!;
+  assert.deepEqual([shown.action?.id, shown.screen], ["h", ""], "not editing: the HUD");
+  const edited = designerSetup(map, story as any, 0, "p")!;
+  assert.deepEqual([edited.action?.id, edited.screen, edited.layout.elements.length], ["p", "pause", 0], "an empty screen, not the classic HUD");
+  assert.deepEqual(edited.screens, ["pause"]);
+  assert.deepEqual(edited.mapEvents, [{ id: "e1", name: "Open chest" }]);
+  assert.equal(designerSetup({ initialActions: [pause] }, story as any, 0, "p")!.screen, "pause", "no Start Toolkit here: the screen still opens");
+  assert.equal(designerSetup({ initialActions: [pause] }, story as any, 0), null);
 });
 
 test("designer values: every element shown (variables and items count as on), the start of the game", () => {

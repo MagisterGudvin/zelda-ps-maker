@@ -144,7 +144,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
   },
   "Zelda: Set Controls": {
     keywords: ["keys", "controls", "keyboard", "bindings", "input", "gamepad"],
-    preview: (p) => join(["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory"].map((k) => set(p[k]) && k)),
+    preview: (p) => join(["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu"].map((k) => set(p[k]) && k)),
   },
   "Zelda: Stop Toolkit": { keywords: ["stop", "disable", "shutdown"] },
   "Zelda: Pause Combat": {
@@ -312,14 +312,24 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
   },
   "Zelda: UI Layout": {
-    keywords: ["hud", "ui", "interface", "designer", "layout", "hearts", "counter", "bar", "menu", "skin"],
+    keywords: ["hud", "ui", "interface", "designer", "layout", "hearts", "counter", "bar", "menu", "screen", "button", "skin"],
     fields: { layout: { group: "Data" } },
     collapsed: ["Data"],
     preview: (p) => {
       const text = typeof p.layout === "string" ? p.layout : "";
       const n = text ? (text.match(/"type":/g) ?? []).length : 0;
-      return text ? `${n} elements` : "classic HUD";
+      const what = set(p.name) ? `screen "${String(p.name)}"` : "HUD";
+      return text ? `${what}, ${n} elements` : set(p.name) ? `${what}, empty` : "classic HUD";
     },
+  },
+  "Zelda: Open UI Screen": {
+    keywords: ["menu", "screen", "ui", "open", "pause", "shop"],
+    fields: { name: { required: true } },
+    preview: (p) => (set(p.name) ? String(p.name) : undefined),
+  },
+  "Zelda: Close UI Screen": {
+    keywords: ["menu", "screen", "ui", "close", "back"],
+    preview: (p) => (p.all === true ? "all" : "top screen"),
   },
   "Zelda: Message Style": {
     keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign"],

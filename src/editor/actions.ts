@@ -292,11 +292,11 @@ const startToolkit = defineEvent({
   },
 });
 
-const CONTROL_ACTIONS = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory"] as const;
+const CONTROL_ACTIONS = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu"] as const;
 
 const setControls = defineEvent({
   name: "Zelda: Set Controls",
-  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I. / Клавиши Toolkit (пусто — не менять).",
+  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Enter. / Клавиши Toolkit (пусто — не менять).",
   parameterDefs: {
     sword: keys("Sword", "Default: X."),
     useItem: keys("Use item", "Default: C."),
@@ -305,6 +305,7 @@ const setControls = defineEvent({
     nextItem: keys("Next item", "Default: E."),
     prevItem: keys("Previous item", "Default: Q."),
     inventory: keys("Inventory", "Default: I."),
+    menu: keys("Menu", "Opens the UI screen marked Menu key. Default: Enter."),
   },
   execute(params, ctx) {
     run("Zelda: Set Controls", ctx, params, (s, tk) => {
@@ -971,25 +972,55 @@ const setAbility = defineEvent({
 
 const uiLayout = defineEvent({
   name: "Zelda: UI Layout",
-  description: "Your own HUD, made with the mouse: with this action on a map, the editor shows the layout in the game window frame and the designer panel next to it (pictures, texts, meters, hearts, counters, the item box). Put it after Start Toolkit. / Свой HUD из дизайнера.",
+  description: "Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or the Menu key. Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.",
   parameterDefs: {
+    name: str("Screen name", "Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key. / Пусто — HUD; имя — экран меню.", ""),
     layout: str("Layout data", "Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер.", ""),
   },
   execute(params, ctx) {
     run("Zelda: UI Layout", ctx, params, (s, tk) => {
-      const { layout, error } = parseLayout(textOf((params as Record<string, unknown>).layout));
-      if (error) s.logger.warn(`UI Layout: ${error}; the classic HUD is shown.`);
-      tk.hudLayout = layout ?? classicLayout();
+      const p = params as Record<string, unknown>;
+      const screen = textOf(p.name).trim();
+      const { layout: parsed, error } = parseLayout(textOf(p.layout));
+      if (error) s.logger.warn(`UI Layout${screen ? ` "${screen}"` : ""}: ${error}; ${screen ? "the screen is empty" : "the classic HUD is shown"}.`);
+      const layout = parsed ?? (screen ? { ...classicLayout(), elements: [] } : classicLayout());
+      if (screen) tk.uiScreens.set(screen, layout);
+      else tk.hudLayout = layout;
       const story = psStory(s, "UI Layout");
       // Fonts of the texts: PS Maker loads a project font only when it first shows its own text.
-      for (const id of new Set([tk.hudLayout.theme.font, ...tk.hudLayout.elements.map((e) => (e.type === "text" ? e.font : ""))].filter(Boolean))) {
+      for (const id of new Set([layout.theme.font, ...layout.elements.map((e) => (e.type === "text" || e.type === "button" ? e.font : ""))].filter(Boolean))) {
         tk.uiFonts[id] = fontFamilyCss(story, id);
         s.host.loadProjectFont?.(id);
       }
-      for (const e of tk.hudLayout.elements) {
+      for (const e of layout.elements) {
         for (const key of pictureKeys(e)) if (s.host.textureSize && !s.host.textureSize(key)) s.logger.warnOnce(`ui-pic-${key}`, `UI Layout: picture "${key}" (${e.id}) is not loaded; the built-in look is shown.`);
       }
+      s.hud?.markDirty();
     });
+  },
+});
+
+const openUiScreen = defineEvent({
+  name: "Zelda: Open UI Screen",
+  description: "Opens a UI screen made with Zelda: UI Layout (by its screen name) over the game. Arrow keys choose a button, the action key presses it, the sword or inventory key goes back. / Открывает экран меню.",
+  parameterDefs: {
+    name: str("Screen name", "The screen name given in its Zelda: UI Layout. / Имя экрана.", ""),
+  },
+  execute(params, ctx) {
+    run("Zelda: Open UI Screen", ctx, params, (s) => {
+      s.screens?.open(textOf((params as Record<string, unknown>).name).trim());
+    });
+  },
+});
+
+const closeUiScreen = defineEvent({
+  name: "Zelda: Close UI Screen",
+  description: "Closes the open UI screen (back to the one it was opened from), or all of them. / Закрывает экран меню.",
+  parameterDefs: {
+    all: bool("All screens", "Close every open screen, not just the top one. / Закрыть все экраны.", false),
+  },
+  execute(params, ctx) {
+    run("Zelda: Close UI Screen", ctx, params, (s) => s.screens?.close(params.all === true));
   },
 });
 
@@ -1222,6 +1253,8 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   showMessage,
   messageStyle,
   uiLayout,
+  openUiScreen,
+  closeUiScreen,
   linkVariable,
   setRespawn,
   respawnPlayer,

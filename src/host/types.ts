@@ -39,6 +39,8 @@ export interface HostAdapter {
   getVariable?(id: string): string | number | boolean | undefined;
   /** Optional: sets a project variable; the value is converted to the variable's type. False when unknown. */
   setVariable?(id: string, value: string | number | boolean): boolean;
+  /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does. False when it cannot. */
+  runStoryEvent?(eventId: string): boolean;
   /** Optional: true while the engine shows a dialogue (combat pauses, see combat.pauseDuringDialogue). */
   isDialogueOpen?(): boolean;
   /** Host facts for the diagnostics panel (scene, camera, player). */
@@ -68,9 +70,10 @@ export interface HostAdapter {
   dispose(): void;
 }
 
-export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "debug" | "diagnostics";
+/** Toolkit keys; "up"…"right" are the movement keys, read only by UI screens (PS Maker moves the player). */
+export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | "debug" | "diagnostics";
 
-export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "debug", "diagnostics"];
+export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", "debug", "diagnostics"];
 
 /**
  * Edge-aware input. `latch()` is called once per fixed tick; presses that
@@ -170,6 +173,8 @@ export interface HudModel {
   inventory: HudItemSlot[];
   dead: boolean;
   deathText: string;
+  /** The open UI screen over the game (its selected button), or null. */
+  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string } | null;
 }
 
 export interface HudSink {
@@ -177,4 +182,8 @@ export interface HudSink {
   setVisible(visible: boolean): void;
   /** Diagnostics text block (null hides it). */
   setDiagnostics(lines: string[] | null): void;
+  /** Optional: the size of the game window in a layout's pixels. */
+  viewSize?(layout: UiLayout): { w: number; h: number };
+  /** Optional: pointer moves and clicks over an open screen, in its layout pixels. Returns the unsubscribe. */
+  setScreenPointer?(handler: (type: "move" | "down", x: number, y: number) => void): () => void;
 }

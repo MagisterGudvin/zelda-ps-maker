@@ -747,6 +747,24 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
   }
 
+  /**
+   * Runs a PS Maker event by id through PS Maker's own "Run event" action (runStoryEventAction:
+   * it finds the event among the project's and this map's and plays its actions on the map's story
+   * runner). False when the map has no story runner.
+   */
+  runStoryEvent(eventId: string): boolean {
+    const runner = this.scene?.storyRunner;
+    if (!eventId || !runner || typeof runner.playActions !== "function") return false;
+    const action = { id: `zmt-run-${++this.dialogueSeq}`, name: "Run event", type: "runStoryEventAction", storyEventId: eventId, loopMode: "none", waitForCompletion: true };
+    try {
+      void Promise.resolve(runner.playActions([action])).catch((err: unknown) => this.logger.warn(`PS Maker event "${eventId}" failed:`, err));
+      return true;
+    } catch (err) {
+      this.logger.warn(`PS Maker event "${eventId}" failed:`, err);
+      return false;
+    }
+  }
+
   loadProjectFont(fontId: string): void {
     if (!fontId || !this.scene?.textures) return;
     const story = this.psMakerStory();

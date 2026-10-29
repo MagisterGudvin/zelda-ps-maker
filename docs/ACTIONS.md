@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.22.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.23.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **36**. Все имена начинаются с `Zelda: `.
+Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -34,7 +34,9 @@
 - [Zelda: Set Ability](#zelda-set-ability)
 - [Zelda: Show Message](#zelda-show-message)
 - [Zelda: Message Style](#zelda-message-style)
-- [Zelda: HUD Style](#zelda-hud-style)
+- [Zelda: UI Layout](#zelda-ui-layout)
+- [Zelda: Open UI Screen](#zelda-open-ui-screen)
+- [Zelda: Close UI Screen](#zelda-close-ui-screen)
 - [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
 - [Zelda: Set Respawn Point](#zelda-set-respawn-point)
 - [Zelda: Respawn Player](#zelda-respawn-player)
@@ -64,7 +66,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 
 ## Zelda: Set Controls
 
-Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I. / Клавиши Toolkit (пусто — не менять).
+Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Enter. / Клавиши Toolkit (пусто — не менять).
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
@@ -75,6 +77,7 @@ Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sw
 | `nextItem` (Next item) | key-bindings | `[]` | Default: E. |
 | `prevItem` (Previous item) | key-bindings | `[]` | Default: Q. |
 | `inventory` (Inventory) | key-bindings | `[]` | Default: I. |
+| `menu` (Menu) | key-bindings | `[]` | Opens the UI screen marked Menu key. Default: Enter. |
 
 ## Zelda: Stop Toolkit
 
@@ -400,49 +403,30 @@ Shows toolkit messages (signs, "You got...") as PS Maker dialogues, with everyth
 | `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the messages use. / Макет диалога PS Maker. Варианты: Default layout. |
 | `kinds` (Messages as dialogues) | string-enum-multi | `["sign","item"]` | Which toolkit messages are dialogues; the others stay short HUD notes. / Какие сообщения показывать диалогом. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
 
-## Zelda: HUD Style
+## Zelda: UI Layout
 
-Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar, item icons, inventory panel. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.
+Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or the Menu key. Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `parts` (Toolkit HUD parts) | string-enum-multi | `["hearts","counters","item","magic"]` | What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit. Варианты: Hearts, Counters (rupees, bombs, arrows, keys), Item box, Magic meter. |
-| `heartFull` (Heart: full) | image | — | Picture of a full heart (its size sets the size of all hearts). / Полное сердце. |
-| `heartHalf` (Heart: half) | image | — | Half a heart. Empty = the full heart. / Половина сердца. |
-| `heartEmpty` (Heart: empty) | image | — | An empty heart container. / Пустое сердце. |
-| `rupees` (Icon: rupees) | image | — | Icon above the rupee counter. / Значок рупий. |
-| `bombs` (Icon: bombs) | image | — | Icon above the bomb counter. / Значок бомб. |
-| `arrows` (Icon: arrows) | image | — | Icon above the arrow counter. / Значок стрел. |
-| `keys` (Icon: keys) | image | — | Icon above the small key counter. / Значок ключей. |
-| `digits` (Digits 0-9) | image | — | One picture with the ten digits 0 1 2 3 4 5 6 7 8 9 in a row, all the same width. / Цифры 0–9 в одну строку. |
-| `itemBox` (Item box) | image | — | Frame around the selected item. / Рамка предмета. |
-| `magicFrame` (Magic meter: frame) | image | — | The empty magic meter. / Рамка шкалы магии. |
-| `magicFill` (Magic meter: fill) | image | — | Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии. |
-| `bar` (Bar background) | image | — | Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса. |
-| `barSlice` (Bar border (px)) | number | `4` | How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается. |
-| `iconSword` (Icon: sword) | image | — | Icon of the sword in the item box and the inventory. / Иконка предмета. |
-| `iconShield` (Icon: shield) | image | — | Icon of the shield in the item box and the inventory. / Иконка предмета. |
-| `iconGlove` (Icon: power glove) | image | — | Icon of the power glove in the item box and the inventory. / Иконка предмета. |
-| `iconBomb` (Icon: bomb item) | image | — | Icon of the bomb item in the item box and the inventory. / Иконка предмета. |
-| `iconBoomerang` (Icon: boomerang) | image | — | Icon of the boomerang in the item box and the inventory. / Иконка предмета. |
-| `iconBow` (Icon: bow) | image | — | Icon of the bow in the item box and the inventory. / Иконка предмета. |
-| `iconFireRod` (Icon: fire rod) | image | — | Icon of the fire rod in the item box and the inventory. / Иконка предмета. |
-| `iconHealingSpell` (Icon: healing spell) | image | — | Icon of the healing spell in the item box and the inventory. / Иконка предмета. |
-| `inventoryPanel` (Inventory panel) | image | — | Background of the inventory panel (I), stretched; its border keeps its size (9-slice). / Фон панели предметов. |
-| `panelSlice` (Panel border (px)) | number | `4` | How many pixels of the panel picture's edge are not stretched. / Рамка фона панели, не растягивается. |
-| `inventoryCursor` (Inventory cursor) | image | — | Frame around the selected item in the inventory (20×20 HUD pixels). / Рамка выбранного предмета. |
-| `lifeLabel` (LIFE label) | boolean | `true` | Show the LIFE label above the hearts. / Надпись над сердцами. |
-| `font` (Font) | string-enum | `""` | A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта. Варианты: Default. |
-| `textColor` (Text color) | string-enum | `"#f8e0a0"` | Colour of the HUD texts. / Цвет текста. Варианты: Cream, White, Gold, Dark. |
-| `scale` (Scale) | number | `0` | Size of one HUD pixel on screen: 0 = like the map (one HUD pixel = one map pixel), 4 = four screen pixels. / Масштаб: 0 — как у карты. |
-| `heartsX` (Hearts X) | number | `-1` | Left edge of the hearts in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `heartsY` (Hearts Y) | number | `-1` | Top edge of the hearts in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `countersX` (Counters X) | number | `-1` | Left edge of the counters in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `countersY` (Counters Y) | number | `-1` | Top edge of the counters in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `itemX` (Item box X) | number | `-1` | Left edge of the item box in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `itemY` (Item box Y) | number | `-1` | Top edge of the item box in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
-| `magicX` (Magic meter X) | number | `-1` | Left edge of the magic meter in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место). |
-| `magicY` (Magic meter Y) | number | `-1` | Top edge of the magic meter in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место). |
+| `name` (Screen name) | string | `""` | Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key. / Пусто — HUD; имя — экран меню. |
+| `layout` (Layout data) | string | `""` | Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер. |
+
+## Zelda: Open UI Screen
+
+Opens a UI screen made with Zelda: UI Layout (by its screen name) over the game. Arrow keys choose a button, the action key presses it, the sword or inventory key goes back. / Открывает экран меню.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `name` (Screen name) | string | `""` | The screen name given in its Zelda: UI Layout. / Имя экрана. |
+
+## Zelda: Close UI Screen
+
+Closes the open UI screen (back to the one it was opened from), or all of them. / Закрывает экран меню.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `all` (All screens) | boolean | `false` | Close every open screen, not just the top one. / Закрыть все экраны. |
 
 ## Zelda: Show Stat In Variable
 

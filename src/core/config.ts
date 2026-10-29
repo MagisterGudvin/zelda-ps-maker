@@ -63,6 +63,8 @@ export interface ToolkitConfig {
     nextItem: string[];
     prevItem: string[];
     inventory: string[];
+    /** Opens and closes the UI screen marked "Menu key" (Zelda: UI Layout). */
+    menu: string[];
     /** Movement keys of the PS Maker controller, read only as a facing hint. */
     move: { up: string[]; down: string[]; left: string[]; right: string[] };
     gamepad: {
@@ -74,6 +76,7 @@ export interface ToolkitConfig {
       nextItem: number;
       prevItem: number;
       inventory: number;
+      menu: number;
     };
   };
   player: {
@@ -292,8 +295,9 @@ export function createDefaultConfig(): ToolkitConfig {
       nextItem: ["KeyE"],
       prevItem: ["KeyQ"],
       inventory: ["KeyI"],
+      menu: ["Enter"],
       move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
-      gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9 },
+      gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
     },
     player: {
       heartValue: 2,

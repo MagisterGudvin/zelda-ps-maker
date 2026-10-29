@@ -191,6 +191,13 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text"]);
     assert.equal(layout!.scale, 0);
     assert.equal(layout!.theme.font, DEMO_FONT.id);
+    // The pause screen (Enter): its buttons run project events that exist.
+    const pause = m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout" && a.pluginParams.name === "pause");
+    const screen = parseLayout(pause.pluginParams.layout).layout!;
+    assert.ok(screen.screen.menuKey && screen.screen.pause);
+    const events = screen.elements.filter((e) => e.type === "button" && e.action.kind === "event").map((e: Any) => e.action.id);
+    assert.deepEqual(events, ["zelda-pause-settings", "zelda-pause-title"]);
+    for (const id of events) assert.ok(story.globalStoryEvents.some((e: Any) => e.id === id && e.actions.length > 0), id);
     assert.deepEqual(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.kinds, ["sign", "item"]);
   }
   assert.deepEqual(story.variables.map((v: Any) => v.id), ["zelda-progress"]);

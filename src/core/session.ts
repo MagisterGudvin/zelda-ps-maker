@@ -12,6 +12,7 @@ import { RulesEngine } from "../puzzles/rules.ts";
 import { DungeonSystem } from "../dungeons/dungeonSystem.ts";
 import { HudSystem } from "../ui/hud.ts";
 import { MessageBoxSystem } from "../ui/messageBox.ts";
+import { UiScreenSystem } from "../ui/uiScreens.ts";
 import { DebugSystem } from "../debug/debug.ts";
 import { SoundSystem } from "../ui/sound.ts";
 import type { FeatureId } from "./config.ts";
@@ -59,6 +60,7 @@ export class Session {
   readonly dungeons: DungeonSystem | null;
   readonly hud: HudSystem | null;
   readonly messageBox: MessageBoxSystem | null;
+  readonly screens: UiScreenSystem | null;
   readonly debug: DebugSystem | null;
   readonly sound: SoundSystem;
 
@@ -86,6 +88,7 @@ export class Session {
     this.dungeons = f.dungeons ? new DungeonSystem(this) : null;
     this.hud = f.ui && toolkit.config.ui.enabled && host.hud ? new HudSystem(this) : null;
     this.messageBox = this.hud ? new MessageBoxSystem(this) : null;
+    this.screens = this.hud ? new UiScreenSystem(this) : null;
     this.debug = f.debugTools && host.debug ? new DebugSystem(this) : null;
     this.sound = new SoundSystem(this);
 
@@ -229,6 +232,7 @@ export class Session {
     }
 
     this.debug?.handleInput();
+    this.screens?.tick();
     this.inventoryUi?.tick(dtMs);
     this.messageBox?.tick();
 
@@ -308,6 +312,7 @@ export class Session {
         this.logger.error(`Disposing ${this.systems[i].name} failed:`, err);
       }
     }
+    this.screens?.dispose();
     this.inventoryUi?.dispose();
     this.messageBox?.dispose();
     this.rules?.dispose();

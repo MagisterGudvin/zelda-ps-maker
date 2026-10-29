@@ -60,6 +60,8 @@ export interface ZeldaEventMap {
   "zelda:dungeon:completed": { dungeonId: string };
   "zelda:message": { text: string; durationMs: number; kind?: MessageKind };
   "zelda:inventory:toggled": { open: boolean };
+  "zelda:ui:screen": { name: string; open: boolean };
+  "zelda:ui:button": { screen: string; id: string };
   [custom: `zelda:custom:${string}`]: Record<string, unknown>;
 }
 

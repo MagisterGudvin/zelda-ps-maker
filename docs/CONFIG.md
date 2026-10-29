@@ -27,12 +27,12 @@
 `combat, items, inventory, enemies, interactions, puzzles, dungeons, ui, save, debugTools` — `true/false`. Отключение подсистемы не ломает остальные (проверено тестом для каждой): например, при `enemies: false` действие `Create Enemy` пишет предупреждение и ничего не создаёт.
 
 ### `controls` — привязка кнопок (в редакторе — `Zelda: Set Controls`)
-`controls.move` — клавиши движения PS Maker (по умолчанию стрелки и WASD): Toolkit их не обрабатывает, а только использует как подсказку направления, чтобы игрок мог «повернуться» к стене/сундуку, не сдвигаясь (`player.facingFromInput`).
+`controls.move` — клавиши движения PS Maker (по умолчанию стрелки и WASD): игрока ими двигает PS Maker; Toolkit использует их как подсказку направления, чтобы игрок мог «повернуться» к стене/сундуку, не сдвигаясь (`player.facingFromInput`), и для выбора кнопок на экранах меню.
 
-Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory`. Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory}` — индексы кнопок стандартной раскладки; работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
+Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory, menu` (`menu`, по умолчанию Enter, открывает экран меню с отметкой *Menu key opens it*). Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory, menu}` — индексы кнопок стандартной раскладки (крестовина 12–15 выбирает кнопки экранов); работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
 
 ```json
-{"controls":{"sword":["Space","KeyJ"],"useItem":["KeyK"],"action":["KeyZ","Enter"]}}
+{"controls":{"sword":["Space","KeyJ"],"useItem":["KeyK"],"action":["KeyZ","KeyL"]}}
 ```
 
 ### `player`
@@ -87,8 +87,8 @@
 `positionUnits "pixels" | "tiles"`, `tileSize 16` (шаг толкания блоков и пересчёт координат в режиме `tiles`), `useArcadeStaticBodies true` (коллизии карты PS Maker — статические тела Arcade), `npcsBlock true` (NPC PS Maker — препятствия для врагов и снарядов), `depthMode "auto" | "y" | "fixed"` (`auto`: если PS Maker сортирует персонажей по y — тоже по y, иначе на слое игрока с поправкой по y, чтобы объекты не оказывались под слоями карты), `depthBase 0`, `fixedStepHz 60`, `maxStepsPerFrame 5`, `collisionRefreshTicks 120`.
 
 ### `ui`
-Классическая полоса: шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд).
-`enabled, showHearts, showMagic, showActiveItem, counters ["rupees","bombs","arrows","keys"], position "top" | "bottom"` (старые `top-left` и т.п. читаются как top/bottom), `scale 0` (0 = наибольший целый масштаб, при котором 256×224 помещается на экран), `safeArea { top 0, right 24, bottom 0, left 0 }` (место под собственный UI PS Maker — шестерёнку настроек справа сверху; в пикселях HUD), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true, fontFamily "monospace"`. Сообщения выводятся рамками внизу свободной области и не перекрывают полосу HUD.
+Классический HUD (пока на карте нет `Zelda: UI Layout`): шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд), левее шестерёнки настроек PS Maker. Свой HUD и экраны меню — дизайнер `Zelda: UI Layout` ([UI.md](UI.md)).
+`enabled, showMagic, position "top" | "bottom"` (старые `top-left` и т.п. читаются как top/bottom; для классического HUD), `scale 0` (размер пикселя макета на экране, если в макете 0: 0 = как у карты), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true`. Сообщения выводятся рамками внизу свободной области и не перекрывают HUD.
 
 ### `audio`
 `enabled true, volume 1, sounds {}` — звуки моментов (`Zelda: Set Sound`): `{"audio":{"sounds":{"swordSwing":{"src":"sfx/swing.ogg","volume":0.8}}}}`. Список моментов — в [PS_MAKER_INTEGRATION.md](PS_MAKER_INTEGRATION.md#звук).
@@ -108,7 +108,7 @@
 {"player":{"maxMagic":64,"startMagic":64,"magicRegenPerSecond":2},"items":{"fireRod":{"magicCost":6,"damage":5}}}
 ```
 
-HUD справа, без магии, только сердца и рупии:
+Классический HUD внизу, без шкалы магии:
 ```json
-{"ui":{"position":"top-right","showMagic":false,"counters":["rupees"]}}
+{"ui":{"position":"bottom","showMagic":false}}
 ```

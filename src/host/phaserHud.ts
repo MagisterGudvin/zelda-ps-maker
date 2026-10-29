@@ -1,5 +1,6 @@
 import type { Logger } from "../core/logger.ts";
 import type { HudModel, HudSink } from "./types.ts";
+import type { UiLayout } from "../ui/uiLayout.ts";
 import { LayoutPainter, layoutScale, type Painted } from "./layoutPainter.ts";
 
 export const HUD_SCENE_KEY = "ZeldaMakerToolkitHUD";
@@ -30,6 +31,10 @@ export class PhaserHud implements HudSink {
   private pending: HudModel | null = null;
   private visible = true;
   private painter: LayoutPainter | null = null;
+  /** The open UI screen, above the HUD. */
+  private screenPainter: LayoutPainter | null = null;
+  private screenK = 0;
+  private pointerHandler: ((type: "move" | "down", x: number, y: number) => void) | null = null;
   private diagText: any = null;
   private diagLines: string[] | null = null;
 
@@ -65,6 +70,13 @@ export class PhaserHud implements HudSink {
           create(this: any) {
             self.scene = this;
             self.painter = new LayoutPainter(this, 0);
+            self.screenPainter = new LayoutPainter(this, 5);
+            // Pointer over an open screen: hover and click its buttons (in its layout pixels).
+            const pointer = (type: "move" | "down") => (p: { x: number; y: number }) => {
+              if (self.screenK > 0) self.pointerHandler?.(type, p.x / self.screenK, p.y / self.screenK);
+            };
+            this.input?.on?.("pointermove", pointer("move"));
+            this.input?.on?.("pointerdown", pointer("down"));
             self.diagText = this.add.text(0, 0, "", { fontFamily: "monospace", color: "#d0ffd0", backgroundColor: "#000000cc" }).setOrigin(0, 1).setDepth(10).setVisible(false);
             if (self.pending) self.render(self.pending);
             self.renderDiagnostics();
@@ -99,6 +111,38 @@ export class PhaserHud implements HudSink {
     }
     if (model.inventoryOpen) this.drawInventory(model, painted, k, font);
     p.end();
+    this.drawScreen(model);
+  }
+
+  /** The open screen over the game: the dim colour, then its layout with the selected button. */
+  private drawScreen(model: HudModel): void {
+    const sp = this.screenPainter;
+    if (!sp) return;
+    sp.begin();
+    const sc = model.screen;
+    this.screenK = 0;
+    if (sc) {
+      const { W, H } = this.screen();
+      const k = layoutScale(sc.layout.scale || model.scale, model.mapZoom, W, H);
+      const dim = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(sc.layout.screen.dim.trim());
+      if (dim) sp.graphics.fillStyle(parseInt(dim[1], 16), dim[2] ? parseInt(dim[2], 16) / 255 : 1).fillRect(0, 0, W, H);
+      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, sc.focus);
+      this.screenK = k;
+    }
+    sp.end();
+  }
+
+  viewSize(layout: UiLayout): { w: number; h: number } {
+    const { W, H } = this.screen();
+    const k = layoutScale(layout.scale || this.pending?.scale || 0, this.pending?.mapZoom ?? 0, W, H);
+    return { w: Math.floor(W / k), h: Math.floor(H / k) };
+  }
+
+  setScreenPointer(handler: (type: "move" | "down", x: number, y: number) => void): () => void {
+    this.pointerHandler = handler;
+    return () => {
+      if (this.pointerHandler === handler) this.pointerHandler = null;
+    };
   }
 
   /** Notes in boxes above the bottom elements, newest at the bottom. */

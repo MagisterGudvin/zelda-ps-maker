@@ -62,6 +62,9 @@
     "inventory": [
       "KeyI"
     ],
+    "menu": [
+      "Enter"
+    ],
     "move": {
       "up": [
         "ArrowUp",
@@ -88,7 +91,8 @@
       "action": 1,
       "nextItem": 7,
       "prevItem": 6,
-      "inventory": 9
+      "inventory": 9,
+      "menu": 8
     }
   },
   "player": {

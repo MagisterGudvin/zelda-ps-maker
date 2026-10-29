@@ -42,6 +42,8 @@ export class HudSystem {
   tick(dtMs: number): void {
     const hud = this.s.host.hud;
     if (!hud) return;
+    // Project variables change without toolkit events: a layout showing one is redrawn a few times a second.
+    if (++this.ticks % 15 === 0 && this.showsVariables()) this.dirty = true;
     if (this.messages.length > 0) {
       for (const m of this.messages) m.remainingMs -= dtMs;
       while (this.messages.length > 0 && this.messages[0].remainingMs <= 0) this.messages.shift();
@@ -50,6 +52,14 @@ export class HudSystem {
     if (!this.dirty) return;
     this.dirty = false;
     hud.render(this.buildModel());
+  }
+
+  private ticks = 0;
+
+  private showsVariables(): boolean {
+    const shows = (l: UiLayout | undefined) => !!l && [...layoutBindings(l)].some((k) => k.startsWith("var:"));
+    const screen = this.s.screens?.current;
+    return shows(this.layout()) || shows(screen?.layout);
   }
 
   /** The layout the HUD shows: the designer's (Zelda: UI Layout) or the classic one. */
@@ -122,6 +132,10 @@ export class HudSystem {
       inventory: open ? [...st.inventory.owned.filter((id) => s.toolkit.items.has(id)).map(slot)] : [],
       dead: s.player.isDead,
       deathText: s.i18n.t("hud.dead"),
+      screen: (() => {
+        const cur = s.screens?.current;
+        return cur ? { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus } : null;
+      })(),
     };
   }
 

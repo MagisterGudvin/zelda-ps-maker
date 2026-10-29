@@ -160,6 +160,31 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "hearts", type: "hearts", x: -112, y: 13, w: 84, h: 17, anchor: "tr", show: always, full: "zelda-ui-heart-full", half: "zelda-ui-heart-half", empty: "zelda-ui-heart-empty", perRow: 8, gap: 1 },
     ],
   };
+  // A pause screen (Enter) made of the same pictures: its buttons close it or run project events
+  // (PS Maker's options menu with saving, the main menu).
+  const globalStoryEvents = [
+    { name: "Pause: settings", id: "zelda-pause-settings", actions: [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: true }], hidden: false },
+    {
+      name: "Pause: main menu",
+      id: "zelda-pause-title",
+      actions: [{ id: makeId(), name: "Change map", type: "changeActiveMapAction", destination: { mapId: TITLE_MAP_ID, position: { x: 160, y: 96 } }, faceDirection: "down", fadeOutDuration: 500, fadeInDuration: 500, fadeInTiming: "beforeMapStart", skipFadeIn: false }],
+      hidden: false,
+    },
+  ];
+  const pauseButton = (id, text, y, action) => ({ id, type: "button", x: -48, y, w: 96, h: 18, anchor: "c", show: always, image: "zelda-ui-button", hover: "", slice: 6, color: "", hoverColor: "", text, font: "", size: 8, textColor: "", action: { value: "", ...action } });
+  const pauseLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: { pause: true, dim: "#1f1a24a0", menuKey: true },
+    elements: [
+      { id: "panel", type: "image", x: -60, y: -50, w: 120, h: 100, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -60, y: -43, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
+      pauseButton("continue", "Continue", -26, { kind: "close", id: "" }),
+      pauseButton("settings", "Settings", -4, { kind: "event", id: "zelda-pause-settings" }),
+      pauseButton("title", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
+    ],
+  };
   const mapIds = Object.fromEntries(Object.keys(maps).map((key) => [key, `zelda-demo-${key}`]));
   /** A "Player touch" event trigger on an area (top-left rect) that changes the map. */
   const transferTrigger = (rect, to) =>
@@ -292,6 +317,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
+        zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
         zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
@@ -395,7 +421,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     spritesheetAnimations: structuredClone(source.spritesheetAnimations ?? []),
     variables: [structuredClone(PROGRESS_VARIABLE)],
     videos: [],
-    globalStoryEvents: [],
+    globalStoryEvents,
     ownedStoryEvents,
     maps: builtMaps,
     player: { ...structuredClone(source.player), startingMap: TITLE_MAP_ID },

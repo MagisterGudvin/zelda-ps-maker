@@ -1,7 +1,7 @@
 import { LayoutPainter, type Painted } from "../host/layoutPainter.ts";
 import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
 import { ensureProjectFont } from "../host/projectFonts.ts";
-import { ANCHORS, ELEMENT_TYPES, classicLayout, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
+import { ANCHORS, ELEMENT_TYPES, anchorPoint, classicLayout, offsetFrom, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 import { ABILITY_OPTIONS, ITEM_OPTIONS } from "./fields.ts";
 import {
   BINDING_OPTIONS,
@@ -139,6 +139,22 @@ export class UiDesigner {
     return this.host.story();
   }
 
+  /** The edited layout is a screen (not the HUD). */
+  get isScreen(): boolean {
+    return !!this.setup?.screen;
+  }
+
+  /** Events a button can run: the project's and this map's. */
+  get events(): { id: string; name: string }[] {
+    const global = ((this.host.story() as { globalStoryEvents?: { id?: string; name?: string; hidden?: boolean }[] } | null)?.globalStoryEvents ?? []).filter((e) => e?.id && !e.hidden).map((e) => ({ id: e.id!, name: e.name || e.id! }));
+    return [...global, ...(this.setup?.mapEvents ?? [])];
+  }
+
+  /** Screen names of this map's UI Layout actions. */
+  get screens(): string[] {
+    return this.setup?.screens ?? [];
+  }
+
   get canUndo(): boolean {
     return this.history.canUndo;
   }
@@ -179,6 +195,7 @@ export class UiDesigner {
     if (!L) return;
     const next = cloneLayout(L);
     if (path === "scale") next.scale = Math.max(0, Math.round(Number(value) || 0));
+    else if (path.startsWith("screen.")) (next.screen as any)[path.slice(7)] = path === "screen.dim" ? String(value) : value === true;
     else if (path.startsWith("theme.icons.")) {
       const item = path.slice("theme.icons.".length);
       if (value) next.theme.icons[item] = String(value);
@@ -192,9 +209,18 @@ export class UiDesigner {
         if (!id || next.elements.some((e, j) => j !== i && e.id === id)) return;
         this.selected = id;
       }
-      next.elements[i] = withField(next.elements[i], path, value);
+      const before = next.elements[i];
+      next.elements[i] = withField(before, path, value);
+      // A new anchor keeps the element where it is on the game window (X and Y count from the new corner).
+      if (path === "anchor" && this.setup) {
+        const k = boardScale(this.setup, L);
+        const viewW = Math.floor(this.setup.frame.w / k);
+        const viewH = Math.floor(this.setup.frame.h / k);
+        const p = anchorPoint(before.anchor, viewW, viewH);
+        next.elements[i] = { ...next.elements[i], ...offsetFrom(next.elements[i].anchor, p.x + before.x, p.y + before.y, viewW, viewH) };
+      }
     }
-    this.change(next, { rebuild: path === "id" || path === "show.when" });
+    this.change(next, { rebuild: path === "id" || path === "show.when" || path === "action.kind" });
   }
 
   add(type: ElementType): void {
@@ -243,11 +269,12 @@ export class UiDesigner {
     if (next) this.change(next, { rebuild: true });
   }
 
-  /** Starts again from the classic Zelda HUD (undo brings the old layout back). */
+  /** Starts again from the classic Zelda HUD, or an empty screen (undo brings the old layout back). */
   template(): void {
     if (!this.layout || !this.setup) return;
     const sp = this.setup.start;
-    this.change(classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true }), { record: true, rebuild: true });
+    const classic = classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true });
+    this.change(this.isScreen ? { ...classic, screen: this.layout.screen, elements: [] } : classic, { record: true, rebuild: true });
   }
 
   // ---- saving ------------------------------------------------------------------------------------
@@ -316,12 +343,16 @@ export class UiDesigner {
         g.lineBetween(x1 + (x2 - x1) * a, y1 + (y2 - y1) * a, x1 + (x2 - x1) * b, y1 + (y2 - y1) * b);
       }
     };
+    // A screen is drawn over the game, dimmed by its colour.
+    const dim = st.screen ? /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(layout.screen.dim.trim()) : null;
+    if (dim) g.fillStyle(parseInt(dim[1], 16), dim[2] ? parseInt(dim[2], 16) / 255 : 1).fillRect(f.x, f.y, f.w, f.h);
     dash(f.x, f.y, f.x + f.w, f.y);
     dash(f.x + f.w, f.y, f.x + f.w, f.y + f.h);
     dash(f.x + f.w, f.y + f.h, f.x, f.y + f.h);
     dash(f.x, f.y + f.h, f.x, f.y);
+    const what = st.screen ? `screen "${st.screen}"` : "UI Layout";
     const text = this.layout
-      ? "Game window · UI Layout: drag to move, the corner to resize; the panel on the left edits"
+      ? `Game window · ${what}: drag to move, the corner to resize; the panel on the left edits`
       : st.action
         ? "Game window · UI Layout (click the HUD to edit it)"
         : "Game window · classic Zelda HUD (add Zelda: UI Layout after Start Toolkit to design your own)";
@@ -367,7 +398,7 @@ export class UiDesigner {
     });
     // The resize corner of the selected element.
     const sel = this.layout && st && painted ? painted.boxes[this.selected] : null;
-    const resizable = sel && ["image", "text", "bar", "item"].includes(this.selection?.type ?? "");
+    const resizable = sel && ["image", "text", "bar", "item", "button"].includes(this.selection?.type ?? "");
     if (!this.handle && resizable) {
       this.handle = add.zone(0, 0, 1, 1).setOrigin(0, 0).setDepth(DEPTH + 3);
       this.handle.on?.("dragstart", () => this.dragStart(this.selected, "size", this.handle));
@@ -479,7 +510,7 @@ export class UiDesigner {
 // ---- the panel -----------------------------------------------------------------------------------
 
 type Opt = readonly [string, string];
-type FieldKind = "num" | "text" | "color" | "pic" | "font" | "bind" | "choice" | "check" | "var" | "item";
+type FieldKind = "num" | "text" | "color" | "pic" | "font" | "bind" | "choice" | "check" | "var" | "item" | "event" | "screen";
 interface FieldDef {
   path: string;
   label: string;
@@ -488,7 +519,7 @@ interface FieldDef {
 }
 
 const ANCHOR_LABELS: Record<string, string> = { tl: "Top left", t: "Top", tr: "Top right", l: "Left", c: "Centre", r: "Right", bl: "Bottom left", b: "Bottom", br: "Bottom right" };
-const TYPE_LABELS: Record<ElementType, string> = { image: "Picture", text: "Text", bar: "Bar", hearts: "Hearts", counter: "Counter", item: "Item box" };
+const TYPE_LABELS: Record<ElementType, string> = { image: "Picture", text: "Text", bar: "Bar", hearts: "Hearts", counter: "Counter", item: "Item box", button: "Button" };
 
 const COMMON: FieldDef[] = [
   { path: "id", label: "Name", kind: "text" },
@@ -540,7 +571,33 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "places", label: "Digits", kind: "num" },
   ],
   item: [{ path: "frame", label: "Frame picture", kind: "pic" }],
+  button: [
+    { path: "text", label: "Text", kind: "text" },
+    { path: "font", label: "Font", kind: "font" },
+    { path: "size", label: "Size", kind: "num" },
+    { path: "textColor", label: "Text colour", kind: "color" },
+    { path: "image", label: "Picture", kind: "pic" },
+    { path: "hover", label: "Picture when selected", kind: "pic" },
+    { path: "slice", label: "Corner size (9-slice, 0 = stretch)", kind: "num" },
+    { path: "color", label: "Colour without a picture", kind: "color" },
+    { path: "hoverColor", label: "Colour when selected", kind: "color" },
+    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"]] },
+    { path: "action.id", label: "Event", kind: "event" },
+    { path: "action.id", label: "Screen", kind: "screen" },
+    { path: "action.id", label: "Variable", kind: "var" },
+    { path: "action.value", label: "Value", kind: "text" },
+  ],
 };
+
+/** Fields that apply only for some choice of the element (the visibility rule, the button's action). */
+function applies(f: FieldDef, e: UiElement): boolean {
+  if (f.path === "show.id") return (f.kind === "var" && e.show.when === "variable") || (f.kind === "item" && e.show.when === "item");
+  if (e.type === "button" && f.path.startsWith("action.") && f.path !== "action.kind") {
+    const k = e.action.kind;
+    return (f.kind === "event" && k === "event") || (f.kind === "screen" && k === "open") || (f.kind === "var" && k === "variable") || (f.path === "action.value" && k === "variable");
+  }
+  return true;
+}
 
 const CSS = {
   panel: "position:fixed;left:8px;top:64px;width:250px;max-height:calc(100vh - 88px);overflow:auto;z-index:10000;background:#1f1a24;color:#eee;border:1px solid #ffd23a;border-radius:6px;font:12px/1.35 sans-serif;padding:6px;box-shadow:0 4px 16px #0008",
@@ -665,7 +722,7 @@ class DesignerPanel {
     };
     states();
     this.syncers.push(states);
-    tools.append(undo, redo, this.button("Classic HUD", () => this.d.template(), "Start again from the classic Zelda HUD (Undo brings this layout back)"));
+    tools.append(undo, redo, this.d.isScreen ? this.button("Clear", () => this.d.template(), "Remove every element (Undo brings them back)") : this.button("Classic HUD", () => this.d.template(), "Start again from the classic Zelda HUD (Undo brings this layout back)"));
     this.body.append(tools);
 
     const adder = this.el("div", CSS.row);
@@ -688,8 +745,7 @@ class DesignerPanel {
       this.body.append(order);
       this.body.append(this.el("div", CSS.head, `${TYPE_LABELS[sel.type]} “${sel.id}”`));
       for (const f of [...COMMON, ...BY_TYPE[sel.type]]) {
-        const when = sel.show.when;
-        if ((f.kind === "var" && when !== "variable") || (f.kind === "item" && when !== "item")) continue;
+        if (!applies(f, sel)) continue;
         this.field(f, () => {
           const now = this.d.selection;
           return now ? getField(now, f.path) : undefined;
@@ -697,7 +753,12 @@ class DesignerPanel {
       }
     } else this.body.append(this.el("div", "color:#999;margin:2px 0", "Click an element on the map or in the list."));
 
-    this.body.append(this.el("div", CSS.head, "Layout"));
+    this.body.append(this.el("div", CSS.head, this.d.isScreen ? "Screen" : "Layout"));
+    if (this.d.isScreen) {
+      this.field({ path: "screen.pause", label: "Pause the game", kind: "check" }, () => this.d.current?.screen.pause);
+      this.field({ path: "screen.dim", label: "Dim colour", kind: "color" }, () => this.d.current?.screen.dim);
+      this.field({ path: "screen.menuKey", label: "Menu key opens it", kind: "check" }, () => this.d.current?.screen.menuKey);
+    }
     this.field({ path: "scale", label: "Scale (0 = like the map)", kind: "num" }, () => this.d.current?.scale);
     this.field({ path: "theme.font", label: "Font", kind: "font" }, () => this.d.current?.theme.font);
     this.field({ path: "theme.textColor", label: "Text colour", kind: "color" }, () => this.d.current?.theme.textColor);
@@ -730,6 +791,10 @@ class DesignerPanel {
         return [["", "—"], ...(story?.variables ?? []).map((v) => [v.id, v.name || v.id] as const)];
       case "item":
         return [["", "—"], ...ITEM_OPTIONS];
+      case "event":
+        return [["", "—"], ...this.d.events.map((e) => [e.id, e.name] as const)];
+      case "screen":
+        return [["", "—"], ...this.d.screens.map((n) => [n, n] as const)];
       default:
         return [...(f.options ?? [])];
     }
@@ -751,7 +816,7 @@ class DesignerPanel {
         this.d.setField(f.path, input.checked);
       });
       this.syncers.push(() => (input.checked = value() === true));
-    } else if (["choice", "pic", "font", "bind", "var", "item"].includes(f.kind)) {
+    } else if (["choice", "pic", "font", "bind", "var", "item", "event", "screen"].includes(f.kind)) {
       input = this.el("select", CSS.input);
       const opts = this.choices(f);
       const now = String(value() ?? "");

@@ -563,6 +563,48 @@ await check("UI Layout theme: own icons for built-in items (item box, inventory)
   return `own icon ×${r.icons}, panel in ${r.panel} pieces, cursor, title visible`;
 });
 
+await check("UI screens: Enter opens the menu screen (game paused, player still), arrows and Z press a button that runs a PS Maker event, a click closes it", async () => {
+  await ev(() => {
+    const H = window.__harness;
+    window.__dialogues = [];
+    const button = (id, y, action) => ({ id, type: "button", anchor: "c", x: -40, y, w: 80, h: 16, text: id, action });
+    const layout = { v: 1, screen: { menuKey: true, dim: "#00000099" }, elements: [button("Continue", -30, { kind: "close" }), button("Hint", -8, { kind: "event", id: "ev-hint" })] };
+    H.run("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(layout) });
+  });
+  const at = () => ev(() => window.__harness.player().body.center.x + "," + window.__harness.player().body.center.y);
+  const before = await at();
+  await tapKey("Enter");
+  await new Promise((ok) => setTimeout(ok, 200));
+  const opened = await ev(() => ({ name: window.ZeldaMakerToolkit.session.screens.current?.name, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
+  await page.keyboard.down("ArrowDown");
+  await new Promise((ok) => setTimeout(ok, 250));
+  await page.keyboard.up("ArrowDown");
+  const focus = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.focus);
+  const still = (await at()) === before;
+  await page.screenshot({ path: `${ARTIFACTS}ui-screen.png` });
+  await tapKey("z");
+  await new Promise((ok) => setTimeout(ok, 200));
+  const ran = await ev(() => (window.__dialogues ?? []).map((d) => d.actions.map((a) => `${a.type}:${a.storyEventId ?? ""}`).join("+")));
+  await ev(() => window.__dialogues.forEach((d) => d.close()));
+  // A click on Continue (its text, drawn by the HUD scene, in page pixels).
+  const xy = await ev(() => {
+    const hud = window.__harness.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const t = hud.children.list.find((o) => o.type === "Text" && o.visible && o.text === "Continue");
+    const c = window.__harness.game.canvas.getBoundingClientRect();
+    const k = c.width / window.__harness.game.scale.width;
+    return t && [c.x + (t.x + t.width / 2) * k, c.y + (t.y + t.height / 2) * k];
+  });
+  await page.mouse.click(xy[0], xy[1]);
+  await new Promise((ok) => setTimeout(ok, 200));
+  const closed = await ev(() => ({ screen: window.ZeldaMakerToolkit.session.screens.current, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
+  assert(opened.name === "pause" && opened.paused, `opened ${JSON.stringify(opened)}`);
+  assert(focus === "Hint", `focus ${focus}`);
+  assert(still, "the player moved while the menu was open");
+  assert(ran.includes("runStoryEventAction:ev-hint"), `ran ${JSON.stringify(ran)}`);
+  assert(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
+  return `opened by Enter, Down → Hint, Z ran ${ran.join(", ")}, click on Continue closed it`;
+});
+
 await check("Message Style: a toolkit message is a PS Maker Dialogue (storyRunner) in the chosen layout; the game waits until it closes", async () => {
   const r = await ev(async () => {
     const H = window.__harness;

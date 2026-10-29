@@ -357,6 +357,33 @@ await check("Escape opens the PS Maker options menu (game paused); Save game kee
   expect(progress.state?.objects?.["zelda-demo-field/chest@140,200"] === "opened", `progress variable: ${JSON.stringify(progress.state?.objects)}`);
   return "chest opened in the progress variable";
 });
+await check("Enter opens the pause screen (Zelda: UI Layout); its Settings button runs a project event that opens PS Maker's options menu; Enter closes it", async () => {
+  const state = () => ev(() => ({ screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null, focus: window.ZeldaMakerToolkit.session.screens.current?.focus ?? null, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
+  const player = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return `${Math.round(b.x)},${Math.round(b.y)}`; });
+  await page.keyboard.press("Enter");
+  await wait(400);
+  const opened = await state();
+  const at = await player();
+  await page.keyboard.press("ArrowDown");
+  await wait(300);
+  const moved = await state();
+  const still = (await player()) === at;
+  await page.screenshot({ path: path.join(OUT, "pause.png") });
+  await page.keyboard.press("z");
+  await button("Save game").waitFor({ state: "visible", timeout: 5000 });
+  await page.keyboard.press("Escape");
+  await wait(600);
+  const back = await state();
+  await page.keyboard.press("Enter");
+  await wait(400);
+  const closed = await state();
+  expect(opened.screen === "pause" && opened.paused && opened.focus === "continue", `opened ${JSON.stringify(opened)}`);
+  expect(moved.focus === "settings", `down → ${moved.focus}`);
+  expect(still, "the player walked while the pause screen was open");
+  expect(back.screen === "pause", `after the options menu: ${JSON.stringify(back)}`);
+  expect(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
+  return "pause → Settings → PS Maker options menu → back → closed";
+});
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
   await ev(() => (window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 15));

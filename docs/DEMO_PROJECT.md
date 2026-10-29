@@ -28,7 +28,8 @@ node scripts/make-demo-project.mjs --from "Istina"
 | Карта **Title** (стартовая): главное меню — название и кнопки *New game*, *Continue* (меню загрузки), *Settings* (меню опций), *Exit*; игрок спрятан | «Map setup» и «Map start» карты Title: *Add UI*, события кнопок |
 | Свои картинки интерфейса (рамка окна, кнопка, полоса HUD, сердца, значки, цифры, рамка предмета, шкала магии) — нарисованы `scripts/ui-assets.mjs` | Библиотека *Images* («Zelda UI …») |
 | Макет диалога «Zelda dialogue» (по умолчанию), стиль кнопок «Zelda button», меню опций, загрузки и выбора — на этих картинках | Game UI |
-| HUD Toolkit на картинках демо, в пикселях карты (*Scale* 0); в редакторе — в жёлтой рамке *Game window* на карте, части перетаскиваются мышью | «Map start»: `Zelda: HUD Style` |
+| HUD Toolkit на картинках демо (две панели 9-slice, шкала магии, рамка предмета, счётчики с лентой цифр, сердца), в пикселях карты (*Scale* 0); в редакторе — в жёлтой рамке *Game window*, открытое действие редактируется мышью в дизайнере | «Map start»: `Zelda: UI Layout` (без имени экрана) |
+| Экран паузы по Enter: *Continue* закрывает, *Settings* и *Main menu* запускают глобальные события проекта (меню опций PS Maker с сохранением; переход на титульную карту) | «Map start»: `Zelda: UI Layout` с *Screen name* `pause`; события «Pause: settings», «Pause: main menu» в глобальных событиях |
 | Шрифт Pixelify Sans с кириллицей (SIL OFL 1.1, лицензия — `PixelifySans-OFL.txt` в папке проекта) в диалогах, кнопках, меню и HUD | Game UI → Fonts |
 | Таблички и полученные предметы — диалогом PS Maker на макете «Zelda dialogue» | `Zelda: Message Style` → *PS Maker Dialogue* |
 | Житель у старта (персонаж *New Female*) говорит штатным диалогом | «Map setup» поля; «Map start»: *Add event trigger* (взаимодействие) → *Dialogue* |
@@ -58,7 +59,8 @@ node scripts/make-demo-project.mjs --from "Istina"
 | 9 | Инвентарь и ресурсы | HUD, панель (I), бомбы/стрелы/рупии, лук в сундуке |
 | 10 | Сохранение прогресса | при возврате на карту открытые сундуки, стены и ворота остаются; Escape → *Save game*, затем в главном меню *Continue* (прогресс Toolkit — в переменной «Zelda progress») |
 | 11 | Главное меню, настройки | карта Title; Escape в игре — меню опций PS Maker (громкость действует и на звуки Toolkit) |
-| 12 | HUD, диалоги и панель предметов в своих картинках | `HUD Style` (и панель I), `Message Style` → диалог PS Maker, Game UI; табличка у старта, житель |
+| 12 | HUD, диалоги и панель предметов в своих картинках | `UI Layout` (и панель I), `Message Style` → диалог PS Maker, Game UI; табличка у старта, житель |
+| 13 | Экран меню с кнопками и событиями | Enter на поле: стрелки, Z, мышь; *Settings* — меню опций PS Maker из события |
 
 ## Прохождение
 

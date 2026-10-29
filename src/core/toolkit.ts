@@ -48,6 +48,8 @@ export class Toolkit {
   hudLayout: UiLayout | null = null;
   /** Project font id → CSS family, for the fonts the layouts use. */
   readonly uiFonts: Record<string, string> = {};
+  /** UI screens by name (Zelda: UI Layout with a screen name), kept across maps. */
+  readonly uiScreens = new Map<string, UiLayout>();
   private progressWritten: string | null = null;
   /** Executed editor actions by name (shown by the diagnostics panel). */
   readonly actionCounts = new Map<string, number>();
@@ -118,6 +120,8 @@ export class Toolkit {
   start(host: HostAdapter, mapId: string, options: SessionOptions = {}): Session {
     this.stop("restart");
     if (!this.gameInitialized) this.newGame();
+    // Each map shows its own UI Layout or the classic HUD, as its game window frame in the editor does.
+    this.hudLayout = null;
     const session = new Session(this, host, mapId, options);
     this.session = session;
     session.player.captureStartPosition();

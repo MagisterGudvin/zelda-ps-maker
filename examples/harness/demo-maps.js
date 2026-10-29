@@ -36,7 +36,7 @@ export const MAPS = {
       ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
-      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC: use the item. Q/E: switch items. I: all items. Esc: menu and save." }],
+      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC: use the item. Q/E: switch items. I: all items. Enter: pause. Esc: menu and save." }],
       // 3. Sword targets and enemies (several types); group 1 = the field.
       ["Zelda: Create Enemy", { template: "slime", position: { x: 230, y: 120 }, group: "1" }],
       ["Zelda: Create Enemy", { template: "slime", position: { x: 260, y: 160 }, group: "1" }],

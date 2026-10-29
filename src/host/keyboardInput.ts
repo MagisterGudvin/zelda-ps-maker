@@ -144,6 +144,11 @@ export class KeyboardInput implements InputSource {
     add("nextItem", c.nextItem);
     add("prevItem", c.prevItem);
     add("inventory", c.inventory);
+    add("menu", c.menu);
+    add("up", c.move.up);
+    add("down", c.move.down);
+    add("left", c.move.left);
+    add("right", c.move.right);
     add("debug", [this.config.debug.toggleKey]);
     add("diagnostics", [this.config.debug.diagnosticsKey]);
     this.moveKeys.clear();
@@ -190,6 +195,12 @@ export class KeyboardInput implements InputSource {
       ["nextItem", g.nextItem],
       ["prevItem", g.prevItem],
       ["inventory", g.inventory],
+      ["menu", g.menu],
+      // The standard gamepad's d-pad.
+      ["up", 12],
+      ["down", 13],
+      ["left", 14],
+      ["right", 15],
     ];
     for (const [action, index] of map) {
       const now = !!pad.buttons[index]?.pressed;

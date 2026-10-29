@@ -18,8 +18,8 @@ export interface Visibility {
   hideInDialogue?: boolean;
 }
 
-export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item";
-export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item"];
+export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "button";
+export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "button"];
 
 interface Base {
   id: string;
@@ -90,7 +90,35 @@ export interface ItemElement extends Base {
   frame: string;
 }
 
-export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement;
+/** What a button does: run a PS Maker event, open or close a screen, set a project variable. */
+export interface ButtonAction {
+  kind: "none" | "event" | "open" | "close" | "variable";
+  /** Event id, screen name or variable id. */
+  id: string;
+  /** The variable's new value. */
+  value: string;
+}
+export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable"];
+
+/**
+ * A button of a screen: a picture (another one while it is selected) or a colour, and a text.
+ * Arrow keys move the selection between buttons, the action key or a click presses it.
+ */
+export interface ButtonElement extends Base {
+  type: "button";
+  image: string;
+  hover: string;
+  slice: number;
+  color: string;
+  hoverColor: string;
+  text: string;
+  font: string;
+  size: number;
+  textColor: string;
+  action: ButtonAction;
+}
+
+export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | ButtonElement;
 
 /** Look of things the toolkit draws around the layout (inventory panel, item icons, notes). */
 export interface LayoutTheme {
@@ -103,11 +131,22 @@ export interface LayoutTheme {
   cursor: string;
 }
 
+/** How a screen (a layout with a name, opened over the game) behaves. */
+export interface ScreenSettings {
+  /** The game waits and the player stands still while the screen is open. */
+  pause: boolean;
+  /** Colour over the game behind the screen ("" = none). */
+  dim: string;
+  /** The Menu key (Enter) opens and closes this screen. */
+  menuKey: boolean;
+}
+
 export interface UiLayout {
   v: number;
   /** Size of a layout pixel on screen: 0 = like the map. */
   scale: number;
   theme: LayoutTheme;
+  screen: ScreenSettings;
   elements: UiElement[];
 }
 
@@ -155,7 +194,22 @@ export function readElement(v: unknown, index = 0): UiElement | null {
       return { ...base, type, value: str(v.value, "rupees"), icon: str(v.icon), digits: str(v.digits), places: Math.min(6, Math.max(1, Math.round(num(v.places, 2)))) };
     case "item":
       return { ...base, type, frame: str(v.frame) };
+    case "button": {
+      const a = isObj(v.action) ? v.action : {};
+      const action: ButtonAction = { kind: oneOf(a.kind, BUTTON_ACTIONS, "none"), id: str(a.id), value: str(a.value) };
+      return { ...base, type, image: str(v.image), hover: str(v.hover), slice: Math.max(0, Math.round(num(v.slice, 4))), color: str(v.color, "#1f1a24e6"), hoverColor: str(v.hoverColor, "#4a3f58f0"), text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), textColor: str(v.textColor), action };
+    }
   }
+}
+
+export function defaultScreen(): ScreenSettings {
+  return { pause: true, dim: "#00000080", menuKey: false };
+}
+
+function readScreen(v: unknown): ScreenSettings {
+  const o = isObj(v) ? v : {};
+  const d = defaultScreen();
+  return { pause: o.pause !== false, dim: str(o.dim, d.dim), menuKey: o.menuKey === true };
 }
 
 export function defaultTheme(): LayoutTheme {
@@ -191,11 +245,7 @@ export function parseLayout(text: string): { layout: UiLayout | null; error: str
     e.id = id;
     seen.add(id);
   }
-  return { layout: { v: LAYOUT_VERSION, scale: Math.max(0, Math.round(num(data.scale, 0))), theme: readTheme(data.theme), elements }, error: null };
-}
-
-export function layoutText(layout: UiLayout): string {
-  return JSON.stringify(layout);
+  return { layout: { v: LAYOUT_VERSION, scale: Math.max(0, Math.round(num(data.scale, 0))), theme: readTheme(data.theme), screen: readScreen(data.screen), elements }, error: null };
 }
 
 // ---- values ----------------------------------------------------------------------------------
@@ -209,7 +259,7 @@ export function layoutBindings(layout: UiLayout): Set<string> {
     if (e.type === "bar") (out.add(e.value), out.add(e.max));
     if (e.type === "counter") out.add(e.value);
     if (e.type === "item") (out.add("item.icon"), out.add("item.count"));
-    if (e.type === "text") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
+    if (e.type === "text" || e.type === "button") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
     if (e.show.when === "variable" && e.show.id) out.add(`var:${e.show.id}`);
     if (e.show.when === "item" && e.show.id) out.add(`owned:${e.show.id}`);
   }
@@ -232,7 +282,7 @@ export function isShown(e: UiElement, values: LayoutValues): boolean {
 
 /** The pictures an element uses (built-in sprites like "hud_rupee" included). */
 export function pictureKeys(e: UiElement): string[] {
-  const keys = e.type === "image" ? [e.image] : e.type === "bar" ? [e.fill, e.back] : e.type === "hearts" ? [e.full, e.half, e.empty] : e.type === "counter" ? [e.icon, e.digits] : e.type === "item" ? [e.frame] : [];
+  const keys = e.type === "image" ? [e.image] : e.type === "bar" ? [e.fill, e.back] : e.type === "hearts" ? [e.full, e.half, e.empty] : e.type === "counter" ? [e.icon, e.digits] : e.type === "item" ? [e.frame] : e.type === "button" ? [e.image, e.hover] : [];
   return keys.filter((k) => k && !k.startsWith("hud_") && !k.startsWith("icon_"));
 }
 
@@ -252,6 +302,40 @@ export function anchorPoint(anchor: Anchor, viewW: number, viewH: number): { x: 
   if (anchor === "l") return { x: 0, y: viewH / 2 };
   if (anchor === "r") return { x: viewW, y: viewH / 2 };
   return { x: Math.round(x), y: Math.round(y) };
+}
+
+/** Each element's box on a game window of a size (layout pixels), as placed by its anchor. */
+export function layoutBoxes(layout: UiLayout, viewW: number, viewH: number): Record<string, Box> {
+  const out: Record<string, Box> = {};
+  for (const e of layout.elements) {
+    const p = anchorPoint(e.anchor, viewW, viewH);
+    out[e.id] = { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h };
+  }
+  return out;
+}
+
+/**
+ * The button the selection moves to from `from` in a direction: the nearest one whose centre lies
+ * that way (distance across the direction counts double); `from` itself when there is none.
+ */
+export function nextButton(boxes: Record<string, Box>, ids: readonly string[], from: string, dir: "up" | "down" | "left" | "right"): string {
+  const a = boxes[from];
+  if (!a) return ids[0] ?? "";
+  const ac = { x: a.x + a.w / 2, y: a.y + a.h / 2 };
+  let best = from;
+  let bestScore = Infinity;
+  for (const id of ids) {
+    const b = boxes[id];
+    if (id === from || !b) continue;
+    const dx = b.x + b.w / 2 - ac.x;
+    const dy = b.y + b.h / 2 - ac.y;
+    const along = dir === "up" ? -dy : dir === "down" ? dy : dir === "left" ? -dx : dx;
+    const across = dir === "up" || dir === "down" ? Math.abs(dx) : Math.abs(dy);
+    if (along <= 0) continue;
+    const score = along + 2 * across;
+    if (score < bestScore) (bestScore = score), (best = id);
+  }
+  return best;
 }
 
 /** The element's top-left from a point on the game window (the inverse of placing it). */
@@ -289,5 +373,5 @@ export function classicLayout(options: { magic?: boolean; bottom?: boolean } = {
   // Ten hearts a row, 8 pixels apart, right-aligned 30 pixels in (the gear sits in the corner).
   elements.push({ id: "life", type: "text", x: -110, y: top(3, 8), w: 80, h: 8, anchor: a("r"), show, text: "{t:hud.life}", font: "", size: 7, color: "", align: "center" });
   elements.push({ id: "hearts", type: "hearts", x: -110, y: top(13, 16), w: 80, h: 16, anchor: a("r"), show, full: "", half: "", empty: "", perRow: 10, gap: 1 });
-  return { v: LAYOUT_VERSION, scale: 0, theme: defaultTheme(), elements };
+  return { v: LAYOUT_VERSION, scale: 0, theme: defaultTheme(), screen: defaultScreen(), elements };
 }
