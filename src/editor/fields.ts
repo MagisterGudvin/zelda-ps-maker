@@ -264,14 +264,6 @@ export function fillMapObjectOptions(objects: readonly { id: string; name: strin
   return fillOptions(MAP_OBJECT_OPTIONS, objects);
 }
 
-/** Fonts of the project (gameUI.fonts); "" = the toolkit's default font. */
-export const FONT_OPTIONS: { label: string; value: string }[] = [{ label: "Default", value: "" }];
-export const fontField = (label: string, description: string) =>
-  ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: FONT_OPTIONS }) as unknown as ReturnType<typeof str>;
-export function fillFontOptions(fonts: readonly { id: string; name: string }[] | undefined): boolean {
-  return fillOptions(FONT_OPTIONS, fonts);
-}
-
 /** Dialogue layouts of the project (gameUI.dialogLayouts); "" = the project's default layout. */
 export const DIALOG_LAYOUT_OPTIONS: { label: string; value: string }[] = [{ label: "Default layout", value: "" }];
 export const dialogLayoutField = (label: string, description: string) =>

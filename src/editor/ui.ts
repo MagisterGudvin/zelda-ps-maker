@@ -1,5 +1,4 @@
 import type { PluginEvent } from "@ps-maker/plugin-api";
-import { HUD_ITEM_ICONS, HUD_PLACE_FIELDS } from "./hudStyleConfig.ts";
 
 /**
  * How the actions look in the PS Maker editor, kept apart from what they do:
@@ -312,35 +311,15 @@ export const ACTION_UI: Record<string, ActionUi> = {
     keywords: ["ability", "disable", "enable"],
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
   },
-  "Zelda: HUD Style": {
-    keywords: ["hud", "ui", "interface", "hearts", "icons", "skin", "style", "digits", "font"],
-    fields: {
-      heartFull: { group: "Hearts" },
-      heartHalf: { group: "Hearts" },
-      heartEmpty: { group: "Hearts" },
-      lifeLabel: { group: "Hearts" },
-      rupees: { group: "Counters" },
-      bombs: { group: "Counters" },
-      arrows: { group: "Counters" },
-      keys: { group: "Counters" },
-      digits: { group: "Counters" },
-      itemBox: { group: "Item and magic" },
-      magicFrame: { group: "Item and magic" },
-      magicFill: { group: "Item and magic" },
-      bar: { group: "Bar and text" },
-      barSlice: { group: "Bar and text", min: 0, max: 64, step: 1 },
-      font: { group: "Bar and text" },
-      textColor: { group: "Bar and text" },
-      scale: { group: "Bar and text", min: 0, max: 8, step: 1 },
-      ...Object.fromEntries(HUD_ITEM_ICONS.map(([field]) => [field, { group: "Item icons" }])),
-      inventoryPanel: { group: "Inventory panel" },
-      panelSlice: { group: "Inventory panel", min: 0, max: 64, step: 1 },
-      inventoryCursor: { group: "Inventory panel" },
-      ...Object.fromEntries(Object.values(HUD_PLACE_FIELDS).flat().map((field) => [field, { group: "Positions", min: -1, max: 2000, step: 1 }])),
+  "Zelda: UI Layout": {
+    keywords: ["hud", "ui", "interface", "designer", "layout", "hearts", "counter", "bar", "menu", "skin"],
+    fields: { layout: { group: "Data" } },
+    collapsed: ["Data"],
+    preview: (p) => {
+      const text = typeof p.layout === "string" ? p.layout : "";
+      const n = text ? (text.match(/"type":/g) ?? []).length : 0;
+      return text ? `${n} elements` : "classic HUD";
     },
-    visible: { barSlice: (p) => !!p.bar, panelSlice: (p) => !!p.inventoryPanel },
-    collapsed: ["Counters", "Item and magic", "Bar and text", "Item icons", "Inventory panel", "Positions"],
-    preview: (p) => join(["heartFull", "rupees", "digits", "itemBox", "magicFrame", "bar"].filter((k) => set(p[k])).map((k) => k.replace(/[A-Z].*/, ""))) || "built-in pictures",
   },
   "Zelda: Message Style": {
     keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign"],

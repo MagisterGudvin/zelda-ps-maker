@@ -1,3 +1,4 @@
+import { parseLayout, pictureKeys } from "../../src/ui/uiLayout.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assetKeysOf, buildDemoStory, DEMO_ASSETS, DEMO_FONT, sanitizeName } from "../../scripts/demo-project.mjs";
@@ -163,9 +164,11 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   assert.equal(ui.loadGameMenu.background.imageId, "zelda-ui-panel");
   for (const m of story.maps.filter((x: Any) => x !== title)) {
     const names = m.initialActions.map((a: Any) => a.actionName).filter(Boolean);
-    assert.ok(names.indexOf("Zelda: HUD Style") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: HUD Style after Start Toolkit`);
-    const hud = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
-    for (const k of ["heartFull", "rupees", "digits", "itemBox", "bar", "inventoryPanel", "inventoryCursor"]) assert.ok(ids.has(hud[k]), `${k} = ${hud[k]}`);
+    assert.ok(names.indexOf("Zelda: UI Layout") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: UI Layout after Start Toolkit`);
+    const { layout } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout").pluginParams.layout);
+    const pictures = [...layout!.elements.flatMap(pictureKeys), layout!.theme.panel, layout!.theme.cursor];
+    assert.ok(pictures.length >= 10);
+    for (const k of pictures) assert.ok(ids.has(k), `picture ${k} is in Images`);
     assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.layout, "zelda-dialogue-layout");
   }
   const field = story.maps[0];
@@ -183,10 +186,11 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
     assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
-    const style = m.initialActions.find((a: Any) => a.actionName === "Zelda: HUD Style").pluginParams;
-    assert.deepEqual(style.parts, ["hearts", "counters", "item", "magic"]);
-    assert.equal(style.scale, 0);
-    assert.equal(style.font, DEMO_FONT.id);
+    const { layout, error } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout").pluginParams.layout);
+    assert.equal(error, null);
+    assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text"]);
+    assert.equal(layout!.scale, 0);
+    assert.equal(layout!.theme.font, DEMO_FONT.id);
     assert.deepEqual(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.kinds, ["sign", "item"]);
   }
   assert.deepEqual(story.variables.map((v: Any) => v.id), ["zelda-progress"]);

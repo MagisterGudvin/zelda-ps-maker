@@ -364,7 +364,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private solidSig = "";
   private overlayHidPlayer = false;
   private savedAlpha = 1;
-  private previewing: string | null = null;
 
   constructor(ctx: PluginContextLike, cfg: ToolkitConfig, logger: Logger) {
     this.scene = mapSceneOf(ctx);
@@ -389,7 +388,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
       },
     };
     this.sheets = new SheetLibrary(scene, logger);
-    this.hud = this.game?.scene ? getHud(this.game, cfg, logger) : null;
+    this.hud = this.game?.scene ? getHud(this.game, logger) : null;
     this.debug = scene?.add ? new PhaserDebug(scene, cfg, logger) : null;
   }
 
@@ -674,21 +673,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
   }
 
-  previewSheet(sheetId: string | null): boolean {
-    if (!this.hud) return false;
-    if (sheetId === null) {
-      this.previewing = null;
-      this.hud.setSheetPreview(null);
-      return true;
-    }
-    const def = this.cfg.sprites.sheets[sheetId];
-    if (!def) return false;
-    const key = this.sheets.textureKey(sheetId, def);
-    this.previewing = sheetId;
-    if (key) this.hud.setSheetPreview({ textureKey: key, frameWidth: def.frameWidth, frameHeight: def.frameHeight, margin: def.margin ?? 0, spacing: def.spacing ?? 0, title: sheetId });
-    return true;
-  }
-
   private readonly soundKeys = new Map<string, string>();
   private readonly soundLoading = new Set<string>();
 
@@ -835,7 +819,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
       this.playerY = p.y;
       this.ySorted = Math.abs(p.depth - p.y) < 2 || Math.abs(p.depth - (p.body ? p.body.y + p.body.height : p.y)) < 2;
     }
-    if (this.previewing) this.previewSheet(this.previewing);
     this.refreshNpcBodies();
     const world = this.scene?.physics?.world;
     const statics = world?.staticBodies;
@@ -923,7 +906,6 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.setPlayerOverlay(null);
     for (const img of this.overlayImgs) img.destroy();
     this.overlayImgs = [];
-    if (this.previewing) this.hud?.setSheetPreview(null);
     this.locked = false;
     this.setPlayerBlink(true);
     this.setPlayerTint(null);

@@ -111,10 +111,6 @@ export class FakeHud implements HudSink {
   setDiagnostics(lines: string[] | null): void {
     this.diagnostics = lines;
   }
-  preview: unknown = null;
-  setSheetPreview(p: unknown): void {
-    this.preview = p;
-  }
 }
 
 export class FakeDebug implements DebugDraw {
@@ -193,11 +189,6 @@ export class FakeHost implements HostAdapter {
   setPlayerOverlay(layers: OverlayLayer[] | null): void {
     this.overlay = layers;
     this.overlayLog.push(layers);
-  }
-  previewed: string | null = null;
-  previewSheet(id: string | null): boolean {
-    this.previewed = id;
-    return true;
   }
   describe(): string[] {
     return ["fake host"];

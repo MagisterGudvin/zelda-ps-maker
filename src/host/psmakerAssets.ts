@@ -65,6 +65,9 @@ export interface PsStory {
   mapObjects?: PsMapObject[];
   gameUI?: { fonts?: PsFont[]; dialogLayouts?: unknown[]; defaultDialogLayoutId?: string | null };
   player?: { animationSets: PsAnimationSet[]; defaultAnimationSetId?: string };
+  /** The image library: loaded as textures under `id` (in the editor's map scene too). */
+  images?: { id: string; name: string; url?: string }[];
+  variables?: { id: string; name: string; type?: string }[];
 }
 
 export function isStory(v: unknown): v is PsStory {

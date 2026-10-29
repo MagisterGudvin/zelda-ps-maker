@@ -215,37 +215,17 @@ export interface ToolkitConfig {
   };
   ui: {
     enabled: boolean;
-    showHearts: boolean;
+    /** Classic HUD (no UI Layout on the map): the magic meter is shown. */
     showMagic: boolean;
-    showActiveItem: boolean;
-    counters: string[];
-    /** Classic bar at the top or bottom of the screen ("top-left" etc. are read as top/bottom). */
+    /** Classic HUD: at the top or bottom of the screen ("top-left" etc. are read as top/bottom). */
     position: "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
-    /** HUD pixel scale; 0 = like the map (its camera zoom), or the largest whole scale that fits 256x224 where unknown. */
+    /** Layout pixel scale for layouts without their own; 0 = like the map (its camera zoom). */
     scale: number;
-    /** Space kept free for PS Maker's own UI, in HUD pixels (the settings gear sits top-right). */
-    safeArea: { top: number; right: number; bottom: number; left: number };
     messageMs: number;
     inventoryPanel: boolean;
     pauseWhileInventoryOpen: boolean;
-    fontFamily: string;
-    /**
-     * Own HUD pictures (Zelda: HUD Style), slot → texture key (a PS Maker image id). Slots:
-     * heartFull, heartHalf, heartEmpty, rupees, bombs, arrows, keys, magic, digits (0-9 in one
-     * row), itemBox, magicFrame, magicFill, bar, inventoryPanel, inventoryCursor, and
-     * item_<item id> for the icon of a built-in item. Missing = the built-in picture.
-     */
-    skin: Record<string, string>;
-    /** Border of the bar picture that is not stretched (9-slice), in picture pixels. */
-    barSlice: number;
-    /** Border of the inventory panel picture that is not stretched (9-slice), in picture pixels. */
-    panelSlice: number;
-    showLifeLabel: boolean;
-    /** Colour of the HUD texts ("LIFE", inventory title). */
-    textColor: string;
-    /** Parts placed by the author (HUD Style positions): part → top-left in HUD pixels; x/y < 0 = classic place. */
-    places: Record<string, { x: number; y: number }>;
   };
+
   /** Exposes `globalThis.ZeldaMakerToolkit` for extension plugins. */
   publicApi: boolean;
 }
@@ -419,23 +399,12 @@ export function createDefaultConfig(): ToolkitConfig {
     },
     ui: {
       enabled: true,
-      showHearts: true,
       showMagic: true,
-      showActiveItem: true,
-      counters: ["rupees", "bombs", "arrows", "keys"],
       position: "top",
       scale: 0,
-      safeArea: { top: 0, right: 24, bottom: 0, left: 0 },
       messageMs: 2200,
       inventoryPanel: true,
       pauseWhileInventoryOpen: true,
-      fontFamily: "monospace",
-      skin: {},
-      barSlice: 4,
-      panelSlice: 4,
-      showLifeLabel: true,
-      textColor: "#f8e0a0",
-      places: {},
     },
     publicApi: true,
   };
@@ -490,7 +459,7 @@ export function mergeConfig(target: object, patch: unknown, path = "", issues: C
   return issues;
 }
 
-const OPEN_RECORDS = new Set(["ui.skin", "ui.places", "inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
+const OPEN_RECORDS = new Set(["inventory.capacities", "combat.damageTable", "player.startCounts", "sprites.sheets", "sprites.animations", "audio.sounds"]);
 
 /** Ready-made balance presets selectable from the editor. */
 export const CONFIG_PRESETS: Record<string, unknown> = {

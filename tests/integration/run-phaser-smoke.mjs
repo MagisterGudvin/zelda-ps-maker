@@ -416,7 +416,7 @@ await check("PS Maker NPC bodies block enemies; sounds load from a URL and play"
   return `enemy stopped at x=${Math.round(r.ex)} (NPC at ${Math.round(r.npcX)}), sound played: ${r.played}`;
 });
 
-await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits, item box, magic and a 9-slice bar", async () => {
+await check("UI Layout: own pictures (PS Maker images) for hearts, counter icon and digit strip, item frame, magic meter and a 9-slice panel", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
     const scene = H.scene();
@@ -439,14 +439,26 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
     pic("IMG_MFRAME", 12, 40, fill("#202020"));
     pic("IMG_MFILL", 12, 40, fill("#40e080"));
     pic("IMG_BAR", 32, 32, (g) => ((g.fillStyle = "#c0a070"), g.fillRect(0, 0, 32, 32), (g.fillStyle = "#302010"), g.fillRect(4, 4, 24, 24)));
-    H.run("Zelda: HUD Style", { heartFull: "IMG_HEART", heartEmpty: "IMG_HEART_E", rupees: "IMG_RUPEE", digits: "IMG_DIGITS", itemBox: "IMG_BOX", magicFrame: "IMG_MFRAME", magicFill: "IMG_MFILL", bar: "IMG_BAR", barSlice: 4, scale: 2 });
+    const layout = {
+      v: 1,
+      scale: 2,
+      elements: [
+        { id: "panel", type: "image", x: 2, y: 2, w: 120, h: 44, image: "IMG_BAR", mode: "nine", slice: 4 },
+        { id: "magic", type: "bar", x: 6, y: 4, w: 12, h: 40, value: "magic", max: "maxMagic", fill: "IMG_MFILL", back: "IMG_MFRAME", dir: "up" },
+        { id: "item", type: "item", x: 24, y: 8, w: 32, h: 32, frame: "IMG_BOX" },
+        { id: "rupees", type: "counter", x: 64, y: 8, value: "rupees", icon: "IMG_RUPEE", digits: "IMG_DIGITS", places: 3 },
+        { id: "hearts", type: "hearts", anchor: "tr", x: -200, y: 6, w: 170, h: 30, full: "IMG_HEART", empty: "IMG_HEART_E", perRow: 10 },
+      ],
+    };
+    H.run("Zelda: UI Layout", { layout: JSON.stringify(layout) });
     window.ZeldaMakerToolkit.toolkit.inventory.give("rupees", 7, { silent: true });
     await new Promise((ok) => setTimeout(ok, 300));
     const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
     const shown = hud.children.list.filter((o) => o.visible);
     const by = (key) => shown.filter((o) => o.texture?.key === key);
     const heart = by("IMG_HEART")[0] ?? by("IMG_HEART_E")[0];
-    const out = {
+    const images = hud.children.list.filter((o) => o.type === "Image" && o.visible);
+    return {
       hearts: by("IMG_HEART").length + by("IMG_HEART_E").length,
       maxHearts: Math.ceil(window.ZeldaMakerToolkit.toolkit.state.player.maxHp / window.ZeldaMakerToolkit.toolkit.config.player.heartValue),
       heartScale: heart?.scaleX,
@@ -455,41 +467,61 @@ await check("HUD Style: own pictures (PS Maker images) for hearts, icons, digits
       rupees: window.ZeldaMakerToolkit.toolkit.inventory.count("rupees"),
       box: by("IMG_BOX").length,
       magic: by("IMG_MFRAME").length + by("IMG_MFILL").length,
-      bar: by("IMG_BAR").map((o) => `${o.type}:${o.depth}`).join(","),
+      panel: by("IMG_BAR").length,
+      // The panel is the first element: drawn first, under the others.
+      panelFirst: images.slice(0, 9).every((o) => o.texture.key === "IMG_BAR"),
     };
-    return out;
   });
-  await page.screenshot({ path: `${ARTIFACTS}hud-style.png` });
-  await ev(() => window.__harness.run("Zelda: HUD Style", {}));
+  await page.screenshot({ path: `${ARTIFACTS}ui-layout.png` });
+  await ev(() => window.__harness.run("Zelda: UI Layout", {}));
   assert(r.hearts === r.maxHearts && r.heartScale === 2, `hearts ${r.hearts}/${r.maxHearts} at ×${r.heartScale}`);
   assert(r.rupee === 1 && r.box === 1 && r.magic === 2, JSON.stringify(r));
   // The rupee counter's digits (3 places) come from the digit strip.
   const want = String(r.rupees).padStart(3, "0").split("").map((d) => `zmt_digit_${d}`);
   assert(want.every((f) => r.digits.split(",").includes(f)), `digits ${r.digits} for ${r.rupees} rupees`);
-  assert(/^(NineSlice|Image):-[0-9.]+$/.test(r.bar), `bar ${r.bar} (must be behind the HUD)`);
-  return `${r.hearts} hearts, digits ${r.digits}, bar ${r.bar}`;
+  assert(r.panel === 9 && r.panelFirst, `panel ${r.panel} pieces, under the others: ${r.panelFirst}`);
+  return `${r.hearts} hearts, digits ${r.digits}, panel in ${r.panel} pieces`;
 });
 
-await check("HUD Style positions: a placed part is drawn there in the game (HUD pixels × scale), each part on its own panel", async () => {
+await check("UI Layout positions: anchor + offset × scale; an element shown only while the player has an item", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
+    const tk = window.ZeldaMakerToolkit.toolkit;
     // IMG_BAR: the picture of the check above.
-    H.run("Zelda: HUD Style", { bar: "IMG_BAR", barSlice: 4, scale: 2, heartsX: 40, heartsY: 60 });
+    const layout = {
+      v: 1,
+      scale: 2,
+      elements: [
+        { id: "hearts", type: "hearts", x: 40, y: 60, w: 80, h: 16 },
+        { id: "corner", type: "image", anchor: "br", x: -20, y: -10, w: 10, h: 5, image: "IMG_BAR" },
+        { id: "bowOnly", type: "text", x: 4, y: 100, text: "BOW", show: { when: "item", id: "bow" } },
+      ],
+    };
+    H.run("Zelda: UI Layout", { layout: JSON.stringify(layout) });
+    tk.inventory.remove?.("bow");
     await new Promise((ok) => setTimeout(ok, 300));
     const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
-    const shown = hud.children.list.filter((o) => o.visible);
-    const hearts = shown.filter((o) => /heart8_/.test(o.texture?.key ?? ""));
-    return { first: hearts[0] && [hearts[0].x, hearts[0].y], panels: shown.filter((o) => o.texture?.key === "IMG_BAR").length, keys: [...new Set(shown.map((o) => o.texture?.key))].join(",") };
+    const shown = () => hud.children.list.filter((o) => o.visible);
+    const hearts = shown().filter((o) => /heart8_/.test(o.texture?.key ?? ""));
+    const corner = shown().find((o) => o.texture?.key === "IMG_BAR");
+    const bowBefore = shown().some((o) => o.type === "Text" && o.text === "BOW");
+    tk.inventory.give("bow", 1, { silent: true });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const bowAfter = shown().some((o) => o.type === "Text" && o.text === "BOW");
+    return { first: hearts[0] && [hearts[0].x, hearts[0].y], corner: corner && [corner.x, corner.y], W: H.game.scale.width, H: H.game.scale.height, bowBefore, bowAfter, hadBow: tk.inventory.has("bow") };
   });
-  await page.screenshot({ path: `${ARTIFACTS}hud-places.png` });
-  await ev(() => window.__harness.run("Zelda: HUD Style", {}));
-  // The hearts part starts with the LIFE label (7 px and a 2 px gap): its first heart is 9 HUD px lower.
-  assert(r.first && r.first[0] === 80 && r.first[1] === (60 + 9) * 2, `first heart at ${JSON.stringify(r.first)} (${r.keys})`);
-  assert(r.panels === 4, `${r.panels} panels`);
-  return `first heart at ${r.first.join(",")} screen px, ${r.panels} panels`;
+  await page.screenshot({ path: `${ARTIFACTS}ui-layout-places.png` });
+  await ev(() => window.__harness.run("Zelda: UI Layout", {}));
+  assert(r.first && r.first[0] === 80 && r.first[1] === 120, `first heart at ${JSON.stringify(r.first)}`);
+  // Bottom-right anchor: the screen corner in layout pixels (whole pixels), then the offset.
+  const cx = (Math.floor(r.W / 2) - 20) * 2;
+  const cy = (Math.floor(r.H / 2) - 10) * 2;
+  assert(r.corner && r.corner[0] === cx && r.corner[1] === cy, `corner at ${JSON.stringify(r.corner)}, want ${cx},${cy}`);
+  assert(!r.bowBefore && r.bowAfter, `bow text before ${r.bowBefore}, after ${r.bowAfter}`);
+  return `first heart at ${r.first.join(",")}, corner at ${r.corner.join(",")}, item-bound text shown with the bow`;
 });
 
-await check("HUD Style: own icons for built-in items (item box, inventory), own inventory panel (9-slice) and cursor", async () => {
+await check("UI Layout theme: own icons for built-in items (item box, inventory), own inventory panel (9-slice) and cursor", async () => {
   const r = await ev(async () => {
     const H = window.__harness;
     const scene = H.scene();
@@ -507,7 +539,8 @@ await check("HUD Style: own icons for built-in items (item box, inventory), own 
     pic("IMG_INV_PANEL", 24, 24, "#304060");
     pic("IMG_INV_CURSOR", 20, 20, "#ffd23a");
     const tk = window.ZeldaMakerToolkit.toolkit;
-    H.run("Zelda: HUD Style", { iconBoomerang: "IMG_ICON_BOOM", inventoryPanel: "IMG_INV_PANEL", panelSlice: 6, inventoryCursor: "IMG_INV_CURSOR" });
+    const theme = { icons: { boomerang: "IMG_ICON_BOOM" }, panel: "IMG_INV_PANEL", panelSlice: 6, cursor: "IMG_INV_CURSOR" };
+    H.run("Zelda: UI Layout", { layout: JSON.stringify({ v: 1, theme, elements: [{ id: "item", type: "item", x: 6, y: 6, w: 22, h: 22 }] }) });
     tk.inventory.give("boomerang", 1, { silent: true });
     tk.state.inventory.activeItem = "boomerang";
     window.ZeldaMakerToolkit.session.inventoryUi.setOpen(true);
@@ -515,13 +548,12 @@ await check("HUD Style: own icons for built-in items (item box, inventory), own 
     const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
     const shown = hud.children.list.filter((o) => o.visible);
     const by = (key) => shown.filter((o) => o.texture?.key === key);
-    const out = { title: shown.filter((o) => o.type === "Text" && o.text === "Items").map((t) => t.alpha), icons: by("IMG_ICON_BOOM").length, panel: by("IMG_INV_PANEL").length, cursor: by("IMG_INV_CURSOR").length, builtin: shown.filter((o) => /icon_boomerang/.test(o.texture?.key ?? "")).length };
-    return out;
+    return { title: shown.filter((o) => o.type === "Text" && o.text === "Items").map((t) => t.alpha), icons: by("IMG_ICON_BOOM").length, panel: by("IMG_INV_PANEL").length, cursor: by("IMG_INV_CURSOR").length, builtin: shown.filter((o) => /icon_boomerang/.test(o.texture?.key ?? "")).length };
   });
-  await page.screenshot({ path: `${ARTIFACTS}hud-inventory-skin.png` });
+  await page.screenshot({ path: `${ARTIFACTS}ui-layout-inventory.png` });
   await ev(() => {
     window.ZeldaMakerToolkit.session.inventoryUi.setOpen(false);
-    window.__harness.run("Zelda: HUD Style", {});
+    window.__harness.run("Zelda: UI Layout", {});
   });
   // The boomerang in the item box and in the inventory; the panel as 9 pieces.
   assert(r.icons === 2 && r.builtin === 0, `icons ${JSON.stringify(r)}`);

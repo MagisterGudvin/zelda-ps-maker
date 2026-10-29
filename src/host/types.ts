@@ -1,3 +1,4 @@
+import type { LayoutValues, UiLayout } from "../ui/uiLayout.ts";
 import type { AABB, Facing } from "../core/math.ts";
 
 /**
@@ -34,8 +35,6 @@ export interface HostAdapter {
   readPlayerTouching?(): { up: boolean; down: boolean; left: boolean; right: boolean } | null;
   /** Draws animation frames over the player sprite (attack, weapon); null restores the sprite. */
   setPlayerOverlay(layers: OverlayLayer[] | null): void;
-  /** Shows a sprite sheet full screen with frame numbers (null closes). Returns false if unknown. */
-  previewSheet(sheetId: string | null): boolean;
   /** Optional: a project variable of the engine (PS Maker variables), undefined when unknown. */
   getVariable?(id: string): string | number | boolean | undefined;
   /** Optional: sets a project variable; the value is converted to the variable's type. False when unknown. */
@@ -155,48 +154,22 @@ export interface HudItemSlot {
 
 export interface HudModel {
   visible: boolean;
-  hp: number;
-  maxHp: number;
-  heartValue: number;
-  magic: number;
-  maxMagic: number;
-  showHearts: boolean;
-  showMagic: boolean;
-  /** The item box is drawn (HUD Style parts), even while no item is selected. */
-  showItem: boolean;
-  activeItem: HudItemSlot | null;
-  counters: { id: string; label: string; icon: string; value: number; digits: number }[];
+  /** What the HUD shows: the map's UI Layout, or the classic one. */
+  layout: UiLayout;
+  /** The values the layout shows, by binding ("health", "rupees", "var:<id>", "t:hud.life"...). */
+  values: LayoutValues;
+  /** Project font id → CSS font family (Game UI → Fonts). */
+  fonts: Record<string, string>;
+  /** Layout pixel scale when the layout has none (config.ui.scale; 0 = like the map). */
+  scale: number;
+  /** The map's zoom (screen pixels per map pixel). */
+  mapZoom: number;
   messages: { text: string; remainingMs: number }[];
   inventoryOpen: boolean;
   inventoryTitle: string;
   inventory: HudItemSlot[];
   dead: boolean;
   deathText: string;
-  lifeLabel: string;
-  position: "top" | "bottom";
-  scale: number;
-  safeArea: { top: number; right: number; bottom: number; left: number };
-  fontFamily: string;
-  /** Own pictures by slot (config.ui.skin). */
-  skin: Record<string, string>;
-  barSlice: number;
-  panelSlice: number;
-  showLifeLabel: boolean;
-  textColor: string;
-  /** Parts placed by the author (config.ui.places). */
-  places: Record<string, { x: number; y: number }>;
-  /** The map's zoom (screen pixels per map pixel): HUD scale 0 draws HUD pixels this size. */
-  mapZoom: number;
-}
-
-/** Sheet shown full-screen with frame numbers (Zelda: Preview Sprite Sheet). */
-export interface SheetPreview {
-  textureKey: string;
-  frameWidth: number;
-  frameHeight: number;
-  margin: number;
-  spacing: number;
-  title: string;
 }
 
 export interface HudSink {
@@ -204,6 +177,4 @@ export interface HudSink {
   setVisible(visible: boolean): void;
   /** Diagnostics text block (null hides it). */
   setDiagnostics(lines: string[] | null): void;
-  /** Full-screen sprite-sheet viewer (null hides it). */
-  setSheetPreview(preview: SheetPreview | null): void;
 }

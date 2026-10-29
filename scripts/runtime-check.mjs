@@ -179,7 +179,7 @@ await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start
   await page.screenshot({ path: path.join(OUT, "field.png") });
   return `${s.enemies} enemies`;
 });
-await check("HUD: the toolkit draws hearts, counters, item box, magic and bar in the demo's pictures, one HUD pixel per map pixel", async () => {
+await check("HUD (Zelda: UI Layout): hearts, counters, item box, magic and 9-slice panels in the demo's pictures, one layout pixel per map pixel", async () => {
   const hud = () =>
     ev(() => {
       const scene = window.game.scene.getScene("ZeldaMakerToolkitHUD");

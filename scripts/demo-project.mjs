@@ -136,29 +136,29 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     outlineOrder: "below-text",
     textAlign: align,
   });
-  // The toolkit HUD and message box in the demo's own UI pictures and dialogue layout.
-  const hudStyle = {
-    heartFull: "zelda-ui-heart-full",
-    heartHalf: "zelda-ui-heart-half",
-    heartEmpty: "zelda-ui-heart-empty",
-    rupees: "zelda-ui-rupee",
-    bombs: "zelda-ui-bomb",
-    arrows: "zelda-ui-arrow",
-    keys: "zelda-ui-key",
-    digits: "zelda-ui-digits",
-    itemBox: "zelda-ui-item-box",
-    magicFrame: "zelda-ui-magic-frame",
-    magicFill: "zelda-ui-magic-fill",
-    bar: "zelda-ui-hud-bar",
-    // The inventory panel (I) on the dialogue panel picture, with a gold cursor.
-    inventoryPanel: "zelda-ui-panel",
-    panelSlice: 7,
-    inventoryCursor: "zelda-ui-cursor",
-    barSlice: 4,
-    // Scale 0: one HUD pixel per map pixel, like the map.
+  // The toolkit HUD (Zelda: UI Layout, as the designer saves it) on the demo's own UI pictures:
+  // two 9-slice panels, the magic meter, the item box and the counters on the left, "- LIFE -" and
+  // the hearts on the right (clear of PS Maker's settings gear). Scale 0: like the map.
+  const always = { when: "always" };
+  const hudLayout = {
+    v: 1,
     scale: 0,
-    font: uiFont.id,
-    textColor: "#f8e0a0",
+    // The inventory panel (I) on the dialogue panel picture, with a gold cursor.
+    theme: { font: uiFont.id, textColor: "#f8e0a0", icons: {}, panel: "zelda-ui-panel", panelSlice: 7, cursor: "zelda-ui-cursor" },
+    elements: [
+      { id: "leftPanel", type: "image", x: 2, y: 2, w: 122, h: 32, anchor: "tl", show: always, image: "zelda-ui-hud-bar", mode: "nine", slice: 4, color: "" },
+      { id: "magic", type: "bar", x: 6, y: 3, w: 8, h: 30, anchor: "tl", show: always, value: "magic", max: "maxMagic", fill: "zelda-ui-magic-fill", back: "zelda-ui-magic-frame", dir: "up", fillColor: "#3ad16b", backColor: "#000000d9" },
+      { id: "item", type: "item", x: 18, y: 7, w: 22, h: 22, anchor: "tl", show: always, frame: "zelda-ui-item-box" },
+      ...[
+        ["rupees", "zelda-ui-rupee", 3, 46],
+        ["bombs", "zelda-ui-bomb", 2, 70],
+        ["arrows", "zelda-ui-arrow", 2, 88],
+        ["key", "zelda-ui-key", 1, 106],
+      ].map(([id, icon, places, x]) => ({ id, type: "counter", x, y: 8, w: Math.max(10, places * 6), h: 19, anchor: "tl", show: always, value: id, icon, digits: "zelda-ui-digits", places })),
+      { id: "rightPanel", type: "image", x: -116, y: 2, w: 92, h: 32, anchor: "tr", show: always, image: "zelda-ui-hud-bar", mode: "nine", slice: 4, color: "" },
+      { id: "life", type: "text", x: -112, y: 4, w: 84, h: 8, anchor: "tr", show: always, text: "{t:hud.life}", font: "", size: 7, color: "", align: "center" },
+      { id: "hearts", type: "hearts", x: -112, y: 13, w: 84, h: 17, anchor: "tr", show: always, full: "zelda-ui-heart-full", half: "zelda-ui-heart-half", empty: "zelda-ui-heart-empty", perRow: 8, gap: 1 },
+    ],
   };
   const mapIds = Object.fromEntries(Object.keys(maps).map((key) => [key, `zelda-demo-${key}`]));
   /** A "Player touch" event trigger on an area (top-left rect) that changes the map. */
@@ -291,7 +291,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
-        zelda.push(pluginAction("Zelda: HUD Style", hudStyle));
+        zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
         zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));

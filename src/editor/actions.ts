@@ -13,7 +13,8 @@ import { createDataItem, type DataItemSpec } from "../items/builtinItems.ts";
 import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/health.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
-import { HUD_ITEM_ICONS, HUD_PART_LABELS, HUD_PART_OPTIONS, HUD_PLACE_FIELDS, hudStyleConfig } from "./hudStyleConfig.ts";
+import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
+import { fontFamilyCss } from "../host/psmakerAssets.ts";
 import type { MessageKind } from "../core/events.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
@@ -21,7 +22,7 @@ import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import type { Facing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, fontField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -968,51 +969,26 @@ const setAbility = defineEvent({
   },
 });
 
-const PART_LABEL: Record<string, string> = HUD_PART_LABELS;
-
-const hudStyle = defineEvent({
-  name: "Zelda: HUD Style",
-  description: "Your own HUD pictures from the project's Images (for example a Mana Seed UI pack): hearts, counter icons, digits, item box, magic meter, bar, item icons, inventory panel. Empty = the built-in picture. Put it after Start Toolkit. / Свои картинки интерфейса Toolkit.",
+const uiLayout = defineEvent({
+  name: "Zelda: UI Layout",
+  description: "Your own HUD, made with the mouse: with this action on a map, the editor shows the layout in the game window frame and the designer panel next to it (pictures, texts, meters, hearts, counters, the item box). Put it after Start Toolkit. / Свой HUD из дизайнера.",
   parameterDefs: {
-    parts: { ...multi("Toolkit HUD parts", "What the toolkit draws itself. Turn parts off to build them with PS Maker's Add UI instead (see HUD Variables). / Какие части HUD рисует Toolkit.", HUD_PART_OPTIONS), defaultValue: HUD_PART_OPTIONS.map(([v]) => v) },
-    heartFull: img("Heart: full", "Picture of a full heart (its size sets the size of all hearts). / Полное сердце."),
-    heartHalf: img("Heart: half", "Half a heart. Empty = the full heart. / Половина сердца."),
-    heartEmpty: img("Heart: empty", "An empty heart container. / Пустое сердце."),
-    rupees: img("Icon: rupees", "Icon above the rupee counter. / Значок рупий."),
-    bombs: img("Icon: bombs", "Icon above the bomb counter. / Значок бомб."),
-    arrows: img("Icon: arrows", "Icon above the arrow counter. / Значок стрел."),
-    keys: img("Icon: keys", "Icon above the small key counter. / Значок ключей."),
-    digits: img("Digits 0-9", "One picture with the ten digits 0 1 2 3 4 5 6 7 8 9 in a row, all the same width. / Цифры 0–9 в одну строку."),
-    itemBox: img("Item box", "Frame around the selected item. / Рамка предмета."),
-    magicFrame: img("Magic meter: frame", "The empty magic meter. / Рамка шкалы магии."),
-    magicFill: img("Magic meter: fill", "Drawn over the frame and cut from the top as magic is spent. / Заливка шкалы магии."),
-    bar: img("Bar background", "Stretched behind the whole HUD bar; its border keeps its size (9-slice). / Фон полосы интерфейса."),
-    barSlice: num("Bar border (px)", "How many pixels of the bar picture's edge are not stretched (corners and border). / Рамка фона, не растягивается.", 4),
-    ...Object.fromEntries(HUD_ITEM_ICONS.map(([field, , label]) => [field, img(`Icon: ${label.toLowerCase()}`, `Icon of the ${label.toLowerCase()} in the item box and the inventory. / Иконка предмета.`)])),
-    inventoryPanel: img("Inventory panel", "Background of the inventory panel (I), stretched; its border keeps its size (9-slice). / Фон панели предметов."),
-    panelSlice: num("Panel border (px)", "How many pixels of the panel picture's edge are not stretched. / Рамка фона панели, не растягивается.", 4),
-    inventoryCursor: img("Inventory cursor", "Frame around the selected item in the inventory (20×20 HUD pixels). / Рамка выбранного предмета."),
-    lifeLabel: bool("LIFE label", "Show the LIFE label above the hearts. / Надпись над сердцами.", true),
-    font: fontField("Font", "A font of the project (Game UI → Fonts) for the HUD texts. PS Maker loads it the first time it shows its own text (a menu, a dialogue). / Шрифт проекта."),
-    textColor: choice("Text color", "Colour of the HUD texts. / Цвет текста.", [["#f8e0a0", "Cream"], ["#ffffff", "White"], ["#ffd23a", "Gold"], ["#202020", "Dark"]], "#f8e0a0"),
-    scale: num("Scale", "Size of one HUD pixel on screen: 0 = like the map (one HUD pixel = one map pixel), 4 = four screen pixels. / Масштаб: 0 — как у карты.", 0),
-    ...Object.fromEntries(
-      Object.entries(HUD_PLACE_FIELDS).flatMap(([part, [fx, fy]]) => [
-        [fx, num(`${PART_LABEL[part]} X`, `Left edge of the ${PART_LABEL[part].toLowerCase()} in HUD pixels (map pixels at Scale 0) from the left of the game window; -1 = the classic place. Drag the part on the map in the editor to set it. / Положение по X (−1 — обычное место).`, -1)],
-        [fy, num(`${PART_LABEL[part]} Y`, `Top edge of the ${PART_LABEL[part].toLowerCase()} in HUD pixels (map pixels at Scale 0) from the top of the game window; -1 = the classic place. / Положение по Y (−1 — обычное место).`, -1)],
-      ]),
-    ),
+    layout: str("Layout data", "Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер.", ""),
   },
   execute(params, ctx) {
-    run("Zelda: HUD Style", ctx, params, (s, tk) => {
-      const p = params as Record<string, unknown>;
-      const ui = hudStyleConfig(p, psStory(s, "HUD Style"));
-      for (const [slot, key] of Object.entries(ui.skin ?? {})) {
-        if (key && s.host.textureSize && !s.host.textureSize(key)) s.logger.warn(`HUD Style: picture "${key}" (${slot}) is not loaded; the built-in one is shown.`);
+    run("Zelda: UI Layout", ctx, params, (s, tk) => {
+      const { layout, error } = parseLayout(textOf((params as Record<string, unknown>).layout));
+      if (error) s.logger.warn(`UI Layout: ${error}; the classic HUD is shown.`);
+      tk.hudLayout = layout ?? classicLayout();
+      const story = psStory(s, "UI Layout");
+      // Fonts of the texts: PS Maker loads a project font only when it first shows its own text.
+      for (const id of new Set([tk.hudLayout.theme.font, ...tk.hudLayout.elements.map((e) => (e.type === "text" ? e.font : ""))].filter(Boolean))) {
+        tk.uiFonts[id] = fontFamilyCss(story, id);
+        s.host.loadProjectFont?.(id);
       }
-      const font = textOf(p.font);
-      if (font) s.host.loadProjectFont?.(font);
-      tk.configure({ ui }, "HUD Style");
+      for (const e of tk.hudLayout.elements) {
+        for (const key of pictureKeys(e)) if (s.host.textureSize && !s.host.textureSize(key)) s.logger.warnOnce(`ui-pic-${key}`, `UI Layout: picture "${key}" (${e.id}) is not loaded; the built-in look is shown.`);
+      }
     });
   },
 });
@@ -1245,7 +1221,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   setAbility,
   showMessage,
   messageStyle,
-  hudStyle,
+  uiLayout,
   linkVariable,
   setRespawn,
   respawnPlayer,

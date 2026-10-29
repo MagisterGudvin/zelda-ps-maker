@@ -307,33 +307,12 @@
   },
   "ui": {
     "enabled": true,
-    "showHearts": true,
     "showMagic": true,
-    "showActiveItem": true,
-    "counters": [
-      "rupees",
-      "bombs",
-      "arrows",
-      "keys"
-    ],
     "position": "top",
     "scale": 0,
-    "safeArea": {
-      "top": 0,
-      "right": 24,
-      "bottom": 0,
-      "left": 0
-    },
     "messageMs": 2200,
     "inventoryPanel": true,
-    "pauseWhileInventoryOpen": true,
-    "fontFamily": "monospace",
-    "skin": {},
-    "barSlice": 4,
-    "panelSlice": 4,
-    "showLifeLabel": true,
-    "textColor": "#f8e0a0",
-    "places": {}
+    "pauseWhileInventoryOpen": true
   },
   "publicApi": true
 }

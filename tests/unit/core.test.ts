@@ -59,26 +59,20 @@ test("inventory: capacities, quick-item cycling, keys, heart containers", () => 
   assert.deepEqual(messages, ["You got Power Glove!"]);
 });
 
-test("HUD model reflects hearts, magic, counters and the active item", () => {
+test("HUD model: the classic layout and its values (hearts, counters, the active item)", () => {
   const rig = createRig();
   rig.tk.inventory.give("bombs", 4, { silent: true });
   rig.tk.state.player.hp = 3;
   rig.tk.bus.emit("zelda:custom:refresh", {});
   rig.step();
   const m = rig.host.hud.last!;
-  assert.equal(m.hp, 3);
-  assert.equal(m.maxHp, 6);
-  assert.equal(m.activeItem?.itemId, "bomb");
-  assert.equal(m.activeItem?.count, 4);
-  assert.deepEqual(
-    m.counters.map((c) => [c.id, c.value]),
-    [
-      ["rupees", 0],
-      ["bombs", 4],
-      ["arrows", 0],
-      ["keys", 0],
-    ],
-  );
+  assert.deepEqual(m.layout.elements.map((e) => e.id), ["magic", "item", "rupees", "bombs", "arrows", "key", "life", "hearts"]);
+  assert.equal(m.values.health, 3);
+  assert.equal(m.values.maxHealth, 6);
+  assert.equal(m.values["item.icon"], "icon_bomb");
+  assert.equal(m.values["item.count"], 4);
+  assert.deepEqual([m.values.rupees, m.values.bombs, m.values.arrows, m.values.key], [0, 4, 0, 0]);
+  assert.equal(m.values["t:hud.life"], "- LIFE -");
   const renders = rig.host.hud.renders;
   rig.step(10);
   assert.equal(rig.host.hud.renders, renders, "no re-render when nothing changed");

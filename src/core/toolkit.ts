@@ -12,6 +12,7 @@ import { EnemyTemplateRegistry } from "../enemies/templates.ts";
 import { RuleRegistry } from "../puzzles/ruleRegistry.ts";
 import { parseProgress, serializeProgress } from "../save/save.ts";
 import type { MessageBoxSettings } from "../ui/messageBox.ts";
+import type { UiLayout } from "../ui/uiLayout.ts";
 
 export interface ToolkitOptions {
   logSink?: LogSink;
@@ -43,6 +44,10 @@ export class Toolkit {
   progressVariable: string | null = null;
   /** Dialogue box for toolkit messages (Zelda: Message Style); null = short HUD notes. */
   messageBox: MessageBoxSettings | null = null;
+  /** The HUD made in the designer (Zelda: UI Layout); null = the classic HUD. */
+  hudLayout: UiLayout | null = null;
+  /** Project font id → CSS family, for the fonts the layouts use. */
+  readonly uiFonts: Record<string, string> = {};
   private progressWritten: string | null = null;
   /** Executed editor actions by name (shown by the diagnostics panel). */
   readonly actionCounts = new Map<string, number>();

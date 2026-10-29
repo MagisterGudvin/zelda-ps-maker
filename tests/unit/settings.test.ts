@@ -23,7 +23,7 @@ test("toolkit sounds follow the Sound Volume of PS Maker's options menu", () => 
   host.dispose();
 });
 
-test("HUD Style: pictures by slot, a project font as PS Maker registers it, empty = built-in", async () => {
+test("UI Layout: the designer's layout is the HUD, with its fonts; empty or unreadable = the classic HUD", async () => {
   const { default: plugin } = await import("../../src/index.ts");
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   resetToolkitForTests();
@@ -32,24 +32,26 @@ test("HUD Style: pictures by slot, a project font as PS Maker registers it, empt
   const run = (name: string, params: Record<string, unknown>) => (plugin.events as any[]).find((e) => e.name === name)!.execute(params, { game: f.game, scene: f.scene, player: f.player });
   run("Zelda: Start Toolkit", { language: "en" });
   const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: HUD Style", { heartFull: "IMG1", digits: "IMG2", bar: "IMG3", barSlice: 6, lifeLabel: false, font: "font-pixel-operator", textColor: "#ffffff", scale: 3 });
-  const ui = tk.config.ui;
-  assert.equal(ui.skin.heartFull, "IMG1");
-  assert.equal(ui.skin.digits, "IMG2");
-  assert.equal(ui.skin.rupees, "", "not chosen = built-in");
-  assert.deepEqual([ui.barSlice, ui.showLifeLabel, ui.textColor, ui.scale], [6, false, "#ffffff", 3]);
-  assert.equal(ui.fontFamily, '"ps-maker-font-font-pixel-operator", "PixelOperator", monospace');
-  const model = tk.session!.hud!.buildModel();
-  assert.equal(model.skin.heartFull, "IMG1");
-  assert.equal(model.showLifeLabel, false);
-  run("Zelda: HUD Style", {});
-  assert.equal(tk.config.ui.skin.heartFull, "");
-  assert.equal(tk.config.ui.fontFamily, "monospace");
+  const warnings: string[] = [];
+  tk.configure({ debug: { logLevel: "warn" } });
+  (tk.logger as any).sink = { debug() {}, info() {}, warn: (...a: unknown[]) => warnings.push(a.join(" ")), error() {} };
+  const layout = { v: 1, scale: 3, theme: { font: "font-pixel-operator" }, elements: [{ id: "rupees", type: "counter", x: 4, y: 4, value: "rupees", icon: "IMG_RUPEE" }, { id: "name", type: "text", text: "{itemName}" }] };
+  run("Zelda: UI Layout", { layout: JSON.stringify(layout) });
+  let model = tk.session!.hud!.buildModel();
+  assert.deepEqual(model.layout.elements.map((e) => e.id), ["rupees", "name"]);
+  assert.equal(model.layout.scale, 3);
+  assert.equal(model.fonts["font-pixel-operator"], '"ps-maker-font-font-pixel-operator", "PixelOperator", monospace');
+  assert.ok("itemName" in model.values && "rupees" in model.values, "the values the layout shows");
+  run("Zelda: UI Layout", { layout: "" });
+  assert.equal(tk.session!.hud!.buildModel().layout.elements.length, 8, "empty = classic");
+  run("Zelda: UI Layout", { layout: "{broken" });
+  model = tk.session!.hud!.buildModel();
+  assert.equal(model.layout.elements.length, 8, "unreadable = classic");
+  assert.ok(warnings.some((w) => w.includes("UI Layout: not valid layout data")), "and the author is told why");
   resetToolkitForTests();
 });
 
-test("HUD Style: own icons for built-in items (item box, inventory) and an inventory panel picture", async () => {
+test("UI Layout theme: own icons for built-in items (item box, inventory) and an inventory panel picture", async () => {
   const { default: plugin } = await import("../../src/index.ts");
   const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
   resetToolkitForTests();
@@ -58,29 +60,18 @@ test("HUD Style: own icons for built-in items (item box, inventory) and an inven
   run("Zelda: Start Toolkit", { language: "en" });
   const tk = getToolkit();
   tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: HUD Style", { iconBoomerang: "IMG_BOOM", inventoryPanel: "IMG_PANEL", panelSlice: 7, inventoryCursor: "IMG_CUR" });
+  const theme = { icons: { boomerang: "IMG_BOOM" }, panel: "IMG_PANEL", panelSlice: 7, cursor: "IMG_CUR" };
+  run("Zelda: UI Layout", { layout: JSON.stringify({ v: 1, theme, elements: [{ id: "item", type: "item" }] }) });
   tk.inventory.give("boomerang", 1, { silent: true });
   tk.inventory.give("bow", 1, { silent: true });
   tk.state.inventory.activeItem = "boomerang";
   let model = tk.session!.hud!.buildModel();
-  assert.equal(model.activeItem!.icon, "IMG_BOOM", "own icon in the item box");
-  assert.deepEqual([model.skin.inventoryPanel, model.skin.inventoryCursor, model.panelSlice], ["IMG_PANEL", "IMG_CUR", 7]);
+  assert.equal(model.values["item.icon"], "IMG_BOOM", "own icon in the item box");
+  assert.deepEqual([model.layout.theme.panel, model.layout.theme.cursor, model.layout.theme.panelSlice], ["IMG_PANEL", "IMG_CUR", 7]);
   tk.state.inventory.activeItem = "bow";
   model = tk.session!.hud!.buildModel();
-  assert.equal(model.activeItem!.icon, "icon_bow", "no own icon = built-in");
-  run("Zelda: HUD Style", {});
-  tk.state.inventory.activeItem = "boomerang";
-  assert.equal(tk.session!.hud!.buildModel().activeItem!.icon, "icon_boomerang");
+  assert.equal(model.values["item.icon"], "icon_bow", "no own icon = built-in");
   resetToolkitForTests();
-});
-
-test("the Font dropdown lists the project's fonts (filled from the open project)", async () => {
-  const { FONT_OPTIONS, fillFontOptions } = await import("../../src/editor/fields.ts");
-  assert.equal(fillFontOptions([{ id: "f1", name: "PixelOperator" }, { id: "f2", name: "Mana" }]), true);
-  assert.deepEqual(FONT_OPTIONS.map((o) => o.value), ["", "f1", "f2"]);
-  assert.equal(fillFontOptions([{ id: "f1", name: "PixelOperator" }, { id: "f2", name: "Mana" }]), false, "unchanged");
-  fillFontOptions([]);
-  assert.deepEqual(FONT_OPTIONS, [{ label: "Default", value: "" }]);
 });
 
 test("Show Stat In Variable: toolkit values in project variables (whole hearts, half heart 0/1, item)", async () => {
@@ -113,32 +104,4 @@ test("Show Stat In Variable: toolkit values in project variables (whole hearts, 
   step();
   assert.deepEqual([v("v_full"), v("v_half")], [2, 0]);
   resetToolkitForTests();
-});
-
-test("HUD Style parts: the toolkit draws only the parts left on", async () => {
-  const { default: plugin } = await import("../../src/index.ts");
-  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
-  resetToolkitForTests();
-  const f = createFakeScene();
-  const run = (name: string, params: Record<string, unknown>) => (plugin.events as any[]).find((e) => e.name === name)!.execute(params, { game: f.game, scene: f.scene, player: f.player });
-  run("Zelda: Start Toolkit", { language: "en" });
-  const tk = getToolkit();
-  tk.configure({ debug: { logLevel: "silent" } });
-  run("Zelda: HUD Style", { parts: ["item", "magic"] });
-  let m = tk.session!.hud!.buildModel();
-  assert.deepEqual([m.showHearts, m.counters.length, m.showItem, tk.config.ui.showMagic], [false, 0, true, true]);
-  run("Zelda: HUD Style", {});
-  m = tk.session!.hud!.buildModel();
-  assert.deepEqual([m.showHearts, m.counters.length, m.showItem], [true, 4, true], "an older action without parts: all on");
-  resetToolkitForTests();
-});
-
-test("HUD Style positions and scale: shared by the game and the editor preview", async () => {
-  const { hudStyleConfig } = await import("../../src/editor/hudStyleConfig.ts");
-  const ui = hudStyleConfig({ heartsX: 12, heartsY: "40", itemX: -1, scale: 0, parts: ["hearts", "item"] }, null);
-  assert.deepEqual(ui.places!.hearts, { x: 12, y: 40 });
-  assert.deepEqual(ui.places!.item, { x: -1, y: -1 });
-  assert.deepEqual(ui.places!.magic, { x: -1, y: -1 }, "missing = classic place");
-  assert.equal(ui.scale, 0, "0 = like the map");
-  assert.deepEqual([ui.showHearts, ui.counters!.length, ui.showActiveItem, ui.showMagic], [true, 0, true, false]);
 });

@@ -1,9 +1,6 @@
-import type { ToolkitConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
-import type { HudModel, HudSink, SheetPreview } from "./types.ts";
-import { resolveTexture } from "./textures.ts";
-import type { HudLayout } from "../ui/hudLayout.ts";
-import { HudPainter, Pool } from "./hudPainter.ts";
+import type { HudModel, HudSink } from "./types.ts";
+import { LayoutPainter, layoutScale, type Painted } from "./layoutPainter.ts";
 
 export const HUD_SCENE_KEY = "ZeldaMakerToolkitHUD";
 
@@ -12,50 +9,39 @@ const MSG_FILL = 0x101030;
 const MSG_BORDER = 0xf0f0f0;
 
 /** One HUD per Phaser game, reused across maps (avoids duplicate HUD objects). */
-export function getHud(game: any, cfg: ToolkitConfig, logger: Logger): PhaserHud {
+export function getHud(game: any, logger: Logger): PhaserHud {
   let hud = HUDS.get(game);
   if (!hud) {
-    hud = new PhaserHud(game, cfg, logger);
+    hud = new PhaserHud(game, logger);
     HUDS.set(game, hud);
   }
   return hud;
 }
 
 /**
- * Classic HUD (A Link to the Past style top bar) drawn in its own Phaser scene
- * above PS Maker's scenes: pixel digits and hearts scaled by a whole factor,
- * real-resolution text for labels and messages, and a layout computed by
- * `computeHudLayout` so elements never overlap.
+ * The HUD in its own Phaser scene above PS Maker's scenes: the UI layout (Zelda: UI Layout, or the
+ * classic one), message notes, the inventory panel and the death text, in layout pixels scaled by a
+ * whole factor.
  */
 export class PhaserHud implements HudSink {
   private readonly game: any;
-  private readonly cfg: ToolkitConfig;
   private readonly logger: Logger;
   private scene: any = null;
   private pending: HudModel | null = null;
   private visible = true;
-  private g: any = null;
-  private painter: HudPainter | null = null;
+  private painter: LayoutPainter | null = null;
   private diagText: any = null;
   private diagLines: string[] | null = null;
-  private preview: SheetPreview | null = null;
-  private previewG: any = null;
-  private previewImg: any = null;
-  private previewLabels!: Pool;
-  private panelPics!: Pool;
-  private cursorImg: any = null;
 
   /** Use getHud(); direct construction would duplicate the HUD scene. */
-  constructor(game: any, cfg: ToolkitConfig, logger: Logger) {
+  constructor(game: any, logger: Logger) {
     this.game = game;
-    this.cfg = cfg;
     this.logger = logger;
     this.ensureScene();
     // Fullscreen / window resize changes the screen size: lay everything out again.
     game.scale?.on?.("resize", () => {
       if (this.pending) this.render(this.pending);
       this.renderDiagnostics();
-      this.renderPreview();
     });
     // A project font PS Maker loads later (on its first dialogue or menu): draw the texts again.
     (globalThis as { document?: { fonts?: { addEventListener?(e: string, f: () => void): void } } }).document?.fonts?.addEventListener?.("loadingdone", () => {
@@ -78,10 +64,10 @@ export class PhaserHud implements HudSink {
           active: true,
           create(this: any) {
             self.scene = this;
-            self.build();
+            self.painter = new LayoutPainter(this, 0);
+            self.diagText = this.add.text(0, 0, "", { fontFamily: "monospace", color: "#d0ffd0", backgroundColor: "#000000cc" }).setOrigin(0, 1).setDepth(10).setVisible(false);
             if (self.pending) self.render(self.pending);
             self.renderDiagnostics();
-            self.renderPreview();
             self.applyVisible();
           },
         },
@@ -93,149 +79,87 @@ export class PhaserHud implements HudSink {
     }
   }
 
-  private build(): void {
-    const s = this.scene;
-    this.painter = new HudPainter(s, this.game, 0);
-    this.painter.fontFamily = this.cfg.ui.fontFamily;
-    this.g = this.painter.g;
-    this.diagText = s.add.text(0, 0, "", { fontFamily: "monospace", color: "#d0ffd0", backgroundColor: "#000000cc" }).setOrigin(0, 1).setDepth(10).setVisible(false);
-    this.previewG = s.add.graphics().setDepth(20);
-    this.previewImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(21).setVisible(false);
-    this.previewLabels = new Pool(() => s.add.text(0, 0, "", { fontFamily: "monospace", color: "#ffff66", backgroundColor: "#000000aa" }).setOrigin(0, 0).setDepth(22));
-    // Inventory panel picture: over the HUD bar, under the HUD's graphics and item icons.
-    this.panelPics = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(-0.05));
-    // Inventory cursor picture: under the item icons (a highlight or a frame with an open middle).
-    this.cursorImg = s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(0.15).setVisible(false);
-  }
-
   private screen(): { W: number; H: number } {
     return { W: this.game.scale?.width ?? this.game.config?.width ?? 320, H: this.game.scale?.height ?? this.game.config?.height ?? 240 };
   }
 
-  private text(value: string, x: number, y: number, px: number, color: string, opts: Record<string, unknown> = {}): any {
-    return this.painter!.text(value, x, y, px, color, opts);
-  }
-
-  private pixelImage(id: string, x: number, y: number, k: number, size?: number): void {
-    this.painter!.pixelImage(id, x, y, k, size);
-  }
-
   render(model: HudModel): void {
     this.pending = model;
-    if (!this.scene || !this.scene.sys?.displayList || !this.painter) return;
+    const p = this.painter;
+    if (!this.scene || !this.scene.sys?.displayList || !p) return;
     const { W, H } = this.screen();
-    const painter = this.painter;
-    painter.begin();
-    const L = painter.paint(model, { x: 0, y: 0, w: W, h: H });
-    const k = L.k;
-
-    this.drawMessages(model, L);
+    const k = layoutScale(model.layout.scale || model.scale, model.mapZoom, W, H);
+    p.begin();
+    const painted = p.paint(model.layout, model.values, model.fonts, { x: 0, y: 0, w: W, h: H, k });
+    const font = model.fonts[model.layout.theme.font] ?? "monospace";
+    this.drawMessages(model, painted, k, font);
     if (model.dead) {
-      const t = this.text(model.deathText, 0, 0, 10 * k, "#ffffff");
+      const t = p.text(model.deathText, font, 10, "#ffffff");
       t.setPosition(Math.round(W / 2 - t.width / 2), Math.round(H / 2 - t.height / 2));
     }
-    this.panelPics.begin();
-    this.cursorImg?.setVisible(false);
-    if (model.inventoryOpen) this.drawInventory(model, L);
-    this.panelPics.end();
-    painter.end();
+    if (model.inventoryOpen) this.drawInventory(model, painted, k, font);
+    p.end();
   }
 
-  /** Classic dialogue-style boxes in the free area, newest at the bottom. */
-  private drawMessages(model: HudModel, L: HudLayout): void {
+  /** Notes in boxes above the bottom elements, newest at the bottom. */
+  private drawMessages(model: HudModel, L: Painted, k: number, font: string): void {
     if (model.messages.length === 0) return;
-    const k = L.k;
+    const g = this.painter!.graphics;
     const { W } = this.screen();
     const boxW = Math.min(W - 16 * k, 240 * k);
     const x = Math.round((W - boxW) / 2);
-    let bottom = (L.free.y + L.free.h) * k - 6 * k;
+    let bottom = L.bottomEdge * k - 6 * k;
     for (let i = model.messages.length - 1; i >= 0; i--) {
       const m = model.messages[i];
-      const t = this.text(m.text, 0, 0, 8 * k, "#ffffff", { wordWrap: { width: boxW - 12 * k, useAdvancedWrap: true } });
+      const t = this.painter!.text(m.text, font, 8, "#ffffff", boxW - 12 * k);
       const h = t.height + 8 * k;
       const top = bottom - h;
-      if (top < L.free.y * k) {
+      if (top < L.topEdge * k) {
         t.setVisible(false);
         break;
       }
       const a = Math.min(1, m.remainingMs / 300);
-      this.g.fillStyle(MSG_FILL, 0.92 * a).fillRect(x, top, boxW, h);
-      this.g.lineStyle(k, MSG_BORDER, a).strokeRect(x + k / 2, top + k / 2, boxW - k, h - k);
+      g.fillStyle(MSG_FILL, 0.92 * a).fillRect(x, top, boxW, h);
+      g.lineStyle(k, MSG_BORDER, a).strokeRect(x + k / 2, top + k / 2, boxW - k, h - k);
       t.setPosition(x + 6 * k, top + 4 * k);
       t.setAlpha(a);
       bottom = top - 3 * k;
     }
   }
 
-  /**
-   * A picture as a 9-slice over a screen rectangle: corners `slice` picture pixels big drawn at
-   * `border` screen pixels (smaller when the rectangle is), sides and middle stretched.
-   */
-  private nineSlice(pics: Pool, key: string, slice: number, x: number, y: number, w: number, h: number, border: number): void {
-    const size = this.painter!.picSize(key)!;
-    const put = (frame: string, dx: number, dy: number, dw: number, dh: number) => {
-      if (dw <= 0 || dh <= 0) return;
-      pics.next().setTexture(key, frame).setScale(1).setPosition(Math.round(dx), Math.round(dy)).setDisplaySize(Math.round(dw), Math.round(dh)).setAlpha(1);
-    };
-    const sl = Math.max(0, Math.min(slice, Math.floor(size.w / 2), Math.floor(size.h / 2)));
-    const b = Math.round(Math.min(border, w / 2, h / 2));
-    const sx = [0, sl, size.w - sl];
-    const sw = [sl, size.w - 2 * sl, sl];
-    const sy = [0, sl, size.h - sl];
-    const sh = [sl, size.h - 2 * sl, sl];
-    const dx = [x, x + b, x + w - b];
-    const dw = [b, w - 2 * b, b];
-    const dy = [y, y + b, y + h - b];
-    const dh = [b, h - 2 * b, b];
-    const tex = this.scene.textures.get(key);
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        if (sw[col] <= 0 || sh[row] <= 0) continue;
-        const name = `zmt9_${sl}_${row * 3 + col}`;
-        if (!tex.has?.(name)) tex.add?.(name, 0, sx[col], sy[row], sw[col], sh[row]);
-        put(name, dx[col], dy[row], dw[col], dh[row]);
-      }
+  /** The inventory panel (I) under the top elements: the theme's panel and cursor pictures, or built-in. */
+  private drawInventory(model: HudModel, L: Painted, k: number, font: string): void {
+    const p = this.painter!;
+    const g = p.graphics;
+    const theme = model.layout.theme;
+    const pw = Math.min(L.viewW - 16, 200);
+    const ph = Math.min(L.bottomEdge - L.topEdge - 8, 120);
+    const px = Math.round((L.viewW - pw) / 2);
+    const py = L.topEdge + 4;
+    const own = p.panel(theme.panel, theme.panelSlice, { x: px, y: py, w: pw, h: ph });
+    // Content inset: clear of the panel picture's border.
+    const pad = own ? Math.max(6, theme.panelSlice + 3) : 6;
+    if (!own) {
+      g.fillStyle(MSG_FILL, 0.95).fillRect(px * k, py * k, pw * k, ph * k);
+      g.lineStyle(k, MSG_BORDER, 1).strokeRect(px * k + k / 2, py * k + k / 2, pw * k - k, ph * k - k);
     }
-  }
-
-  private drawInventory(model: HudModel, L: HudLayout): void {
-    const k = L.k;
-    const { W } = this.screen();
-    const pw = Math.min(W - 16 * k, 200 * k);
-    const ph = Math.min(L.free.h * k - 8 * k, 120 * k);
-    const px = Math.round((W - pw) / 2);
-    const py = Math.round(L.free.y * k + 4 * k);
-    const g = this.g;
-    const skin = model.skin;
-    const ownPanel = !!this.painter!.picSize(skin.inventoryPanel);
-    // Content inset (HUD pixels): clear of the panel picture's border.
-    const pad = ownPanel ? Math.max(6, model.panelSlice + 3) : 6;
-    if (ownPanel) {
-      // Own panel picture (HUD Style → Inventory panel): a 9-slice whose border is drawn in HUD pixels.
-      const sl = model.panelSlice;
-      this.nineSlice(this.panelPics, skin.inventoryPanel, sl, px, py, pw, ph, sl * k);
-    } else {
-      g.fillStyle(MSG_FILL, 0.95).fillRect(px, py, pw, ph);
-      g.lineStyle(k, MSG_BORDER, 1).strokeRect(px + k / 2, py + k / 2, pw - k, ph - k);
-    }
-    const cursor = this.painter!.picSize(skin.inventoryCursor);
-    this.text(model.inventoryTitle, px + pad * k, py + (pad - 2) * k, 8 * k, model.textColor);
+    p.text(model.inventoryTitle, font, 8, theme.textColor).setPosition((px + pad) * k, (py + pad - 2) * k);
     const cell = 22;
-    const perRow = Math.max(1, Math.floor((pw / k - 2 * pad) / cell));
+    const perRow = Math.max(1, Math.floor((pw - 2 * pad) / cell));
     let desc = model.inventory.length === 0 ? "" : " ";
     model.inventory.forEach((slot, i) => {
-      const ix = px / k + pad + (i % perRow) * cell;
-      const iy = py / k + pad + 12 + Math.floor(i / perRow) * cell;
-      this.pixelImage(slot.icon, ix + 2, iy + 2, k, 16);
+      const ix = px + pad + (i % perRow) * cell;
+      const iy = py + pad + 12 + Math.floor(i / perRow) * cell;
       if (slot.selected) {
-        if (cursor) this.cursorImg?.setTexture(skin.inventoryCursor).setScale(1).setPosition(ix * k, iy * k).setDisplaySize(20 * k, 20 * k).setVisible(true);
-        else g.lineStyle(k, 0xffd23a, 1).strokeRect(ix * k, iy * k, 20 * k, 20 * k);
+        // Under the icon: a highlight or a frame with an open middle.
+        if (!p.panel(theme.cursor, 0, { x: ix, y: iy, w: 20, h: 20 })) g.lineStyle(k, 0xffd23a, 1).strokeRect(ix * k, iy * k, 20 * k, 20 * k);
         desc = `${slot.name}${slot.count !== null ? ` (${slot.count})` : ""}\n${slot.description}`;
       }
+      p.icon(slot.icon, ix + 2, iy + 2, 16);
     });
     if (desc.trim()) {
-      const t = this.text(desc, px + pad * k, 0, 7 * k, "#ffffff", { wordWrap: { width: pw - 2 * pad * k, useAdvancedWrap: true } });
-      t.setPosition(px + pad * k, py + ph - t.height - (pad - 2) * k);
+      const t = p.text(desc, font, 7, "#ffffff", (pw - 2 * pad) * k);
+      t.setPosition((px + pad) * k, (py + ph - pad + 2) * k - t.height);
     }
   }
 
@@ -257,54 +181,6 @@ export class PhaserHud implements HudSink {
     this.diagText.setText(lines.join("\n"));
     this.diagText.setPosition(4, H - 4);
     this.diagText.setVisible(true);
-  }
-
-  setSheetPreview(preview: SheetPreview | null): void {
-    this.preview = preview;
-    this.renderPreview();
-  }
-
-  /** Shows the whole sheet scaled to the screen with every frame number. */
-  private renderPreview(): void {
-    if (!this.previewG) return;
-    this.previewG.clear();
-    this.previewLabels.begin();
-    const p = this.preview;
-    if (!p || !this.scene.textures.exists(p.textureKey)) {
-      this.previewImg.setVisible(false);
-      this.previewLabels.end();
-      return;
-    }
-    const { W, H } = this.screen();
-    const src = this.scene.textures.get(p.textureKey).getSourceImage();
-    const sw = src.width;
-    const sh = src.height;
-    const f = Math.min((W - 16) / sw, (H - 40) / sh);
-    const scale = f >= 1 ? Math.floor(f) : f;
-    const ox = Math.round((W - sw * scale) / 2);
-    const oy = 32;
-    this.previewG.fillStyle(0x000000, 0.9).fillRect(0, 0, W, H);
-    this.previewImg.setTexture(p.textureKey, "__BASE").setPosition(ox, oy).setScale(scale).setVisible(true);
-    const title = this.previewLabels.next();
-    title.setStyle({ fontSize: "14px" });
-    title.setText(`${p.title} — ${p.frameWidth}x${p.frameHeight}`).setPosition(8, 8);
-    const stepX = p.frameWidth + p.spacing;
-    const stepY = p.frameHeight + p.spacing;
-    const cols = Math.floor((sw - 2 * p.margin + p.spacing) / stepX);
-    const rows = Math.floor((sh - 2 * p.margin + p.spacing) / stepY);
-    const font = `${Math.max(8, Math.min(14, Math.round((p.frameWidth * scale) / 4)))}px`;
-    this.previewG.lineStyle(1, 0xffff66, 0.6);
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = ox + (p.margin + c * stepX) * scale;
-        const y = oy + (p.margin + r * stepY) * scale;
-        this.previewG.strokeRect(x, y, p.frameWidth * scale, p.frameHeight * scale);
-        const t = this.previewLabels.next();
-        t.setStyle({ fontSize: font });
-        t.setText(String(r * cols + c)).setPosition(x + 1, y + 1);
-      }
-    }
-    this.previewLabels.end();
   }
 
   setVisible(visible: boolean): void {

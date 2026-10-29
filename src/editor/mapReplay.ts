@@ -32,7 +32,7 @@ export const MAP_BUILDING_ACTIONS = new Set([
   "Zelda: Define Enemy",
   "Zelda: Set Player Sprites",
   "Zelda: Set Sound",
-  "Zelda: HUD Style",
+  "Zelda: UI Layout",
   "Zelda: Message Style",
 ]);
 

@@ -1,22 +1,8 @@
 import type { Session } from "../core/session.ts";
 import type { HudItemSlot, HudModel } from "../host/types.ts";
-import { digitsFor } from "./hudLayout.ts";
+import { classicLayout, layoutBindings, type LayoutValues, type UiLayout } from "./uiLayout.ts";
 
 const MAX_MESSAGES = 3;
-
-const COUNTER_ICONS: Record<string, string> = {
-  rupees: "hud_rupee",
-  bombs: "hud_bomb",
-  arrows: "hud_arrow",
-  keys: "hud_key",
-  magic: "hud_magic",
-};
-
-/** A HUD counter (config.ui.counters id) with its value; capacity sets the digits ("keys" holds 9). */
-export function hudCounter(id: string, label: string, value: number, capacity: number): HudModel["counters"][number] {
-  const max = id === "keys" ? 9 : capacity;
-  return { id, label, icon: COUNTER_ICONS[id] ?? `icon_${id}`, value, digits: Math.min(4, digitsFor(max === 9999 ? 99 : max)) };
-}
 
 /**
  * Builds a render-agnostic HUD model from game state and hands it to the
@@ -66,13 +52,51 @@ export class HudSystem {
     hud.render(this.buildModel());
   }
 
+  /** The layout the HUD shows: the designer's (Zelda: UI Layout) or the classic one. */
+  layout(): UiLayout {
+    const ui = this.s.config.ui;
+    const own = this.s.toolkit.hudLayout;
+    if (own) return own;
+    const key = `${ui.showMagic && this.s.state.player.maxMagic > 0}|${ui.position}`;
+    if (this.classic?.key !== key) this.classic = { key, layout: classicLayout({ magic: ui.showMagic && this.s.state.player.maxMagic > 0, bottom: ui.position.startsWith("bottom") }) };
+    return this.classic.layout;
+  }
+
+  private classic: { key: string; layout: UiLayout } | null = null;
+
+  /** The values a layout shows, from the toolkit state and the project variables. */
+  values(layout: UiLayout): LayoutValues {
+    const s = this.s;
+    const st = s.state;
+    const out: LayoutValues = {};
+    for (const key of layoutBindings(layout)) {
+      if (key.startsWith("var:")) {
+        const v = s.host.getVariable?.(key.slice(4));
+        out[key] = typeof v === "boolean" ? (v ? 1 : 0) : (v ?? 0);
+      } else if (key.startsWith("t:")) out[key] = s.i18n.t(key.slice(2));
+      else if (key === "heartValue") out[key] = s.config.player.heartValue;
+      else if (key === "magic") out[key] = st.player.magic;
+      else if (key === "maxMagic") out[key] = st.player.maxMagic;
+      else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
+      else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
+      else if (key === "item.count") out[key] = s.statValue("itemCount");
+      else out[key] = s.statValue(key);
+    }
+    return out;
+  }
+
+  /** An item's icon: the layout theme's picture for it, its own (Define Item), or the built-in one. */
+  private iconOf(id: string, layout: UiLayout): string {
+    return layout.theme.icons[id] || (this.s.toolkit.items.get(id)?.icon ?? `icon_${id}`);
+  }
+
   buildModel(): HudModel {
     const s = this.s;
-    const ui = s.config.ui;
     const st = s.state;
     const inv = s.toolkit.inventory;
     const open = s.inventoryUi?.open ?? false;
     const activeId = st.inventory.activeItem;
+    const layout = this.layout();
     const slot = (id: string): HudItemSlot => {
       const def = s.toolkit.items.get(id);
       const counter = def?.counter ?? def?.resource;
@@ -80,46 +104,24 @@ export class HudSystem {
         itemId: id,
         name: inv.displayName(id),
         description: inv.displayDescription(id),
-        // HUD Style → Item icons: an own picture for a built-in item (Define Item has its own icon).
-        icon: ui.skin[`item_${id}`] || (def?.icon ?? `icon_${id}`),
+        icon: this.iconOf(id, layout),
         count: counter && counter !== "magic" ? inv.count(counter) : null,
         selected: id === activeId,
       };
     };
-    const counters = ui.counters.map((id) => {
-      const key = id === "keys" ? "key" : id;
-      return hudCounter(id, s.i18n.t(`resource.${id}`), inv.count(key), inv.capacity(key));
-    });
     return {
       visible: true,
-      hp: st.player.hp,
-      maxHp: st.player.maxHp,
-      heartValue: s.config.player.heartValue,
-      magic: st.player.magic,
-      maxMagic: st.player.maxMagic,
-      showHearts: ui.showHearts,
-      showMagic: ui.showMagic && st.player.maxMagic > 0,
-      showItem: ui.showActiveItem && s.feature("inventory"),
-      activeItem: ui.showActiveItem && activeId && s.feature("inventory") ? slot(activeId) : null,
-      counters,
+      layout,
+      values: this.values(layout),
+      fonts: s.toolkit.uiFonts,
+      scale: s.config.ui.scale,
+      mapZoom: s.host.mapZoom?.() ?? 0,
       messages: this.messages.map((m) => ({ text: m.text, remainingMs: m.remainingMs })),
       inventoryOpen: open,
       inventoryTitle: s.i18n.t("hud.inventory"),
       inventory: open ? [...st.inventory.owned.filter((id) => s.toolkit.items.has(id)).map(slot)] : [],
       dead: s.player.isDead,
       deathText: s.i18n.t("hud.dead"),
-      lifeLabel: s.i18n.t("hud.life"),
-      position: ui.position.startsWith("bottom") ? "bottom" : "top",
-      scale: ui.scale,
-      safeArea: { ...ui.safeArea },
-      fontFamily: ui.fontFamily,
-      skin: { ...ui.skin },
-      barSlice: ui.barSlice,
-      panelSlice: ui.panelSlice,
-      showLifeLabel: ui.showLifeLabel,
-      textColor: ui.textColor,
-      places: { ...ui.places },
-      mapZoom: s.host.mapZoom?.() ?? 0,
     };
   }
 
