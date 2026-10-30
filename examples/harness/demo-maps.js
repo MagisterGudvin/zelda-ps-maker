@@ -61,6 +61,9 @@ export const MAPS = {
       // Pegasus Boots and Roc's Feather (they go on the item buttons C and B; I switches them).
       ["Zelda: Create Chest", { position: { x: 136, y: 40 }, item: "boots", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 168, y: 40 }, item: "feather", count: 1, requiresBigKey: false, hidden: false }],
+      // The hookshot; with it the player gets over the pits to the switch ledge by the hook post there.
+      ["Zelda: Create Chest", { position: { x: 216, y: 104 }, item: "hookshot", count: 1, requiresBigKey: false, hidden: false }],
+      ["Zelda: Create Object", { type: "hook_post", position: { x: 364, y: 44 } }],
       // Magic Powder, buried below the start: the villager's shovel digs it up.
       ["Zelda: Create Chest", { position: { x: 48, y: 172 }, item: "magic_powder", count: 1, requiresBigKey: false, hidden: false, buried: true }],
       ["Zelda: Create Chest", { position: { x: 200, y: 40 }, item: "boomerang", count: 1, requiresBigKey: false, hidden: false }],

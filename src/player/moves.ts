@@ -32,7 +32,14 @@ export class MoveAbilities implements SessionSystem {
 
   /** In the air (Roc's Feather): pits, spikes and enemies on the ground do not reach the player. */
   get isAirborne(): boolean {
-    return this.airMs > 0;
+    return this.airMs > 0 || this.pulled;
+  }
+
+  /** Pulled by the hookshot: off the ground too (over pits), without the jump's hop. */
+  private pulled = false;
+
+  setPulled(on: boolean): void {
+    this.pulled = on;
   }
 
   /** Running up or dashing with the Pegasus Boots. */

@@ -22,7 +22,8 @@ export type ObjectType =
   | "spikes"
   | "pit"
   | "sign"
-  | "buried";
+  | "buried"
+  | "hook_post";
 
 export const OBJECT_TYPES: readonly ObjectType[] = [
   "bush",
@@ -45,6 +46,7 @@ export const OBJECT_TYPES: readonly ObjectType[] = [
   "pit",
   "sign",
   "buried",
+  "hook_post",
 ];
 
 export type DoorLock = "none" | "small_key" | "big_key" | "switch";
@@ -179,6 +181,8 @@ const PRESETS: Record<ObjectType, Partial<ObjectConfig>> = {
   sign: { sprite: "obj_sign", activeSprite: "obj_sign", actionable: true },
   // Buried treasure (Create Chest: Buried): unseen until the shovel digs it up; the hole stays.
   buried: { sprite: "obj_dug", activeSprite: "obj_dug", solid: false, hidden: true, persistent: true },
+  // A stake the hookshot grabs (across pits and water).
+  hook_post: { sprite: "obj_hook_post", activeSprite: "obj_hook_post" },
 };
 
 export function isObjectType(v: unknown): v is ObjectType {

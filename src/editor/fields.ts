@@ -121,6 +121,7 @@ export const ITEM_OPTIONS = [
   ["mirror_shield", "Mirror Shield (reflects shots)"],
   ["boots", "Pegasus Boots (dash)"],
   ["feather", "Roc's Feather (jump)"],
+  ["hookshot", "Hookshot"],
   ["shovel", "Shovel (dig)"],
   ["magic_powder", "Magic Powder (with 10 powder)"],
   ["powder", "Magic powder refill"],
@@ -134,7 +135,7 @@ export const ITEM_OPTIONS = [
 ] as const;
 
 /** Items the player equips or that can be switched off (abilities). */
-export const ABILITY_OPTIONS = [["sword", "Sword"], ["shield", "Shield"], ["glove", "Power glove"], ["bomb", "Bombs"], ["boomerang", "Boomerang"], ["bow", "Bow"], ["boots", "Pegasus Boots"], ["feather", "Roc's Feather"], ["shovel", "Shovel"], ["magic_powder", "Magic Powder"], ["fire_rod", "Fire rod"], ["healing_spell", "Healing spell"], ...CUSTOM_ITEM_SLOTS] as const;
+export const ABILITY_OPTIONS = [["sword", "Sword"], ["shield", "Shield"], ["glove", "Power glove"], ["bomb", "Bombs"], ["boomerang", "Boomerang"], ["bow", "Bow"], ["boots", "Pegasus Boots"], ["feather", "Roc's Feather"], ["hookshot", "Hookshot"], ["shovel", "Shovel"], ["magic_powder", "Magic Powder"], ["fire_rod", "Fire rod"], ["healing_spell", "Healing spell"], ...CUSTOM_ITEM_SLOTS] as const;
 
 export const RESOURCE_OPTIONS = [["rupees", "Rupees"], ["bombs", "Bombs"], ["arrows", "Arrows"], ["magic", "Magic"], ["key", "Small keys"]] as const;
 

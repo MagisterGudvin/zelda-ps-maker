@@ -12,6 +12,7 @@ export type DamageType =
   | "ice"
   | "magic"
   | "thrown"
+  | "hookshot"
   | "contact"
   | "projectile"
   | "hazard"
@@ -29,6 +30,7 @@ export const DAMAGE_TYPES: readonly DamageType[] = [
   "ice",
   "magic",
   "thrown",
+  "hookshot",
   "contact",
   "projectile",
   "hazard",

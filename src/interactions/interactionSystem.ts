@@ -3,6 +3,7 @@ import type { Entity } from "../core/entity.ts";
 import { type AABB, type Facing, FACING_VECTORS, makeBox, overlaps } from "../core/math.ts";
 import type { HitResult } from "../core/types.ts";
 import { Projectile } from "../items/projectile.ts";
+import { Bomb } from "../items/bomb.ts";
 import { Interactable } from "./interactable.ts";
 
 /** Carried object above the body centre when the host cannot tell where the head is. */
@@ -59,6 +60,8 @@ export class InteractionSystem implements SessionSystem {
   readonly name = "interactions";
   private readonly s: Session;
   private carried: Interactable | null = null;
+  /** A placed bomb picked up (its fuse burns on; it goes off in the hands if not thrown in time). */
+  private carriedBomb: Bomb | null = null;
   private pushTarget: Interactable | null = null;
   private pushMs = 0;
   private pushLostMs = 0;
@@ -76,7 +79,7 @@ export class InteractionSystem implements SessionSystem {
   }
 
   isCarrying(): boolean {
-    return this.carried !== null;
+    return this.carried !== null || this.carriedBomb !== null;
   }
 
   /** The player is leaning on a block it can push (push animation). */
@@ -92,6 +95,7 @@ export class InteractionSystem implements SessionSystem {
       return;
     }
     if (this.carried) this.updateCarried();
+    if (this.carriedBomb) this.updateCarriedBomb();
     if (this.s.host.input.pressed("action")) this.onAction();
     this.updatePushing(dtMs);
     this.updateFloor();
@@ -103,7 +107,17 @@ export class InteractionSystem implements SessionSystem {
       this.throwCarried();
       return;
     }
+    if (this.carriedBomb) {
+      this.throwBomb();
+      return;
+    }
     if (this.s.sword?.isBusy() || this.s.items?.isBusy()) return;
+    // A placed bomb in front: pick it up.
+    const bomb = this.findBombInFront();
+    if (bomb) {
+      this.liftBomb(bomb);
+      return;
+    }
     const target = this.findInFront();
     if (!target) return;
     if (target.interact(p.facing, p.box.y)) return;
@@ -134,6 +148,59 @@ export class InteractionSystem implements SessionSystem {
     }
     found.length = 0;
     return best;
+  }
+
+  /** A placed bomb on the ground in front (not one in flight). */
+  private findBombInFront(): Bomb | null {
+    const p = this.s.player;
+    const v = FACING_VECTORS[p.facing];
+    const reach = this.s.config.interactions.reachDistance;
+    const r = this.reach;
+    r.x = p.box.x + v.x * (p.box.hw + reach / 2);
+    r.y = p.box.y + v.y * (p.box.hh + reach / 2);
+    r.hw = v.x !== 0 ? reach / 2 + 1 : p.box.hw;
+    r.hh = v.y !== 0 ? reach / 2 + 1 : p.box.hh;
+    this.found2.length = 0;
+    this.s.world.query(r, this.found2, (e) => e instanceof Bomb && !e.removed && !e.carried && !e.isFlying);
+    const bomb = (this.found2[0] as Bomb | undefined) ?? null;
+    this.found2.length = 0;
+    return bomb;
+  }
+
+  private liftBomb(bomb: Bomb): void {
+    this.carriedBomb = bomb;
+    bomb.carried = true;
+    this.s.bus.emit("zelda:object:lifted", { objectId: bomb.id });
+    this.updateCarriedBomb();
+  }
+
+  /** Over the head; a bomb that went off in the hands is gone (its blast hurt the player, bombsHurtPlayer). */
+  private updateCarriedBomb(): void {
+    const bomb = this.carriedBomb!;
+    if (bomb.removed) {
+      this.carriedBomb = null;
+      return;
+    }
+    const p = this.s.player.box;
+    const head = this.s.host.readPlayerTop?.();
+    bomb.x = p.x;
+    bomb.y = typeof head === "number" ? Math.min(head + CARRY_OVERLAP - bomb.hh, p.y - p.hh - bomb.hh) : p.y - CARRY_OFFSET_Y;
+    bomb.view?.setDepthY?.(p.y + p.hh + 1);
+    bomb.view?.setPosition(bomb.x, bomb.y);
+  }
+
+  private throwBomb(): void {
+    const bomb = this.carriedBomb;
+    if (!bomb) return;
+    this.carriedBomb = null;
+    bomb.view?.setDepthY?.(null);
+    const p = this.s.player;
+    const v = FACING_VECTORS[p.facing];
+    const c = this.s.config.items.thrown;
+    bomb.x = p.box.x + v.x * (p.box.hw + 6);
+    bomb.y = p.box.y + v.y * (p.box.hh + 6) - 4;
+    bomb.throwAlong(v.x, v.y, c.speed, c.range);
+    this.s.bus.emit("zelda:object:thrown", { objectId: bomb.id });
   }
 
   private tryLift(obj: Interactable): void {
@@ -175,6 +242,17 @@ export class InteractionSystem implements SessionSystem {
 
   /** Drops the carried object where the player stands; it shatters. */
   dropCarried(): void {
+    const bomb = this.carriedBomb;
+    if (bomb) {
+      // A bomb is put down at the feet, still burning.
+      this.carriedBomb = null;
+      bomb.carried = false;
+      bomb.view?.setDepthY?.(null);
+      if (!bomb.removed) {
+        bomb.x = this.s.player.box.x;
+        bomb.y = this.s.player.box.y + 2;
+      }
+    }
     const obj = this.carried;
     if (!obj) return;
     this.carried = null;

@@ -558,6 +558,70 @@ await check("the shovel digs up the Magic Powder buried below the start (Create 
   expect(booms === 1 && after.arrows === before.arrows - 1 && after.bombs === before.bombs - 1, `booms ${booms}, ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
   return `Magic Powder dug up (10), sprinkled (9 left); a bomb arrow: 1 explosion, arrows ${before.arrows}→${after.arrows}, bombs ${before.bombs}→${after.bombs}`;
 });
+await check("hookshot from its chest: fired up at the hook post it pulls the player over the pits onto the switch ledge (no fall); a placed bomb is picked up with Z, thrown with Z and goes off where it lands", async () => {
+  const putOn = async (item, key) => {
+    await page.keyboard.press("i");
+    await wait(400);
+    const target = await ev((item) => window.ZeldaMakerToolkit.session.screens.gridItems().indexOf(item), item);
+    for (let n = 0; n < 16; n++) {
+      const cur = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.cursor ?? -1);
+      if (cur === target || cur < 0) break;
+      await page.keyboard.press(cur < target ? "ArrowRight" : "ArrowLeft");
+      await wait(120);
+    }
+    await page.keyboard.press(key);
+    await wait(200);
+    await page.keyboard.press("i");
+    await wait(400);
+  };
+  const pos = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return { x: b.center.x, y: b.center.y, hp: window.ZeldaMakerToolkit.toolkit.state.player.hp }; });
+  await tp(216, 126);
+  await hold("ArrowUp", 200);
+  await page.keyboard.press("z");
+  await wait(800);
+  await dismiss();
+  const owned = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.owns("hookshot"));
+  await putOn("hookshot", "c");
+  await ev(() => {
+    window.__falls = 0;
+    window.ZeldaMakerToolkit.toolkit.bus.on("zelda:player:takeDamage", (e) => e.type === "fall" && window.__falls++);
+  });
+  await tp(364, 106);
+  await hold("ArrowUp", 50);
+  await wait(300);
+  const before = await pos();
+  await page.keyboard.press("c");
+  await wait(250);
+  await page.screenshot({ path: path.join(OUT, "hookshot.png") });
+  await wait(1200);
+  const after = await pos();
+  // A placed bomb: Z picks it up, Z throws it.
+  await putOn("bomb", "b");
+  await tp(130, 64);
+  await hold("ArrowRight", 60);
+  await wait(300);
+  await ev(() => {
+    window.__boomAt = null;
+    window.ZeldaMakerToolkit.toolkit.bus.on("zelda:bomb:exploded", (e) => (window.__boomAt = e));
+  });
+  await page.keyboard.press("b");
+  await wait(300);
+  await page.keyboard.press("z");
+  await wait(200);
+  const carrying = await ev(() => window.ZeldaMakerToolkit.session.interactions.isCarrying());
+  await page.screenshot({ path: path.join(OUT, "bomb-carried.png") });
+  const from = await pos();
+  await page.keyboard.press("z");
+  await wait(3200);
+  const boom = await ev(() => window.__boomAt);
+  expect(owned, "the hookshot chest");
+  const falls = await ev(() => window.__falls);
+  // (A shot of the fiery slime below may hit meanwhile: only a fall counts here.)
+  expect(after.y < 80 && before.y > 95 && falls === 0, `pulled ${JSON.stringify(before)} → ${JSON.stringify(after)}, falls ${falls}`);
+  expect(carrying, "the bomb was not picked up");
+  expect(boom && boom.x > from.x + 40, `blast ${JSON.stringify(boom)} from ${from.x}`);
+  return `pulled from y ${Math.round(before.y)} to ${Math.round(after.y)} over the pits; bomb thrown, blast ${Math.round(boom.x - from.x)} px ahead`;
+});
 await check("I opens the inventory screen (UI Designer, role Inventory): the items in a grid of the demo's item boxes, the cursor, the selected item's name; arrows move it; I closes", async () => {
   const look = () =>
     ev(() => {

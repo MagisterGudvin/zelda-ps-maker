@@ -35,6 +35,8 @@ export const en: Record<string, string> = {
   "item.magic_powder.desc": "Sprinkle it in front: it hurts and stuns enemies, lights torches and burns bushes.",
   "item.powder.name": "Magic Powder",
   "item.bomb_arrow.name": "Bomb arrow",
+  "item.hookshot.name": "Hookshot",
+  "item.hookshot.desc": "Fires a hook: it stuns enemies, brings items back and pulls you to posts, chests and blocks — across pits.",
   "item.glove.name": "Power Glove",
   "item.glove.desc": "Lets you lift heavy rocks.",
   "item.heart_container.name": "Heart Container",

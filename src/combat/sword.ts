@@ -63,6 +63,8 @@ export class SwordSystem implements SessionSystem {
     if (this.s.items?.isBusy()) return false;
     // The dash holds the sword out itself (MoveAbilities).
     if (this.s.moves?.isDashing) return false;
+    // The hookshot is out (or pulling).
+    if (p.isLocked("hookshot")) return false;
     return true;
   }
 

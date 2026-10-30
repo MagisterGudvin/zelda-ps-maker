@@ -35,6 +35,8 @@ export const ru: Record<string, string> = {
   "item.magic_powder.desc": "Посыпать перед собой: ранит и оглушает врагов, зажигает факелы, сжигает кусты.",
   "item.powder.name": "Волшебный порошок",
   "item.bomb_arrow.name": "Бомбо-стрела",
+  "item.hookshot.name": "Крюк-кошка",
+  "item.hookshot.desc": "Выстреливает крюк: оглушает врагов, приносит предметы и подтягивает вас к столбам, сундукам и блокам — через ямы.",
   "item.glove.name": "Силовая перчатка",
   "item.glove.desc": "Позволяет поднимать тяжёлые камни.",
   "item.heart_container.name": "Контейнер сердца",

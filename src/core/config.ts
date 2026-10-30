@@ -214,6 +214,11 @@ export interface ToolkitConfig {
     powder: { damage: number; radius: number; stunMs: number };
     /** Bomb arrows: the bow and the bombs on the two item buttons, both pressed together (within comboMs). */
     bombArrow: { comboMs: number };
+    /**
+     * Hookshot: the hook flies `range` pixels; it hurts and stuns an enemy, brings a dropped item back,
+     * or grabs an object of a type in `grabs` and pulls the player to it (over pits).
+     */
+    hookshot: { range: number; speed: number; pullSpeed: number; damage: number; stunMs: number; grabs: string[] };
     thrown: { speed: number; range: number; damage: number };
   };
   inventory: {
@@ -394,11 +399,12 @@ export function createDefaultConfig(): ToolkitConfig {
       shovel: { drops: { chance: 0.2, entries: [{ item: "rupees", count: 1, weight: 6 }, { item: "rupees", count: 5, weight: 1 }, { item: "heart", weight: 3 }] } },
       powder: { damage: 2, radius: 14, stunMs: 800 },
       bombArrow: { comboMs: 100 },
+      hookshot: { range: 96, speed: 300, pullSpeed: 220, damage: 1, stunMs: 1500, grabs: ["hook_post", "chest", "block", "rock", "heavy_rock", "pot", "sign", "torch", "lever"] },
       thrown: { speed: 200, range: 64, damage: 2 },
     },
     inventory: {
       capacities: { bombs: 10, arrows: 30, rupees: 999, powder: 20 },
-      order: ["bow", "boomerang", "bomb", "boots", "feather", "shovel", "magic_powder", "fire_rod", "healing_spell"],
+      order: ["bow", "boomerang", "bomb", "hookshot", "boots", "feather", "shovel", "magic_powder", "fire_rod", "healing_spell"],
       autoEquipFirst: true,
       autoEquipSecond: true,
     },

@@ -10,6 +10,7 @@ import type { Entity } from "../core/entity.ts";
 import { Bomb, explodeAt } from "./bomb.ts";
 import { Boomerang } from "./boomerang.ts";
 import { Projectile } from "./projectile.ts";
+import { Hookshot } from "./hookshot.ts";
 import { spawnEffect } from "./effect.ts";
 import type { ItemDefinition, ItemRegistry, ItemUseContext } from "./registry.ts";
 
@@ -121,6 +122,16 @@ export function registerBuiltinItems(reg: ItemRegistry): void {
       inv.spend("bombs", 1);
       return ctx.session.world.add(new BombArrow(ctx.session, ctx));
     },
+  });
+
+  // Hookshot: stuns enemies, fetches dropped items, pulls the player to posts, chests and blocks.
+  reg.register({
+    id: "hookshot",
+    icon: "icon_hookshot",
+    quickUse: true,
+    maxActive: 1,
+    cooldownMs: 200,
+    use: (ctx) => ctx.session.world.add(new Hookshot(ctx.session, ctx)),
   });
 
   // Shovel: digs the spot in front (buried treasure, else a chance of a drop); a hole stays a while.

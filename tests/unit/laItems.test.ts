@@ -5,6 +5,7 @@ import { spawnEnemy } from "../../src/enemies/spawn.ts";
 import type { Enemy } from "../../src/enemies/enemy.ts";
 import { Projectile } from "../../src/items/projectile.ts";
 import { createObject } from "../../src/interactions/spawnObject.ts";
+import { Pickup } from "../../src/items/pickup.ts";
 
 type Rig = ReturnType<typeof createRig>;
 
@@ -223,4 +224,102 @@ test("bomb arrows: the bow and the bombs on the two item buttons pressed togethe
   r.run(r.tk.config.items.bombArrow.comboMs + 50);
   assert.ok(r.session.world.list("projectile").some((e) => e.id.startsWith("arrow")), "then a plain arrow");
   assert.deepEqual([inv.count("arrows"), inv.count("bombs")], [8, 4]);
+});
+
+function withHookshot(config: unknown = {}) {
+  const r = createRig(config);
+  r.tk.inventory.give("hookshot", 1, { silent: true });
+  r.tk.inventory.equip("hookshot");
+  face(r, 1, 0);
+  return r;
+}
+
+test("Hookshot: an enemy in front is hurt and stunned; the hook comes back and the player is free again", () => {
+  const r = withHookshot();
+  const p = r.host.player!;
+  const enemy = spawnEnemy(r.session, "slime", p.x + 50, p.y, { overrides: STILL }) as Enemy;
+  r.host.input.tap("useItem");
+  r.step();
+  assert.ok(r.session.player.isLocked("hookshot"), "the player waits while the hook is out");
+  r.run(800);
+  assert.equal(enemy.hp, 20 - r.tk.config.items.hookshot.damage);
+  assert.equal(enemy.state, "stunned");
+  assert.ok(!r.session.player.isLocked("hookshot"));
+  assert.equal(r.session.world.list("projectile").filter((e) => !e.removed).length, 0);
+});
+
+test("Hookshot: a dropped item rides the hook back to the player", () => {
+  const r = withHookshot();
+  const p = r.host.player!;
+  r.session.world.add(new Pickup(r.session, p.x + 60, p.y, { item: "rupees", count: 5 }));
+  r.run(1000);
+  r.host.input.tap("useItem");
+  r.run(1000);
+  assert.equal(r.tk.inventory.count("rupees"), 5);
+});
+
+test("Hookshot: it holds a hook post and pulls the player across a pit (no fall); a wall just sends it back", () => {
+  const r = withHookshot();
+  const p = r.host.player!;
+  const x0 = p.x;
+  createObject(r.session, "pit", x0 + 30, p.y, { id: "pit1" });
+  createObject(r.session, "pit", x0 + 46, p.y, { id: "pit2" });
+  const post = createObject(r.session, "hook_post", x0 + 72, p.y, { id: "post1" })!;
+  const hp = r.tk.state.player.hp;
+  let grabbed = 0;
+  r.tk.bus.on("zelda:hookshot:grabbed", () => grabbed++);
+  r.host.input.tap("useItem");
+  r.run(900);
+  assert.equal(grabbed, 1);
+  assert.ok(p.x > x0 + 50, `pulled to ${p.x - x0}`);
+  assert.ok(post.x - p.x < 20, "next to the post");
+  r.run(300);
+  assert.equal(r.tk.state.player.hp, hp, "flew over the pits");
+  // A wall ahead: the hook comes back, the player stays.
+  r.host.walls.push({ x: p.x + 40, y: p.y, hw: 4, hh: 40 });
+  r.session.world.remove(post);
+  r.step();
+  const x1 = p.x;
+  r.host.input.tap("useItem");
+  r.run(900);
+  assert.ok(Math.abs(p.x - x1) < 1);
+  assert.ok(!r.session.player.isLocked("hookshot"));
+});
+
+test("a placed bomb can be picked up (Z) and thrown (Z): it flies and goes off where it lands; held too long, it goes off in the hands", () => {
+  const r = createRig();
+  r.tk.inventory.give("bombs", 5, { silent: true });
+  r.tk.inventory.equip("bomb");
+  face(r, 1, 0);
+  const p = r.host.player!;
+  r.host.input.tap("useItem");
+  r.step(2);
+  const bomb = r.session.world.list("projectile").find((e) => e.id.startsWith("bomb")) as any;
+  assert.ok(bomb);
+  r.run(250);
+  r.host.input.tap("action");
+  r.step();
+  assert.ok(r.session.interactions!.isCarrying() && bomb.carried, "picked up");
+  assert.ok(bomb.y < p.y - 4, "over the head");
+  r.host.input.tap("action");
+  r.step();
+  assert.ok(!r.session.interactions!.isCarrying());
+  r.run(600);
+  assert.ok(bomb.x > p.x + r.tk.config.items.thrown.range * 0.7, `thrown to ${bomb.x - p.x}`);
+  let at: { x: number } | null = null;
+  r.tk.bus.on("zelda:bomb:exploded", (e) => (at = e));
+  r.run(r.tk.config.items.bomb.fuseMs);
+  assert.ok(at && (at as { x: number }).x > p.x + 40, "went off where it landed");
+  // Held too long.
+  r.run(400);
+  r.host.input.tap("useItem");
+  r.step(2);
+  r.run(200);
+  r.host.input.tap("action");
+  r.step();
+  assert.ok(r.session.interactions!.isCarrying());
+  const hp = r.tk.state.player.hp;
+  r.run(r.tk.config.items.bomb.fuseMs);
+  assert.ok(r.tk.state.player.hp < hp, "the blast in the hands hurt the player");
+  assert.ok(!r.session.interactions!.isCarrying());
 });

@@ -102,7 +102,7 @@ export class ItemSystem implements SessionSystem {
     if (!options.free && !(def.requires ?? [itemId]).every((id) => inv.owns(id))) return this.fail(itemId, "notOwned");
     if (!inv.isAbilityEnabled(itemId)) return this.fail(itemId, "disabled");
     const p = s.player;
-    if (!p.present || p.isDead || p.isKnockedBack || this.busyMs > 0 || s.sword?.isBusy() || s.interactions?.isCarrying() || s.moves?.isDashing) return this.fail(itemId, "busy");
+    if (!p.present || p.isDead || p.isKnockedBack || this.busyMs > 0 || s.sword?.isBusy() || s.interactions?.isCarrying() || s.moves?.isDashing || p.isLocked("hookshot")) return this.fail(itemId, "busy");
     if (this.cooldowns.has(itemId)) return this.fail(itemId, "cooldown");
     const cost = resolveNumber(def.cost, s, 0);
     if (!options.free && def.resource && cost > 0 && !inv.has(def.resource, cost)) {

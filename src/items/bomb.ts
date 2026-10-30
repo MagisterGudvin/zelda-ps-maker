@@ -21,7 +21,40 @@ export class Bomb extends Entity {
     this.view = session.host.renderer.createView({ sprite: "bomb" });
   }
 
+  /** Held over the player's head (picked up with the action key); the fuse keeps burning. */
+  carried = false;
+  /** Thrown: flies until `left` pixels are covered or something solid is in the way, then lies there. */
+  private flight: { vx: number; vy: number; left: number } | null = null;
+  private readonly probe = makeBox();
+
+  get isFlying(): boolean {
+    return this.flight !== null;
+  }
+
+  /** Throws the bomb from where it is (the player's head) along a direction. */
+  throwAlong(dirX: number, dirY: number, speed: number, distance: number): void {
+    this.carried = false;
+    this.flight = { vx: dirX * speed, vy: dirY * speed, left: distance };
+  }
+
   tick(dtMs: number, session: Session): void {
+    if (this.flight) {
+      const f = this.flight;
+      const dt = dtMs / 1000;
+      const pr = this.probe;
+      pr.x = this.x + f.vx * dt;
+      pr.y = this.y + f.vy * dt;
+      pr.hw = this.hw;
+      pr.hh = this.hh;
+      if (session.world.isBlocked(pr, this, true)) this.flight = null;
+      else {
+        this.x = pr.x;
+        this.y = pr.y;
+        session.world.touch(this);
+        f.left -= Math.hypot(f.vx, f.vy) * dt;
+        if (f.left <= 0) this.flight = null;
+      }
+    }
     this.fuseMs -= dtMs;
     // Blink faster as the fuse runs out.
     const t = 1 - this.fuseMs / this.fuseTotal;

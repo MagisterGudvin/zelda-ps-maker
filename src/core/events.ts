@@ -56,6 +56,8 @@ export interface ZeldaEventMap {
   "zelda:chest:opened": { chestId: string; itemId: string | null; count: number };
   /** The shovel dug up buried treasure (Create Chest: Buried). */
   "zelda:object:dug": { objectId: string; itemId: string | null; count: number };
+  /** The hookshot holds an object and pulls the player to it. */
+  "zelda:hookshot:grabbed": { objectId: string };
   /** The shovel dug plain ground. */
   "zelda:ground:dug": { x: number; y: number };
   "zelda:door:unlocked": { doorId: string; lock: string };

@@ -216,6 +216,11 @@ const DEFS: Record<string, SpriteDef> = {
   obj_dug: { w: 16, h: 16, paint: (c) => (circle(c, 8, 9, 6, "#5a3a1e"), circle(c, 8, 9, 4, "#3a2412"), rect(c, 2, 4, 2, 1, "#7a5a32"), rect(c, 12, 13, 2, 1, "#7a5a32")) },
   // A cloud of magic powder.
   powder_cloud: { w: 16, h: 16, paint: (c) => (circle(c, 8, 8, 6, "#c8a8f0"), circle(c, 5, 6, 3, "#e8d8ff"), circle(c, 11, 10, 3, "#e8d8ff"), rect(c, 3, 11, 1, 1, "#fff6b0"), rect(c, 12, 4, 1, 1, "#fff6b0")) },
+  // The hook (pointing right) and one link of its chain.
+  hookshot_head: { w: 8, h: 8, paint: (c) => (rect(c, 0, 3, 4, 2, "#a8b0ba"), poly(c, [3, 1, 8, 4, 3, 7, 4, 4], "#e0e6ee")) },
+  hookshot_chain: { w: 4, h: 4, paint: (c) => (rect(c, 0, 1, 4, 2, "#8a929c"), rect(c, 1, 0, 2, 4, "#a8b0ba")) },
+  // A wooden stake with an iron ring (hookshot target).
+  obj_hook_post: { w: 16, h: 16, paint: (c) => (rect(c, 5, 6, 6, 9, "#8a5a2b"), rect(c, 5, 6, 6, 2, "#a8743a"), rect(c, 4, 14, 8, 2, "#4a2a10"), circle(c, 8, 4, 3, "#a8b0ba"), circle(c, 8, 4, 1.5, "#5a6270")) },
   arrow: {
     w: 14,
     h: 4,
@@ -389,6 +394,8 @@ const DEFS: Record<string, SpriteDef> = {
   icon_shovel: { w: 16, h: 16, paint: (c) => (poly(c, [10, 2, 12, 2, 6, 10, 4, 10], "#8a5a2b"), poly(c, [3, 9, 7, 9, 7, 13, 5, 15, 3, 13], "#b8c0c8")) },
   // Magic Powder: a small sack with sparkles.
   icon_magic_powder: { w: 16, h: 16, paint: (c) => (circle(c, 8, 10, 5, "#7a4fb5"), rect(c, 6, 4, 4, 3, "#7a4fb5"), rect(c, 6, 6, 4, 1, "#e8d070"), rect(c, 12, 2, 1, 1, "#fff6b0"), rect(c, 3, 3, 1, 1, "#fff6b0"), rect(c, 13, 6, 1, 1, "#fff6b0")) },
+  // Hookshot: a grey launcher with a hook and a bit of chain.
+  icon_hookshot: { w: 16, h: 16, paint: (c) => (rect(c, 2, 9, 7, 4, "#6a7280"), rect(c, 3, 13, 3, 2, "#8a5a2b"), rect(c, 8, 10, 2, 2, "#c8d0da"), rect(c, 10, 8, 2, 2, "#c8d0da"), poly(c, [12, 3, 15, 6, 13, 8, 11, 6], "#e0e6ee")) },
   icon_glove: { w: 16, h: 16, paint: (c) => (rect(c, 3, 6, 10, 8, "#c9a227"), rect(c, 3, 2, 2, 5, "#c9a227"), rect(c, 6, 1, 2, 5, "#c9a227"), rect(c, 9, 1, 2, 5, "#c9a227")) },
   icon_bomb: { w: 16, h: 16, paint: (c) => (circle(c, 8, 9, 6, "#1b1f3a"), circle(c, 6, 7, 2, "#5a6390"), rect(c, 8, 1, 1, 3, "#c9a24a"), rect(c, 9, 1, 1, 1, "#ff9a2e")) },
   icon_boomerang: { w: 16, h: 16, paint: (c) => poly(c, [2, 2, 14, 2, 14, 6, 6, 6, 6, 14, 2, 14], "#b5622b") },

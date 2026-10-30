@@ -102,3 +102,9 @@ Zelda: Create Door    Lock: Switch / rule   Height: 32
 ```js
 ZeldaMakerToolkit.createObject("block", 120, 80, { id: "b1", overrides: { pushDirections: ["up"], pushLimit: 1 } });
 ```
+
+## `hook_post` и `buried` (с 0.30–0.31)
+
+- `hook_post` — столб, за который цепляется крюк-кошка (`Create Object` → Type *hook_post*); твёрдый, ничем не разрушается.
+- `buried` — закопанный клад (`Create Chest` → *Buried*): невидим, лопата выкапывает его, ямка остаётся.
+
