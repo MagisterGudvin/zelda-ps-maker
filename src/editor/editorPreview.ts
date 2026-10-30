@@ -408,7 +408,13 @@ function draw(scene: any, sig: string, items: PreviewItem[], onClick: (ref: Acti
     if (!ref) return;
     bounds.set(ref.id, [...(bounds.get(ref.id) ?? []), b]);
     obj.setInteractive?.({ useHandCursor: true });
-    obj.on?.("pointerdown", () => onClick(ref));
+    // Only a press on the map itself: Phaser also reports presses on the page over the canvas (the
+    // UI designer's panel, PS Maker's own panels), which must not pick the picture under them.
+    obj.on?.("pointerdown", (pointer: any) => {
+      const target = pointer?.event?.target;
+      if (target && target !== scene.game?.canvas) return;
+      onClick(ref);
+    });
   };
   const label = (x: number, y: number, text: string, ref?: ActionRef) => {
     if (!text) return;

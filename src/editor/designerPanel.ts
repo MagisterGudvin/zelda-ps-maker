@@ -202,10 +202,16 @@ export class DesignerPanel {
     return b;
   }
 
-  /** Typing in a page part must not reach the editor's shortcuts. */
+  /**
+   * Typing in a page part must not reach the editor's shortcuts, and a press must not reach the map:
+   * Phaser listens for mouse presses on the whole window and takes one outside its canvas as a press
+   * at that point of the map, where the designer's panel or menu may cover an object (a slime, a
+   * chest) that would then be picked and opened.
+   */
   private guard(node: any): void {
-    for (const type of ["keydown", "keyup", "keypress"]) node.addEventListener(type, (e: any) => e.stopPropagation());
+    for (const type of ["keydown", "keyup", "keypress", "mousedown", "mouseup", "pointerdown", "pointerup", "touchstart", "touchend"]) node.addEventListener(type, (e: any) => e.stopPropagation());
   }
+
 
   show(): void {
     if (!this.doc?.body) return;
@@ -304,11 +310,12 @@ export class DesignerPanel {
         this.root.style.top = `${this.pos.top}px`;
       };
       const up = () => {
-        view?.removeEventListener("mousemove", move);
-        view?.removeEventListener("mouseup", up);
+        view?.removeEventListener("mousemove", move, true);
+        view?.removeEventListener("mouseup", up, true);
       };
-      view?.addEventListener("mousemove", move);
-      view?.addEventListener("mouseup", up);
+      // Capture: the panel stops presses from bubbling to the window (see guard).
+      view?.addEventListener("mousemove", move, true);
+      view?.addEventListener("mouseup", up, true);
       e.preventDefault();
     });
   }

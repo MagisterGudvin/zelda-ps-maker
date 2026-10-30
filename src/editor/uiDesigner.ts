@@ -656,6 +656,11 @@ export class UiDesigner {
   }
 
   private down(e: any): void {
+    // The middle button is the editor's (it pans the map). Any other press stays here: cancelling it
+    // also keeps the browser from sending the mouse press Phaser would take as a press on the map.
+    if (e.button === 1) return;
+    e.preventDefault();
+    e.stopPropagation();
     if (e.button !== 0) return;
     this.panel.closeMenu();
     if (!this.layout) {
@@ -663,8 +668,6 @@ export class UiDesigner {
       if (id && this.setup?.action) this.host.openAction(this.setup.action);
       return;
     }
-    e.preventDefault();
-    e.stopPropagation();
     this.overlay.setPointerCapture?.(e.pointerId);
     this.win.document.activeElement?.blur?.();
     const p = this.toLayout(e.clientX, e.clientY);
