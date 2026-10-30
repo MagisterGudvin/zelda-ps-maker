@@ -23,6 +23,7 @@ export const TYPE_ITEMS: readonly [ElementType, string][] = [
   ["button", "Button"],
   ["inventory", "Inventory grid"],
   ["choices", "Choice list"],
+  ["keybinds", "Key bindings"],
 ];
 const TYPE_LABELS = Object.fromEntries(TYPE_ITEMS) as Record<ElementType, string>;
 const ROTATABLE: readonly ElementType[] = ["image", "text", "icon"];
@@ -147,6 +148,15 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "selected", label: "Frame when selected", kind: "pic" },
     { path: "keyLabel", label: "Show its key", kind: "check" },
   ],
+  keybinds: [
+    { path: "font", label: "Font", kind: "font" },
+    { path: "size", label: "Size", kind: "num" },
+    { path: "color", label: "Colour", kind: "color" },
+    { path: "selectedColor", label: "Selected colour (empty = gold)", kind: "color" },
+    { path: "rowHeight", label: "Row height", kind: "num" },
+    { path: "keyColumn", label: "Key column at (% of width, 0 = hidden)", kind: "num" },
+    { path: "padColumn", label: "Gamepad column at (% of width, 0 = hidden)", kind: "num" },
+  ],
   choices: [
     { path: "font", label: "Font", kind: "font" },
     { path: "size", label: "Size", kind: "num" },
@@ -188,7 +198,7 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "slice", label: "Corner size (9-slice, 0 = stretch)", kind: "num" },
     { path: "color", label: "Colour without a picture", kind: "color" },
     { path: "hoverColor", label: "Colour when selected", kind: "color" },
-    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"]] },
+    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"], ["resetControls", "Reset the player's controls"]] },
     { path: "action.id", label: "Event", kind: "event" },
     { path: "action.id", label: "Screen", kind: "screen" },
     { path: "action.id", label: "Variable", kind: "var" },

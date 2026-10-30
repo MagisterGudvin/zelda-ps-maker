@@ -1,5 +1,5 @@
 import type { ToolkitConfig } from "../core/config.ts";
-import { HOTBAR_ACTIONS, INPUT_ACTIONS, type InputAction, type InputSource } from "./types.ts";
+import { HOTBAR_ACTIONS, INPUT_ACTIONS, type InputAction, type InputDevice, type InputSource } from "./types.ts";
 import type { Facing } from "../core/math.ts";
 
 /** Minimal event-emitter surface (Phaser's KeyboardPlugin / Game events). */
@@ -8,9 +8,8 @@ export interface EmitterLike {
   off(event: string, fn: (...args: any[]) => void, context?: unknown): unknown;
 }
 
-export interface GamepadLike {
-  buttons: { pressed: boolean }[];
-}
+/** PS Maker's names of the mouse buttons (features/controls: mouseButtonKeys), usable as keys. */
+export const MOUSE_CODES = ["MouseLeft", "MouseMiddle", "MouseRight"] as const;
 
 /**
  * Normalizes a binding or a KeyboardEvent.code: "x" -> "KeyX", "5" -> "Digit5",
@@ -60,11 +59,13 @@ export class KeyboardInput implements InputSource {
   private readonly isDownMap = new Map<InputAction, boolean>();
   private readonly pressedMap = new Map<InputAction, boolean>();
   private readonly releasedMap = new Map<InputAction, boolean>();
-  private readonly padPrev = new Map<InputAction, boolean>();
   private readonly keyboard: EmitterLike | null;
   private readonly blurSource: EmitterLike | null;
-  private readonly getPad: () => GamepadLike | null;
+  private readonly mouse: EmitterLike | null;
   private readonly config: ToolkitConfig;
+  /** The device the player used last (key prompts follow it); the gamepad bridge sets it too. */
+  device: InputDevice = { kind: "keyboard", family: "xbox" };
+  private capture: ((code: string) => void) | null = null;
 
   /** While PS Maker pauses the game (options or load menu), Phaser queues key events and delivers them after. */
   private pausedAt: number | null = null;
@@ -72,6 +73,16 @@ export class KeyboardInput implements InputSource {
 
   private readonly onDown = (event: KeyboardEvent) => {
     if (!event || typeof event.code !== "string") return;
+    // A real key (not one the gamepad bridge sent): the keyboard is the device now.
+    if (event.isTrusted !== false) {
+      if (this.device.kind !== "keyboard") this.device = { kind: "keyboard", family: this.device.family };
+      if (this.capture) {
+        const cb = this.capture;
+        this.capture = null;
+        cb(normalizeKey(event.code));
+        return;
+      }
+    }
     // A key pressed in the menu does not swing the sword once the menu closes.
     const t = typeof event.timeStamp === "number" ? event.timeStamp : -1;
     if (t >= 0 && (this.pausedAt !== null ? t >= this.pausedAt : t <= this.pausedUntil)) return;
@@ -112,14 +123,27 @@ export class KeyboardInput implements InputSource {
     this.pausedUntil = now();
   };
 
-  constructor(config: ToolkitConfig, keyboard: EmitterLike | null, blurSource: EmitterLike | null, getPad: () => GamepadLike | null) {
+  /** Mouse buttons are keys too ("MouseLeft", "MouseRight", "MouseMiddle"), as in PS Maker's controls. */
+  private readonly onPointerDown = (pointer: { button?: number; event?: { timeStamp?: number } }) => {
+    const code = MOUSE_CODES[pointer?.button ?? 0];
+    if (code) this.onDown({ code, timeStamp: pointer.event?.timeStamp ?? -1 } as KeyboardEvent);
+  };
+
+  private readonly onPointerUp = (pointer: { button?: number }) => {
+    const code = MOUSE_CODES[pointer?.button ?? 0];
+    if (code) this.onUp({ code } as KeyboardEvent);
+  };
+
+  constructor(config: ToolkitConfig, keyboard: EmitterLike | null, blurSource: EmitterLike | null, mouse: EmitterLike | null = null) {
     this.config = config;
     this.keyboard = keyboard;
     this.blurSource = blurSource;
-    this.getPad = getPad;
+    this.mouse = mouse;
     this.rebind();
     keyboard?.on("keydown", this.onDown);
     keyboard?.on("keyup", this.onUp);
+    mouse?.on("pointerdown", this.onPointerDown);
+    mouse?.on("pointerup", this.onPointerUp);
     blurSource?.on("blur", this.onBlur);
     blurSource?.on("pause", this.onPause);
     blurSource?.on("resume", this.onResume);
@@ -194,38 +218,23 @@ export class KeyboardInput implements InputSource {
     for (const code of this.pendingRelease) for (const a of this.bindings.get(code) ?? []) this.releasedMap.set(a, true);
     this.pendingPress.clear();
     this.pendingRelease.clear();
-    this.latchGamepad();
   }
 
-  private latchGamepad(): void {
-    const g = this.config.controls.gamepad;
-    if (!g.enabled) return;
-    const pad = this.getPad();
-    if (!pad || !pad.buttons) return;
-    const map: [InputAction, number][] = [
-      ["sword", g.sword],
-      ["useItem", g.useItem],
-      ["useItem2", g.useItem2],
-      ["shield", g.shield],
-      ["action", g.action],
-      ["nextItem", g.nextItem],
-      ["prevItem", g.prevItem],
-      ["inventory", g.inventory],
-      ["menu", g.menu],
-      // The standard gamepad's d-pad.
-      ["up", 12],
-      ["down", 13],
-      ["left", 14],
-      ["right", 15],
-    ];
-    for (const [action, index] of map) {
-      const now = !!pad.buttons[index]?.pressed;
-      const prev = this.padPrev.get(action) ?? false;
-      if (now) this.isDownMap.set(action, true);
-      if (now && !prev) this.pressedMap.set(action, true);
-      if (!now && prev) this.releasedMap.set(action, true);
-      this.padPrev.set(action, now);
-    }
+  /** The next real key or mouse button goes to `cb` instead of the game (rebinding a key); null cancels. */
+  captureNext(cb: ((code: string) => void) | null): void {
+    this.capture = cb;
+  }
+
+  /** True while the next key is being captured. */
+  get capturing(): boolean {
+    return this.capture !== null;
+  }
+
+  /** Any key bound to a toolkit action (for prompts): the action's keys, normalized. */
+  keysOf(action: InputAction): string[] {
+    const out: string[] = [];
+    for (const [code, actions] of this.bindings) if (actions.includes(action)) out.push(code);
+    return out;
   }
 
   isDown(action: InputAction): boolean {
@@ -253,6 +262,9 @@ export class KeyboardInput implements InputSource {
   dispose(): void {
     this.keyboard?.off("keydown", this.onDown);
     this.keyboard?.off("keyup", this.onUp);
+    this.mouse?.off("pointerdown", this.onPointerDown);
+    this.mouse?.off("pointerup", this.onPointerUp);
+    this.capture = null;
     this.blurSource?.off("blur", this.onBlur);
     this.blurSource?.off("pause", this.onPause);
     this.blurSource?.off("resume", this.onResume);

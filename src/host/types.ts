@@ -1,4 +1,5 @@
 import type { InventoryCell, LayoutValues, MinimapData, UiLayout } from "../ui/uiLayout.ts";
+import type { KeybindsData } from "./layoutPainter.ts";
 import type { AABB, Facing } from "../core/math.ts";
 
 /**
@@ -62,6 +63,10 @@ export interface HostAdapter {
   /** Moves the player sprite by a delta; collision was already checked by the toolkit. */
   movePlayerBy(dx: number, dy: number): void;
   setPlayerPosition(x: number, y: number): void;
+  /** Optional: the kind of the first connected gamepad, null when none is connected. */
+  padFamily?(): "xbox" | "playstation" | "nintendo" | null;
+  /** Optional: the next newly pressed gamepad button goes to `cb` (rebinding a button); null cancels. */
+  capturePadButton?(cb: ((button: number) => void) | null): void;
   /** Optional: draws the player this many pixels above the ground (a jump), with a shadow below; 0 = on the ground. */
   setPlayerHop?(height: number): void;
   /** Optional: the engine's walking speed times this factor (1 = the player's own speed). */
@@ -87,6 +92,12 @@ export const HOTBAR_ACTIONS: readonly HotbarAction[] = ["slot1", "slot2", "slot3
 /** Toolkit keys; "up"…"right" are the movement keys, read only by UI screens (PS Maker moves the player). */
 export type InputAction = "sword" | "useItem" | "useItem2" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | HotbarAction | "debug" | "diagnostics";
 
+/** The device the player used last, and the kind of pad (key prompts follow it). */
+export interface InputDevice {
+  kind: "keyboard" | "gamepad";
+  family: "xbox" | "playstation" | "nintendo";
+}
+
 export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", ...HOTBAR_ACTIONS, "debug", "diagnostics"];
 
 /**
@@ -100,6 +111,14 @@ export interface InputSource {
   released(action: InputAction): boolean;
   /** Clears held/pressed state (window blur, pause). */
   reset(): void;
+  /** Optional: the device used last (key prompts). */
+  device?: InputDevice;
+  /** Optional: the next real key or mouse button goes to `cb` (rebinding); null cancels. */
+  captureNext?(cb: ((code: string) => void) | null): void;
+  /** Optional: the keys bound to an action now. */
+  keysOf?(action: InputAction): string[];
+  /** Optional: rebuilds the key map from the configuration. */
+  rebind?(): void;
 }
 
 /** One layer of a player overlay: a frame of an author sprite sheet. */
@@ -190,7 +209,7 @@ export interface HudModel {
   /** A title screen is open: the HUD layout and its notes are hidden. */
   hudHidden: boolean;
   /** The open UI screen over the game (its selected button; an inventory screen's grid), or null. */
-  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null; choices: { items: string[]; cursor: number } | null } | null;
+  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null; choices: { items: string[]; cursor: number } | null; keybinds: KeybindsData | null } | null;
   /**
    * Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the
    * screen; then one notification layer per note, `stack` = its place (0 = the oldest), each drawn

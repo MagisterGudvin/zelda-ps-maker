@@ -46,6 +46,25 @@ import {
  */
 
 const DEPTH = 1_000_100;
+/** What a key bindings element shows in the editor (the toolkit's default keys, Xbox names). */
+const SAMPLE_KEYBINDS = {
+  rows: [
+    ["Sword", "X", "A"],
+    ["Item 1", "C", "X"],
+    ["Item 2", "B", "Y"],
+    ["Shield", "V", "RB"],
+    ["Action", "Z", "B"],
+    ["Next item", "E", "RT"],
+    ["Previous item", "Q", "LT"],
+    ["Items", "I", "Menu"],
+    ["Pause", "Esc", "View"],
+  ].map(([label, key, pad]) => ({ action: label, label, key, pad })),
+  row: 0,
+  col: 0,
+  waiting: false,
+  waitText: "Press...",
+};
+
 /** How the frame label names a screen's role. */
 const ROLE_NAMES: Record<string, string> = {
   none: "",
@@ -533,7 +552,7 @@ export class UiDesigner {
     const values = this.layout ? sampleValues(layout, st.start) : st.values;
     // Inventory grids show a few built-in item icons, the cursor on the bow (the sample {inv.name}).
     const inventory = { cells: ["sword", "bow", "bomb", "boomerang"].map((id) => ({ icon: layout.theme.icons[id] || `icon_${id}`, count: id === "bow" ? 30 : id === "bomb" ? 10 : null })), cursor: 1 };
-    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory, choices: { items: ["Yes", "No"], cursor: 0 } });
+    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory, choices: { items: ["Yes", "No"], cursor: 0 }, keybinds: SAMPLE_KEYBINDS });
     this.painter.end();
     const under = st.screen && layout.screen.role !== "title" ? st.under : null;
     if (under) this.underPainter.paint(under, sampleValues(under, st.start), this.fonts(under), { x: f.x, y: f.y, w: f.w, h: f.h, k: boardScale(st, under) });

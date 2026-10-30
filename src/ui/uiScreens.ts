@@ -1,5 +1,8 @@
 import type { Session } from "../core/session.ts";
-import { isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
+import { isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type KeybindsElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
+import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
+import { bindAction, resetPlayerControls } from "../core/playerControls.ts";
+import { keyLabel } from "./keyLabels.ts";
 
 /** A message shown in the message screen: its pages, the page on screen and when it began typing. */
 interface MessageState {
@@ -21,8 +24,10 @@ interface MessageState {
 interface Open {
   name: string;
   focus: string;
-  /** Inventory screens: the cell under the cursor. */
+  /** Inventory screens: the cell under the cursor; key bindings: the row (past the last row = the buttons). */
   cursor: number;
+  /** Key bindings: 0 = the key column, 1 = the gamepad column. */
+  col: number;
   message: MessageState | null;
 }
 
@@ -102,7 +107,7 @@ export class UiScreenSystem {
       return true;
     }
     if (this.current?.name === name) return true;
-    this.stack.push({ name, focus: this.buttons(layout)[0]?.id ?? "", cursor: this.startCursor(layout), message: null });
+    this.stack.push({ name, focus: this.buttons(layout)[0]?.id ?? "", cursor: this.startCursor(layout), col: 0, message: null });
     this.sound(layout.screen.soundOpen);
     this.changed(name, true);
     return true;
@@ -126,7 +131,7 @@ export class UiScreenSystem {
         this.s.hud?.markDirty();
         return;
       }
-      this.stack.push({ name, focus: "", cursor: 0, message });
+      this.stack.push({ name, focus: "", cursor: 0, col: 0, message });
       this.sound(layout.screen.soundOpen);
       this.changed(name, true);
     });
@@ -262,6 +267,28 @@ export class UiScreenSystem {
     const grid = this.grid(cur.layout);
     const ids = this.buttons(cur.layout).map((b) => b.id);
     if (!ids.includes(top.focus)) top.focus = ids[0] ?? "";
+    const kb = this.keybindsOf(cur.layout);
+    if (kb) {
+      if (this.binding) return;
+      // The rows first; down past the last row goes to the buttons, up from the buttons comes back.
+      const onRows = top.cursor < PAD_ACTIONS.length;
+      if (onRows) {
+        const cols = [kb.keyColumn > 0 ? 0 : -1, kb.padColumn > 0 ? 1 : -1].filter((c) => c >= 0);
+        if (!cols.includes(top.col)) top.col = cols[0] ?? 0;
+        if (input.pressed("up") && top.cursor > 0) this.moved(cur.layout, () => top.cursor--);
+        else if (input.pressed("down")) {
+          if (top.cursor < PAD_ACTIONS.length - 1) this.moved(cur.layout, () => top.cursor++);
+          else if (ids.length) this.moved(cur.layout, () => ((top.cursor = PAD_ACTIONS.length), (top.focus = ids[0])));
+        } else if ((input.pressed("left") || input.pressed("right")) && cols.length > 1) this.moved(cur.layout, () => (top.col = top.col === 0 ? 1 : 0));
+        if (input.pressed("action")) this.startBinding(top);
+        else if (role !== "title" && (input.pressed("sword") || input.pressed("inventory") || input.pressed("menu"))) this.close();
+        return;
+      }
+      if (input.pressed("up") && top.focus && nextButton(this.boxes(cur.layout), ids, top.focus, "up") === top.focus) {
+        this.moved(cur.layout, () => (top.cursor = PAD_ACTIONS.length - 1));
+        return;
+      }
+    }
     for (const dir of ["up", "down", "left", "right"] as const) {
       if (!input.pressed(dir)) continue;
       if (grid) {
@@ -279,6 +306,65 @@ export class UiScreenSystem {
     else if (input.pressed("action") && top.focus) this.press(top.focus);
     else if (role !== "title" && (input.pressed("sword") || input.pressed("inventory") || input.pressed("menu"))) this.close();
   }
+
+  /** The first key bindings element of a layout, or null. */
+  private keybindsOf(layout: UiLayout): KeybindsElement | null {
+    return layout.elements.find((e): e is KeybindsElement => e.type === "keybinds") ?? null;
+  }
+
+  /** Waiting for the player's new key (the key column) or gamepad button (the gamepad column). */
+  private binding: { action: PadAction; col: number; ms: number } | null = null;
+
+  /** What a key bindings element shows now (null: the open screen has none). */
+  keybindsView(): { rows: { action: string; label: string; key: string; pad: string }[]; row: number; col: number; waiting: boolean; waitText: string } | null {
+    const cur = this.current;
+    const top = this.stack.at(-1);
+    if (!cur || !top || !this.keybindsOf(cur.layout)) return null;
+    const c = this.s.config.controls;
+    const i18n = this.s.i18n;
+    const family = this.s.host.input.device?.kind === "gamepad" ? this.s.host.input.device.family : (this.s.host.padFamily?.() ?? this.s.host.input.device?.family ?? "xbox");
+    return {
+      rows: PAD_ACTIONS.map((a) => ({ action: a, label: i18n.t(`controls.${a}`), key: keyLabel(c[a][0], i18n), pad: padButtonLabel(c.gamepad[a], family) })),
+      row: top.cursor < PAD_ACTIONS.length ? top.cursor : -1,
+      col: top.col,
+      waiting: this.binding !== null,
+      waitText: i18n.t("controls.waiting"),
+    };
+  }
+
+  private startBinding(top: Open): void {
+    const action = PAD_ACTIONS[top.cursor];
+    if (!action) return;
+    const host = this.s.host;
+    this.binding = { action, col: top.col, ms: 0 };
+    this.sound(this.current?.layout.screen.soundPress ?? "");
+    const done = () => {
+      this.binding = null;
+      host.input.captureNext?.(null);
+      host.capturePadButton?.(null);
+      // The key just bound must not also act in this tick (open a menu, swing the sword).
+      host.input.reset();
+      this.s.hud?.markDirty();
+    };
+    if (top.col === 0) {
+      host.input.captureNext?.((code) => {
+        // Escape cancels (unless it is the pause key being set).
+        if (code !== "Escape" || action === "menu") bindAction(this.s.toolkit, action, { key: code });
+        done();
+      });
+    } else {
+      host.capturePadButton?.((button) => {
+        bindAction(this.s.toolkit, action, { button });
+        done();
+      });
+      // Any key cancels waiting for a pad button.
+      host.input.captureNext?.(() => done());
+    }
+    this.cancelBinding = done;
+    this.s.hud?.markDirty();
+  }
+
+  private cancelBinding: (() => void) | null = null;
 
   private moved(layout: UiLayout, apply: () => void): void {
     apply();
@@ -386,10 +472,15 @@ export class UiScreenSystem {
         if (!a.id || !this.s.host.setVariable?.(a.id, a.value)) this.s.logger.warnOnce(`var-${a.id}`, `Button "${id}": no project variable "${a.id}".`);
         this.s.hud?.markDirty();
         break;
+      case "resetControls":
+        resetPlayerControls(this.s.toolkit);
+        this.s.hud?.markDirty();
+        break;
     }
   }
 
   dispose(): void {
+    this.cancelBinding?.();
     this.offPointer();
     this.offMenuKeys();
     this.layerNames.length = 0;

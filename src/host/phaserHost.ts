@@ -3,7 +3,8 @@ import type { Logger } from "../core/logger.ts";
 import { type AABB, type Facing, makeBox, overlaps } from "../core/math.ts";
 import { SpatialHash } from "../core/spatialHash.ts";
 import type { DebugDraw, EntityView, HostAdapter, HudSink, OverlayLayer, Renderer, ViewSpec } from "./types.ts";
-import { KeyboardInput, type GamepadLike } from "./keyboardInput.ts";
+import { KeyboardInput } from "./keyboardInput.ts";
+import { GamepadBridge, gamepadMapping, padFamily, type PadSnapshot } from "./gamepadBridge.ts";
 import { resolveTexture } from "./textures.ts";
 import { ensureProjectFont } from "./projectFonts.ts";
 import { getHud } from "./phaserHud.ts";
@@ -326,6 +327,8 @@ class PhaserDebug implements DebugDraw {
  */
 export class PhaserHost implements HostAdapter, DepthSource {
   readonly input: KeyboardInput;
+  /** Gamepads → key events (PS Maker has no gamepad support of its own). */
+  private readonly pads: GamepadBridge;
   readonly renderer: Renderer;
   readonly hud: HudSink | null;
   readonly debug: PhaserDebug | null;
@@ -382,7 +385,17 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.logger = logger;
     const keyboard = this.scene?.input?.keyboard ?? null;
     if (!keyboard) logger.warn("Phaser keyboard plugin not available on the map scene: toolkit controls are disabled.");
-    this.input = new KeyboardInput(cfg, keyboard, this.game?.events ?? null, () => this.readPad());
+    const pointer = typeof this.scene?.input?.on === "function" ? this.scene.input : null;
+    this.input = new KeyboardInput(cfg, keyboard, this.game?.events ?? null, pointer);
+    this.pads = new GamepadBridge({
+      readPads: () => this.readPads(),
+      send: (type, code) => this.sendKey(type, code),
+      mapping: () => gamepadMapping(cfg, this.moveKeys()),
+      deadzone: () => cfg.controls.gamepad.deadzone,
+      onUse: (family) => (this.input.device = { kind: "gamepad", family }),
+    });
+    // A right-click bound to an action must not open the browser's menu over the game.
+    if (this.usesMouse("MouseRight")) this.scene?.input?.mouse?.disableContextMenu?.();
     const scene = this.scene;
     this.renderer = {
       createView: (spec: ViewSpec): EntityView => {
@@ -405,6 +418,8 @@ export class PhaserHost implements HostAdapter, DepthSource {
     const events = this.scene?.events;
     if (!events) throw new Error("Map scene has no event emitter; cannot attach the toolkit.");
     this.frameListener = (_time: number, delta: number) => {
+      // Pad buttons become key events now; the game reads them in the next frame, as real keys.
+      this.pads.poll();
       this.enforceLock();
       onFrame(delta);
       this.applyHop();
@@ -424,10 +439,54 @@ export class PhaserHost implements HostAdapter, DepthSource {
     if (player && player !== this.player) this.player = player;
   }
 
-  private readPad(): GamepadLike | null {
-    const gp = this.scene?.input?.gamepad;
-    if (!gp || !gp.total) return null;
-    return gp.pad1 ?? gp.getPad?.(0) ?? null;
+  /** Gamepads through the browser (navigator.getGamepads): every connected pad, standard mapping. */
+  private readPads(): PadSnapshot[] {
+    if (!this.cfg.controls.gamepad.enabled) return [];
+    const nav = (globalThis as { navigator?: { getGamepads?: () => (Gamepad | null)[] } }).navigator;
+    let list: (Gamepad | null)[] = [];
+    try {
+      list = nav?.getGamepads?.() ?? [];
+    } catch {
+      return [];
+    }
+    const out: PadSnapshot[] = [];
+    for (const g of list) if (g && g.connected !== false) out.push({ id: g.id, buttons: g.buttons.map((b) => b.pressed || b.value > 0.5), axes: g.axes });
+    return out;
+  }
+
+  /** PS Maker's movement keys for the d-pad and the stick: the first key of each project control (moveUp...). */
+  private moveKeys(): { up: string; down: string; left: string; right: string } {
+    const b = (this.psMakerStory() as { controls?: { bindings?: Record<string, string[]> } } | null)?.controls?.bindings ?? {};
+    return { up: b.moveUp?.[0] ?? "ArrowUp", down: b.moveDown?.[0] ?? "ArrowDown", left: b.moveLeft?.[0] ?? "ArrowLeft", right: b.moveRight?.[0] ?? "ArrowRight" };
+  }
+
+  /**
+   * A key event on the page, as a real key would send it: PS Maker, Phaser and the toolkit all read
+   * window key events. It starts at the page body and bubbles up to the window, as a real key does,
+   * so listeners that capture on the window (the toolkit taking Escape for its pause menu) run
+   * before the window's own ones (PS Maker's options menu); sent at the window itself, the
+   * browser ran PS Maker's listener first.
+   */
+  private sendKey(type: "keydown" | "keyup", code: string): void {
+    const g = globalThis as unknown as { document?: { body?: EventTarget | null }; dispatchEvent?: (e: Event) => boolean; KeyboardEvent?: typeof KeyboardEvent };
+    if (typeof g.KeyboardEvent !== "function") return;
+    const target: EventTarget | null = g.document?.body ?? (typeof g.dispatchEvent === "function" ? (g as unknown as EventTarget) : null);
+    target?.dispatchEvent(new g.KeyboardEvent(type, { code, key: keyOfCode(code), bubbles: true, cancelable: true }));
+  }
+
+  private usesMouse(code: string): boolean {
+    const c = this.cfg.controls;
+    return [c.sword, c.useItem, c.useItem2, c.shield, c.action, c.nextItem, c.prevItem, c.inventory, c.menu].some((keys) => keys.includes(code));
+  }
+
+  capturePadButton(cb: ((button: number) => void) | null): void {
+    this.pads.captureNext(cb);
+  }
+
+  /** The kind of the first connected pad, if any. */
+  padFamily(): ReturnType<typeof padFamily> | null {
+    const pad = this.readPads()[0];
+    return pad ? padFamily(pad.id) : null;
   }
 
   readPlayerBox(out: AABB): boolean {
@@ -1024,6 +1083,7 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
     this.frameListener = null;
     this.shutdownListener = null;
+    this.pads.releaseAll();
     this.input.dispose();
     this.setPlayerOverlay(null);
     for (const img of this.overlayImgs) img.destroy();
@@ -1044,3 +1104,12 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.solidColliderPlayer = null;
   }
 }
+
+/** The `key` value a real key event carries for a code (letters, digits, the named keys). */
+function keyOfCode(code: string): string {
+  const m = /^(?:Key|Digit)(.)$/.exec(code);
+  if (m) return m[1].toLowerCase();
+  const named: Record<string, string> = { Space: " ", Escape: "Escape", Enter: "Enter", ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight", Tab: "Tab", Backspace: "Backspace" };
+  return named[code] ?? code;
+}
+

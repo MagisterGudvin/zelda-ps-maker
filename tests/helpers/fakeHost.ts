@@ -1,3 +1,4 @@
+import type { InputDevice } from "../../src/host/types.ts";
 import type { AABB, Facing } from "../../src/core/math.ts";
 import { overlaps } from "../../src/core/math.ts";
 import type { DebugDraw, EntityView, HostAdapter, HudModel, HudSink, InputAction, InputSource, OverlayLayer, Renderer, ViewSpec } from "../../src/host/types.ts";
@@ -6,6 +7,22 @@ import type { Session } from "../../src/core/session.ts";
 
 /** Scriptable input: tests press/hold/release actions between ticks. */
 export class FakeInput implements InputSource {
+  /** The device used last, and a pending key capture (rebinding): tests call `captured(code)`. */
+  device: InputDevice = { kind: "keyboard", family: "xbox" };
+  capture: ((code: string) => void) | null = null;
+  captureNext(cb: ((code: string) => void) | null): void {
+    this.capture = cb;
+  }
+  /** A key pressed while one is being captured. */
+  captured(code: string): void {
+    const cb = this.capture;
+    this.capture = null;
+    cb?.(code);
+  }
+  rebinds = 0;
+  rebind(): void {
+    this.rebinds++;
+  }
   private readonly held = new Set<InputAction>();
   private readonly queuedPress = new Set<InputAction>();
   private readonly queuedRelease = new Set<InputAction>();
@@ -201,6 +218,16 @@ export class FakeHost implements HostAdapter {
   }
   describe(): string[] {
     return ["fake host"];
+  }
+  /** A pending gamepad button capture (rebinding): tests call `padCaptured(button)`. */
+  padCapture: ((button: number) => void) | null = null;
+  capturePadButton(cb: ((button: number) => void) | null): void {
+    this.padCapture = cb;
+  }
+  padCaptured(button: number): void {
+    const cb = this.padCapture;
+    this.padCapture = null;
+    cb?.(button);
   }
   /** How high the player is drawn (Roc's Feather) and the walking speed factor (shield up), as last set. */
   hop = 0;

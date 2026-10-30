@@ -41,6 +41,10 @@ export class Toolkit {
    * the toolkit's progress too.
    */
   progressVariable: string | null = null;
+  /** The project, for the player's own controls kept in the browser (its PS Maker story id). */
+  projectKey = "";
+  /** The project's controls (Start Toolkit, Set Controls) under the player's choices (playerControls.ts). */
+  projectControls: ToolkitConfig["controls"] | null = null;
   /** The HUD made in the designer (Zelda: UI Layout); null = the classic HUD. */
   hudLayout: UiLayout | null = null;
   /** Project font id → CSS family, for the fonts the layouts use. */

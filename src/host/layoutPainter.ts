@@ -70,6 +70,18 @@ export interface PaintOptions {
   inventory?: { cells: InventoryCell[]; cursor: number } | null;
   /** Choice lists: the answers and the selected one (none = the list is not drawn). */
   choices?: { items: string[]; cursor: number } | null;
+  /** Key bindings: a row per action (name, key, pad button), the selected cell, waiting for a new key. */
+  keybinds?: KeybindsData | null;
+}
+
+/** What a key bindings element shows (computed by the HUD). */
+export interface KeybindsData {
+  rows: { action: string; label: string; key: string; pad: string }[];
+  row: number;
+  /** 0 = the key column, 1 = the gamepad column. */
+  col: number;
+  waiting: boolean;
+  waitText: string;
 }
 
 /** What a paint produced: each shown element's box (layout pixels) and the size of the game window. */
@@ -255,6 +267,9 @@ export class LayoutPainter {
         return b;
       case "choices":
         this.choices(e, b, fonts, layout, opts.choices ?? null);
+        return b;
+      case "keybinds":
+        this.keybinds(e, b, fonts, layout, opts.keybinds ?? null, opts.time ?? 0);
         return b;
       case "button":
         this.button(e, b, values, fonts, layout, focused);
@@ -516,6 +531,34 @@ export class LayoutPainter {
       if (i !== (data?.cursor ?? -1)) continue;
       if (!this.picture(e.cursor, cell, "stretch")) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(cell.x) + this.k / 2, this.sy(cell.y) + this.k / 2, cell.w * this.k - this.k, cell.h * this.k - this.k);
     }
+  }
+
+  /** Key bindings: a row per action with its name, its key and its pad button; the selected cell framed in gold. */
+  private keybinds(e: Extract<UiElement, { type: "keybinds" }>, b: Box, fonts: Record<string, string>, layout: UiLayout, data: KeybindsData | null, time: number): void {
+    if (!data) return;
+    const family = fonts[e.font || layout.theme.font] ?? "monospace";
+    const color = e.color || layout.theme.textColor;
+    const gold = e.selectedColor || "#ffd23a";
+    data.rows.forEach((r, i) => {
+      const y = b.y + i * e.rowHeight;
+      if (y + e.rowHeight > b.y + b.h + 0.5) return;
+      const cells: [string, number, number][] = [[r.label, 0, -1]];
+      if (e.keyColumn > 0) cells.push([r.key, e.keyColumn, 0]);
+      if (e.padColumn > 0) cells.push([r.pad, e.padColumn, 1]);
+      for (const [text, at, col] of cells) {
+        const on = col >= 0 && i === data.row && col === data.col;
+        const waiting = on && data.waiting;
+        // Waiting for the new key: the cell blinks its prompt.
+        const shown = waiting ? (Math.floor(time / 300) % 2 === 0 ? data.waitText : "") : text;
+        const x = b.x + (b.w * at) / 100;
+        const t = this.text(shown, family, e.size, on ? gold : color);
+        t.setPosition(Math.round(this.sx(x + 2)), Math.round(this.sy(y + (e.rowHeight - t.height / this.k) / 2)));
+        if (on) {
+          const right = col === 0 && e.padColumn > e.keyColumn ? (b.w * e.padColumn) / 100 : b.w;
+          this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(x) + this.k / 2, this.sy(y) + this.k / 2, (right - (b.w * at) / 100) * this.k - this.k * 2, e.rowHeight * this.k - this.k);
+        }
+      }
+    });
   }
 
   /** The answers of a dialogue, one row each from the top of the box; the selected one marked. */

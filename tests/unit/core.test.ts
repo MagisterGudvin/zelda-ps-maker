@@ -111,7 +111,7 @@ test("keyboard input latches taps between ticks and maps friendly key names", ()
   const kb = new FakeEmitter();
   const cfg = createDefaultConfig();
   cfg.controls.sword = ["x"];
-  const input = new KeyboardInput(cfg, kb, null, () => null);
+  const input = new KeyboardInput(cfg, kb, null);
   kb.emit("keydown", { code: "KeyX" });
   kb.emit("keyup", { code: "KeyX" });
   input.latch();
@@ -164,7 +164,7 @@ test("keys pressed while PS Maker pauses the game (options menu) do nothing afte
   const game = new FakeEmitter();
   const cfg = createDefaultConfig();
   cfg.controls.sword = ["x"];
-  const input = new KeyboardInput(cfg, kb, game, () => null);
+  const input = new KeyboardInput(cfg, kb, game);
   const t0 = performance.now();
   game.emit("pause");
   const inMenu = performance.now();
@@ -184,7 +184,7 @@ test("keys pressed while PS Maker pauses the game (options menu) do nothing afte
 
 test("held movement keys give a facing hint (facing a wall without moving)", () => {
   const kb = new FakeEmitter();
-  const input = new KeyboardInput(createDefaultConfig(), kb, null, () => null);
+  const input = new KeyboardInput(createDefaultConfig(), kb, null);
   assert.equal(input.directionHint("down"), null);
   kb.emit("keydown", { code: "ArrowUp" });
   assert.equal(input.directionHint("down"), "up");

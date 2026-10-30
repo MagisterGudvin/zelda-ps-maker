@@ -697,6 +697,73 @@ await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker'
   expect(closed.screen === null && !closed.paused && !optionsAtEnd, `closed ${JSON.stringify(closed)}, options ${optionsAtEnd}`);
   return "Escape → pause → Settings → PS Maker options (saved) → Escape → pause → Escape → game";
 });
+await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick walks the player through PS Maker's own movement, A swings the sword, View opens the pause menu; the Controls screen rebinds the sword key, Reset brings X back", async () => {
+  const body = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return { x: b.center.x, y: b.center.y }; });
+  await tp(130, 64);
+  await wait(300);
+  await ev(() => {
+    const mk = (n) => Array.from({ length: n }, () => ({ pressed: false, value: 0 }));
+    window.__pad = { id: "Xbox 360 Controller (XInput STANDARD GAMEPAD)", connected: true, buttons: mk(17), axes: [0, 0, 0, 0] };
+    navigator.getGamepads = () => [window.__pad];
+  });
+  const a0 = await body();
+  await ev(() => (window.__pad.axes = [1, 0, 0, 0]));
+  await wait(500);
+  await ev(() => (window.__pad.axes = [0, 0, 0, 0]));
+  await wait(200);
+  const a1 = await body();
+  const setButton = (i, on) => ev(([i, on]) => (window.__pad.buttons[i] = { pressed: on, value: on ? 1 : 0 }), [i, on]);
+  await setButton(0, true);
+  let swung = false;
+  for (let i = 0; i < 12 && !swung; i++) {
+    await wait(30);
+    swung = await ev(() => window.ZeldaMakerToolkit.session.sword.isAttacking());
+  }
+  await setButton(0, false);
+  await wait(400);
+  await setButton(8, true);
+  await wait(150);
+  await setButton(8, false);
+  await wait(300);
+  const paused = await screenNow();
+  const options = await button("Save game").isVisible();
+  await ev(() => (navigator.getGamepads = () => []));
+  await wait(100);
+  // Controls: the last button of the pause menu.
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(150);
+  }
+  await page.keyboard.press("z");
+  await wait(400);
+  const opened = await screenNow();
+  await page.screenshot({ path: path.join(OUT, "controls.png") });
+  await page.keyboard.press("z");
+  await wait(300);
+  await page.keyboard.press("j");
+  await wait(400);
+  const rebound = await ev(() => window.ZeldaMakerToolkit.toolkit.config.controls.sword[0]);
+  for (let i = 0; i < 9; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(120);
+  }
+  const focus = (await screenNow()).focus;
+  await page.keyboard.press("z");
+  await wait(300);
+  const reset = await ev(() => window.ZeldaMakerToolkit.toolkit.config.controls.sword[0]);
+  await page.keyboard.press("Escape");
+  await wait(300);
+  await page.keyboard.press("Escape");
+  await wait(400);
+  const closed = await screenNow();
+  expect(a1.x - a0.x > 20, `the stick moved the player ${a1.x - a0.x}`);
+  expect(swung, "A did not swing the sword");
+  expect(paused.screen === "pause" && !options, `View: ${JSON.stringify(paused)}, PS Maker options ${options}`);
+  expect(opened.screen === "controls", `controls ${JSON.stringify(opened)}`);
+  expect(rebound === "KeyJ" && focus === "reset" && reset === "KeyX", `rebound ${rebound}, focus ${focus}, reset ${reset}`);
+  expect(closed.screen === null, `closed ${JSON.stringify(closed)}`);
+  return `stick → ${Math.round(a1.x - a0.x)} px, A → sword, View → pause; Controls: sword X → J → Reset → X`;
+});
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
   await ev(() => (window.ZeldaMakerToolkit.toolkit.config.world.fixedStepHz = 15));

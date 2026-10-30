@@ -195,7 +195,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
   // The HUD and the pause screen are on the first map only; the dungeon uses them from the project.
   const shared = projectUi(story);
   assert.equal(shared.hud?.mapId, story.maps[0].id);
-  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "message", "inventory", "dialogue", "notification", "title"]);
+  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "controls", "message", "inventory", "dialogue", "notification", "title"]);
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
     assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
@@ -226,6 +226,11 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     const note = screenOf("notification");
     assert.equal(note.screen.role, "notification");
     assert.ok(note.elements.some((e) => e.type === "text" && e.text === "{note}"));
+    // The player's controls screen, opened from the pause menu: key bindings, Reset, Back.
+    const controls = screenOf("controls");
+    assert.ok(controls.elements.some((e) => e.type === "keybinds"));
+    assert.ok(controls.elements.some((e) => e.type === "button" && e.action.kind === "resetControls"));
+    assert.ok(screenOf("pause").elements.some((e) => e.type === "button" && e.action.kind === "open" && e.action.id === "controls"));
     // The pause screen (Escape): its buttons run project events that exist.
     const screen = screenOf("pause");
     assert.ok(screen.screen.role === "menu" && screen.screen.pause);

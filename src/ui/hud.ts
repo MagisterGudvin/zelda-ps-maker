@@ -1,5 +1,7 @@
 import type { Session } from "../core/session.ts";
 import type { HudItemSlot, HudModel } from "../host/types.ts";
+import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
+import { keyLabel } from "./keyLabels.ts";
 import { classicLayout, isShown, layoutBindings, type LayoutValues, type MinimapData, type UiLayout } from "./uiLayout.ts";
 
 const MAX_MESSAGES = 3;
@@ -47,6 +49,12 @@ export class HudSystem {
     const live = this.liveness();
     this.ticks++;
     if ((live.effects && this.effectShown()) || (live.minimap && this.ticks % 3 === 0) || (live.vars && this.ticks % 15 === 0)) this.dirty = true;
+    // Key prompts follow the device the player used last.
+    const device = s0(this.s.host.input.device);
+    if (device !== this.deviceSeen) {
+      this.deviceSeen = device;
+      this.dirty = true;
+    }
     if (this.messages.length > 0) {
       for (const m of this.messages) m.remainingMs -= dtMs;
       while (this.messages.length > 0 && this.messages[0].remainingMs <= 0) this.messages.shift();
@@ -58,6 +66,7 @@ export class HudSystem {
   }
 
   private ticks = 0;
+  private deviceSeen = "";
 
   private readonly live = new WeakMap<UiLayout, { vars: boolean; effects: boolean; minimap: boolean }>();
 
@@ -130,6 +139,7 @@ export class HudSystem {
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
       else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
       else if (key === "item.count") out[key] = s.statValue("itemCount");
+      else if (key.startsWith("key:")) out[key] = this.keyPrompt(key.slice(4));
       else if (key === "item2.icon" || key === "item2.count") {
         const id = st.inventory.secondItem;
         out[key] = !id || !s.feature("inventory") ? "" : key === "item2.icon" ? this.iconOf(id, layout) : (this.countOf(id) ?? "");
@@ -157,6 +167,21 @@ export class HudSystem {
   private notification(): { name: string; layout: UiLayout } | null {
     for (const [name, layout] of this.s.toolkit.uiScreens) if (layout.screen.role === "notification") return { name, layout };
     return null;
+  }
+
+  /**
+   * A key prompt ({key:sword}): the key bound to a toolkit action, or its gamepad button — named the
+   * Xbox, PlayStation or Nintendo way — when the gamepad was used last. Directions: up, down, left, right.
+   */
+  private keyPrompt(action: string): string {
+    const s = this.s;
+    const c = s.config.controls;
+    const device = s.host.input.device;
+    const dirs: Record<string, [string[], number]> = { up: [c.move.up, 12], down: [c.move.down, 13], left: [c.move.left, 14], right: [c.move.right, 15] };
+    const own = (PAD_ACTIONS as readonly string[]).includes(action) ? ([c[action as PadAction], c.gamepad[action as PadAction]] as [string[], number]) : dirs[action];
+    if (!own) return "";
+    if (device?.kind === "gamepad") return padButtonLabel(own[1], device.family);
+    return keyLabel(own[0][0], s.i18n);
   }
 
   /** The ammunition count an item shows (bombs, arrows), or null. */
@@ -209,7 +234,9 @@ export class HudSystem {
         const inventory = grid ? { cells: s.screens!.gridItems().map((id) => ({ icon: this.iconOf(id, cur.layout), count: this.countOf(id) })), cursor: cur.cursor } : null;
         const view = s.screens!.messageView();
         const choices = view.choices.length ? { items: view.choices, cursor: view.choice } : null;
-        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus, inventory, choices };
+        const keybinds = s.screens!.keybindsView();
+        // While a key bindings row is selected no button is.
+        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: keybinds && keybinds.row >= 0 ? "" : cur.focus, inventory, choices, keybinds };
       })(),
       layers: [
         ...(s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
@@ -227,3 +254,6 @@ export class HudSystem {
     this.s.host.hud?.setVisible(false);
   }
 }
+
+const s0 = (d: { kind: string; family: string } | undefined) => (d ? `${d.kind}/${d.family}` : "");
+

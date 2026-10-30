@@ -143,8 +143,13 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("difficulty"), `${p.hearts ?? 3} hearts`, `sword ${p.swordDamage ?? 2}`]),
   },
   "Zelda: Set Controls": {
-    keywords: ["keys", "controls", "keyboard", "bindings", "input", "gamepad"],
-    preview: (p) => join(["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu"].map((k) => set(p[k]) && k)),
+    keywords: ["keys", "controls", "keyboard", "bindings", "input", "gamepad", "controller", "joystick", "mouse"],
+    fields: Object.fromEntries([
+      ...["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu"].map((a) => [`pad_${a}`, { group: "Gamepad" }]),
+      ...[1, 2, 3, 4].flatMap((n) => [[`padButton${n}`, { group: "Gamepad: extra buttons" }], [`padKey${n}`, { group: "Gamepad: extra buttons" }]]),
+    ]),
+    collapsed: ["Gamepad", "Gamepad: extra buttons"],
+    preview: (p) => join(["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu"].map((k) => set(p[k]) && k)),
   },
   "Zelda: Stop Toolkit": { keywords: ["stop", "disable", "shutdown"] },
   "Zelda: Pause Combat": {

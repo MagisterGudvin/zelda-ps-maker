@@ -230,7 +230,8 @@ await check("map transfer (the map sleeps and wakes up, as in PS Maker) does not
   // Arcade Physics' own POST_UPDATE listener + exactly one toolkit frame listener.
   assert(d2.postupdate === 2, `postupdate listeners ${d2.postupdate}`);
   assert(d2.keydown === 1, `keydown listeners ${d2.keydown}`);
-  assert(d2.pointerdown === 1, `pointerdown listeners ${d2.pointerdown}`);
+  // The debug click (F9) and mouse buttons as keys (MouseLeft, MouseRight).
+  assert(d2.pointerdown === 2, `pointerdown listeners ${d2.pointerdown}`);
   return JSON.stringify(d2);
 });
 
@@ -793,6 +794,29 @@ await check("Roc's Feather: B jumps — the sprite is drawn above its body with 
   assert(!after.airborne && Math.abs(after.offset - after.base) < 0.5, JSON.stringify(after));
   assert(dashing && Math.abs(x1 - x0) > 20, `dash ${dashing}, moved ${x1 - x0}`);
   return `drawn ${(mid.lift - after.base).toFixed(1)} px up, shadow, back on the ground; dash ${Math.round(Math.abs(x1 - x0))} px`;
+});
+
+await check("gamepad through the browser's Gamepad API (no Phaser plugin): A swings the sword, the device turns to the gamepad (PlayStation pad: its names)", async () => {
+  await teleport(60, 160);
+  await ev(() => {
+    const mk = (n) => Array.from({ length: n }, () => ({ pressed: false, value: 0 }));
+    window.__pad = { id: "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)", connected: true, buttons: mk(17), axes: [0, 0, 0, 0] };
+    navigator.getGamepads = () => [window.__pad];
+  });
+  await sleep(100);
+  await ev(() => (window.__pad.buttons[0] = { pressed: true, value: 1 }));
+  let swung = false;
+  for (let i = 0; i < 10 && !swung; i++) {
+    await sleep(30);
+    swung = await ev(() => window.ZeldaMakerToolkit.session.sword.isAttacking());
+  }
+  await ev(() => (window.__pad.buttons[0] = { pressed: false, value: 0 }));
+  await sleep(400);
+  const device = await ev(() => window.ZeldaMakerToolkit.session.host.input.device);
+  await ev(() => (navigator.getGamepads = () => []));
+  assert(swung, "A did not swing the sword");
+  assert(device.kind === "gamepad" && device.family === "playstation", JSON.stringify(device));
+  return `A → sword swing; device ${device.kind} (${device.family})`;
 });
 
 await check("no page errors or console errors", async () => {

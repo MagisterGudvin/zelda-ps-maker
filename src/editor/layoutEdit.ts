@@ -243,6 +243,7 @@ const NEW: Record<ElementType, Raw> = {
   button: { w: 72, h: 16, text: "Button", anchor: "c" },
   inventory: { w: 130, h: 42, cols: 6, cell: 20, gap: 2, anchor: "c" },
   choices: { w: 96, h: 46, rowHeight: 14, gap: 2, anchor: "c" },
+  keybinds: { w: 160, h: 99, rowHeight: 11, anchor: "c" },
 };
 
 /** A new element of a type with its defaults, its top-left at a point of the game window (view size for its anchor). */

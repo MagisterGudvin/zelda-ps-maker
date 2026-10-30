@@ -15,6 +15,7 @@ import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession }
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
 import { layoutKind, useLayoutFonts } from "./projectUi.ts";
+import { applyPlayerControls, rememberProjectControls } from "../core/playerControls.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
@@ -274,6 +275,11 @@ const startToolkit = defineEvent({
         "Start Toolkit",
       );
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
+      // The player's own keys and buttons (a key bindings screen) lie over the project's controls.
+      const story = (ctx as { scene?: { story?: { metadata?: { storyId?: string }; storyName?: string } } } | undefined)?.scene?.story;
+      tk.projectKey = story?.metadata?.storyId || story?.storyName || tk.projectKey;
+      rememberProjectControls(tk);
+      applyPlayerControls(tk);
       if (has("progressVariable")) tk.progressVariable = textOf(old.progressVariable) || null;
       // The map is remembered by its PS Maker map id (scene key); a Map ID typed in older versions still wins.
       const mapId = textOf(old.mapId) || undefined;
@@ -293,6 +299,12 @@ const startToolkit = defineEvent({
 });
 
 const CONTROL_ACTIONS = ["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu"] as const;
+const CONTROL_LABELS: Record<(typeof CONTROL_ACTIONS)[number], string> = { sword: "Sword", useItem: "Use item", useItem2: "Use item 2", shield: "Shield", action: "Action", nextItem: "Next item", prevItem: "Previous item", inventory: "Inventory", menu: "Menu" };
+/** Buttons of the standard gamepad layout, with their Xbox / PlayStation / Nintendo names. */
+const PAD_BUTTON_OPTIONS: [string, string][] = [
+  ["", "Keep"],
+  ...["A / Cross / B", "B / Circle / A", "X / Square / Y", "Y / Triangle / X", "LB / L1 / L", "RB / R1 / R", "LT / L2 / ZL", "RT / R2 / ZR", "View / Share / Minus", "Menu / Options / Plus", "Left stick press", "Right stick press", "D-pad up", "D-pad down", "D-pad left", "D-pad right"].map((label, i): [string, string] => [String(i), `${i}: ${label}`]),
+];
 
 const setControls = defineEvent({
   name: "Zelda: Set Controls",
@@ -307,6 +319,13 @@ const setControls = defineEvent({
     prevItem: keys("Previous item", "Default: Q."),
     inventory: keys("Inventory", "Default: I."),
     menu: keys("Menu", "Opens and closes the pause menu (UI screen with the role Menu). Default: Escape (PS Maker's options menu opens from the pause menu's Settings button then)."),
+    ...Object.fromEntries(CONTROL_ACTIONS.map((a) => [`pad_${a}`, choice(`Gamepad: ${CONTROL_LABELS[a]}`, "Gamepad button for it (standard layout; Xbox / PlayStation / Nintendo names). Keep = no change. / Кнопка геймпада.", PAD_BUTTON_OPTIONS, "")])),
+    ...Object.fromEntries(
+      [1, 2, 3, 4].flatMap((n) => [
+        [`padButton${n}`, choice(`Extra gamepad button ${n}`, "A pad button that presses the key below: PS Maker's keyboard triggers (Add event trigger → Keyboard) and custom controls then work on the pad too. / Кнопка геймпада, нажимающая клавишу.", PAD_BUTTON_OPTIONS, "")],
+        [`padKey${n}`, keys(`Key it presses ${n}`, "The key the extra button presses. / Клавиша.")],
+      ]),
+    ),
   },
   execute(params, ctx) {
     run("Zelda: Set Controls", ctx, params, (s, tk) => {
@@ -315,7 +334,26 @@ const setControls = defineEvent({
         const k = keysOf(s, (params as Record<string, unknown>)[a]);
         if (k.length) controls[a] = k;
       }
-      tk.configure({ controls }, "Set Controls");
+      const p = params as Record<string, unknown>;
+      // Gamepad: a button per toolkit action ("" = keep), and extra pad buttons that press a key.
+      const gamepad: Record<string, unknown> = {};
+      for (const a of CONTROL_ACTIONS) {
+        const b = textOf(p[`pad_${a}`]);
+        if (b !== "") gamepad[a] = Number(b);
+      }
+      const extra = [1, 2, 3, 4].flatMap((n) => {
+        const b = textOf(p[`padButton${n}`]);
+        const k = keysOf(s, p[`padKey${n}`])[0];
+        return b !== "" && k ? [{ button: Number(b), key: k }] : [];
+      });
+      if (extra.length) gamepad.extra = extra;
+      // The project's controls change; the player's own choices stay on top of them.
+      const base = (tk.projectControls ?? JSON.parse(JSON.stringify(tk.config.controls))) as Record<string, unknown>;
+      Object.assign(base, controls);
+      if (Object.keys(gamepad).length) base.gamepad = { ...(base.gamepad as object), ...gamepad };
+      tk.projectControls = base as typeof tk.projectControls;
+      tk.configure({ controls: JSON.parse(JSON.stringify(base)) }, "Set Controls");
+      applyPlayerControls(tk);
       (s.host.input as { rebind?: () => void }).rebind?.();
     });
   },

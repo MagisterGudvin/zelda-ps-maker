@@ -170,11 +170,28 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     theme: hudLayout.theme,
     screen: screen("menu"),
     elements: [
-      { id: "panel", type: "image", x: -60, y: -50, w: 120, h: 100, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
-      { id: "title", type: "text", x: -60, y: -43, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
-      button("continue", "Continue", -26, { kind: "close", id: "" }),
-      button("settings", "Settings", -4, { kind: "event", id: "zelda-pause-settings" }),
-      button("mainMenu", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
+      { id: "panel", type: "image", x: -60, y: -61, w: 120, h: 122, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -60, y: -54, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
+      button("continue", "Continue", -37, { kind: "close", id: "" }),
+      button("settings", "Settings", -15, { kind: "event", id: "zelda-pause-settings" }),
+      button("mainMenu", "Main menu", 7, { kind: "event", id: "zelda-pause-title" }),
+      button("controls", "Controls", 29, { kind: "open", id: "controls" }),
+    ],
+  };
+  // The player's own keys and gamepad buttons (opened from the pause menu).
+  const controlsLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("none"),
+    elements: [
+      { id: "panel", type: "image", x: -95, y: -80, w: 190, h: 160, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -95, y: -73, w: 190, h: 10, anchor: "c", show: always, text: "{t:controls.title}", font: "", size: 9, color: "", align: "center" },
+      { id: "keyboard", type: "text", x: -2, y: -60, w: 40, h: 8, anchor: "c", show: always, text: "{t:controls.keyboard}", font: "", size: 6, color: "#c8b88a", align: "left" },
+      { id: "gamepad", type: "text", x: 45, y: -60, w: 40, h: 8, anchor: "c", show: always, text: "{t:controls.gamepad}", font: "", size: 6, color: "#c8b88a", align: "left" },
+      { id: "keys", type: "keybinds", x: -85, y: -51, w: 170, h: 99, anchor: "c", show: always, font: "", size: 7, color: "", selectedColor: "", rowHeight: 11, keyColumn: 49, padColumn: 77 },
+      { ...button("reset", "Reset", 54, { kind: "resetControls", id: "" }), x: -88, w: 84 },
+      { ...button("back", "Back", 54, { kind: "close", id: "" }), x: 4, w: 84 },
     ],
   };
   // The message box: signs and items received, typed out on the panel at the bottom; a blinking
@@ -374,6 +391,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
         if (key === Object.keys(maps)[0]) {
           zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "controls", layout: JSON.stringify(controlsLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "message", layout: JSON.stringify(messageLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "inventory", layout: JSON.stringify(inventoryLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "dialogue", layout: JSON.stringify(dialogueLayout) }));

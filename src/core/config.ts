@@ -83,6 +83,10 @@ export interface ToolkitConfig {
       prevItem: number;
       inventory: number;
       menu: number;
+      /** Any pad button pressing a key: PS Maker's keyboard triggers and custom controls then work on the pad. */
+      extra: { button: number; key: string }[];
+      /** How far the left stick must lean to count as a direction (0-1). */
+      deadzone: number;
     };
   };
   player: {
@@ -330,7 +334,7 @@ export function createDefaultConfig(): ToolkitConfig {
       menu: ["Escape"],
       hotbar: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"],
       move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
-      gamepad: { enabled: true, sword: 0, useItem: 2, useItem2: 3, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
+      gamepad: { enabled: true, sword: 0, useItem: 2, useItem2: 3, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8, extra: [], deadzone: 0.5 },
     },
     player: {
       heartValue: 2,

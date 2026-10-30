@@ -27,8 +27,8 @@ export interface Visibility {
   hideInDialogue?: boolean;
 }
 
-export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button" | "inventory" | "choices";
-export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button", "inventory", "choices"];
+export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button" | "inventory" | "choices" | "keybinds";
+export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button", "inventory", "choices", "keybinds"];
 
 /** A looping effect on an element while it shows. */
 export type Effect = "none" | "blink" | "pulse" | "bob" | "shake";
@@ -171,13 +171,13 @@ export interface MinimapElement extends Base {
 
 /** What a button does: run a PS Maker event, open or close a screen, set a project variable. */
 export interface ButtonAction {
-  kind: "none" | "event" | "open" | "close" | "variable";
+  kind: "none" | "event" | "open" | "close" | "variable" | "resetControls";
   /** Event id, screen name or variable id. */
   id: string;
   /** The variable's new value. */
   value: string;
 }
-export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable"];
+export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable", "resetControls"];
 
 /**
  * A button of a screen: a picture (another one while it is selected) or a colour, and a text.
@@ -234,7 +234,24 @@ export interface ChoicesElement extends Base {
   marker: string;
 }
 
-export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement | InventoryElement | ChoicesElement;
+/**
+ * The player's key bindings (a controls screen): a row per toolkit action with its key and its
+ * gamepad button. Arrows choose a row and a column, the action key waits for the new key or button.
+ */
+export interface KeybindsElement extends Base {
+  type: "keybinds";
+  font: string;
+  size: number;
+  color: string;
+  /** Colour of the selected key or button ("" = gold). */
+  selectedColor: string;
+  rowHeight: number;
+  /** Where the key column and the gamepad column start (percent of the width; 0 = the column is not shown). */
+  keyColumn: number;
+  padColumn: number;
+}
+
+export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement | InventoryElement | ChoicesElement | KeybindsElement;
 
 /** Look of things the toolkit draws around the layout (inventory panel, item icons, notes). */
 export interface LayoutTheme {
@@ -398,6 +415,8 @@ export function readElement(v: unknown, index = 0): UiElement | null {
         enemyColor: str(v.enemyColor, "#ffd23a"),
         objectColor: str(v.objectColor, "#5ad8ff"),
       };
+    case "keybinds":
+      return { ...base, type, font: str(v.font), size: Math.max(1, num(v.size, 7)), color: str(v.color), selectedColor: str(v.selectedColor), rowHeight: int(v.rowHeight, 11, 4), keyColumn: int(v.keyColumn, 55, 0, 100), padColumn: int(v.padColumn, 80, 0, 100) };
     case "choices":
       return { ...base, type, font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), selectedColor: str(v.selectedColor), rowHeight: int(v.rowHeight, 14, 4), gap: int(v.gap, 2, 0), image: str(v.image), selected: str(v.selected), slice: int(v.slice, 0, 0), marker: str(v.marker, "> ") };
     case "inventory":
