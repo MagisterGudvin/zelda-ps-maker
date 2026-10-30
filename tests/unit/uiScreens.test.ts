@@ -28,7 +28,7 @@ test("a button: its action and looks are read like every element; defaults for t
   assert.deepEqual([b.slice, b.size, b.color], [4, 8, "#1f1a24e6"]);
   assert.equal((readElement({ type: "button", action: { kind: "explode" } }) as any).action.kind, "none");
   const L = parseLayout('{"elements": []}').layout!;
-  assert.deepEqual(L.screen, { pause: true, dim: "#00000080", menuKey: false }, "screen defaults");
+  assert.deepEqual(L.screen, { input: true, pause: true, dim: "#00000080", menuKey: false, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" }, "screen defaults");
 });
 
 test("selection moves to the nearest button that way, and stays at the edge", () => {
@@ -147,4 +147,40 @@ test("Open UI Screen and Close UI Screen actions; an unknown screen is reported 
   assert.equal(tk.hudLayout, null);
   assert.ok(tk.uiScreens.has("pause"));
   resetToolkitForTests();
+});
+
+/** The open screen's name (a call, so a test can check it again after an earlier check narrowed it). */
+const topScreen = (r: ReturnType<typeof createRig>) => r.session.screens!.current?.name ?? null;
+
+test("a screen that does not take the keys is a layer: the game plays on, keys go to the game, closed by name", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("boss", parseLayout(JSON.stringify({ v: 1, screen: { input: false }, elements: [{ id: "hp", type: "bar" }] })).layout!);
+  r.tk.uiScreens.set("pause", pauseMenu());
+  r.session.screens!.open("boss");
+  r.step();
+  assert.ok(!r.session.isPaused());
+  assert.equal(r.session.screens!.current, null, "not the open screen");
+  assert.deepEqual(r.host.hud.last!.layers.map((l) => l.name), ["boss"]);
+  r.host.input.tap("menu");
+  r.step();
+  assert.equal(topScreen(r), "pause", "the menu opens over the layer");
+  r.session.screens!.close();
+  r.session.screens!.close(false, "pause");
+  assert.deepEqual(r.session.screens!.layers.map((l) => l.name), ["boss"], "closing the top screen leaves the layer");
+  r.session.screens!.close(false, "boss");
+  r.step();
+  assert.deepEqual(r.host.hud.last!.layers, []);
+});
+
+test("screen sounds: opens, selection moves, button pressed, closes", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("pause", pauseMenu({ soundOpen: "s-open", soundMove: "s-move", soundPress: "s-press", soundClose: "s-close" }));
+  r.session.screens!.open("pause");
+  r.host.input.tap("down");
+  r.step();
+  r.host.input.tap("up");
+  r.step();
+  r.host.input.tap("action");
+  r.step();
+  assert.deepEqual(r.host.sounds.map((s) => s.src), ["s-open", "s-move", "s-move", "s-press", "s-close"]);
 });

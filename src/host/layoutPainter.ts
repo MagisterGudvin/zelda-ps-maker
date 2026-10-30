@@ -1,7 +1,23 @@
 import { resolveTexture } from "./textures.ts";
-import { anchorPoint, isShown, textWithValues, type Box, type LayoutValues, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
+import {
+  anchorPoint,
+  barFillPolygon,
+  clipPolygon,
+  effectAt,
+  isShown,
+  shapePolygon,
+  textWithValues,
+  type Box,
+  type LayoutValues,
+  type MinimapData,
+  type Point,
+  type UiElement,
+  type UiLayout,
+} from "../ui/uiLayout.ts";
 
 const DIGIT_FRAME = "zmt_digit_";
+/** Depth between two elements: each element's graphics, pictures, texts and frame sit inside its step. */
+const STEP = 0.005;
 
 /** Pool of game objects of one kind; unused ones are hidden, never re-created. */
 export class Pool {
@@ -43,6 +59,14 @@ export interface PaintArea {
   k: number;
 }
 
+export interface PaintOptions {
+  /** The selected button of a screen (drawn with its selected look). */
+  focus?: string;
+  /** Milliseconds, for effects (blink, pulse…). */
+  time?: number;
+  minimap?: MinimapData | null;
+}
+
 /** What a paint produced: each shown element's box (layout pixels) and the size of the game window. */
 export interface Painted {
   boxes: Record<string, Box>;
@@ -67,58 +91,87 @@ function color(value: string, fallback: string): { c: number; a: number } {
   if (hex.length === 3) hex = hex.split("").map((ch) => ch + ch).join("");
   return { c: parseInt(hex.slice(0, 6), 16), a: hex.length === 8 ? parseInt(hex.slice(6), 16) / 255 : 1 };
 }
+const cssColor = (value: string, fallback: string) => {
+  const { c, a } = color(value, fallback);
+  return a >= 1 ? `#${c.toString(16).padStart(6, "0")}` : `rgba(${c >> 16},${(c >> 8) & 255},${c & 255},${a.toFixed(3)})`;
+};
 
 /**
  * Paints a UI layout with Phaser objects (pooled): the HUD in the game and the designer's board in
- * the editor draw the same way. Values come in already computed.
+ * the editor draw the same way. Values come in already computed. Each element gets its own depth
+ * step, so a later element is drawn over an earlier one whatever it is made of.
  */
 export class LayoutPainter {
   private readonly scene: any;
-  private readonly g: any;
-  /** Over the pictures (a selected button's frame). */
-  private readonly fg: any;
+  private readonly depth: number;
+  private readonly under: any;
+  private readonly over: any;
   private readonly images: Pool;
   private readonly texts: Pool;
+  private readonly shapes: Pool;
   private ox = 0;
   private oy = 0;
   private k = 1;
+  /** The element being drawn: its depth, opacity and lazily taken graphics (behind and in front of its pictures). */
+  private d = 0;
+  private a = 1;
+  private back: any = null;
+  private front: any = null;
 
   /** `textResolution` > 1 keeps small texts sharp under a zoomed camera (the editor's map). */
   constructor(scene: any, depth = 0, textResolution = 1) {
     this.scene = scene;
+    this.depth = depth;
     const s = scene;
-    this.g = s.add.graphics().setDepth(depth);
-    this.fg = s.add.graphics().setDepth(depth + 0.15);
-    this.images = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0).setDepth(depth + 0.1));
+    this.under = s.add.graphics().setDepth(depth);
+    this.over = s.add.graphics().setDepth(depth + 0.9);
+    this.images = new Pool(() => s.add.image(0, 0, resolveTexture(s.textures, "pixel")).setOrigin(0, 0));
+    this.shapes = new Pool(() => s.add.graphics());
     this.texts = new Pool(() => {
-      const t = s.add.text(0, 0, "", { fontFamily: "monospace" }).setOrigin(0, 0).setDepth(depth + 0.2);
+      const t = s.add.text(0, 0, "", { fontFamily: "monospace" }).setOrigin(0, 0);
       if (textResolution > 1) t.setResolution?.(textResolution);
       return t;
     });
+    this.extras();
   }
 
-  /** Graphics of this painter (also for what the HUD draws around the layout). */
+  /** Graphics over the layout (what the HUD draws around it: notes, the inventory panel). */
   get graphics(): any {
-    return this.g;
+    return this.over;
+  }
+
+  /** Graphics under the layout (a screen's dim colour). */
+  get backdrop(): any {
+    return this.under;
   }
 
   begin(): void {
-    this.g.clear();
-    this.fg.clear();
+    this.under.clear();
+    this.over.clear();
     this.images.begin();
     this.texts.begin();
+    this.shapes.begin();
+    this.extras();
   }
 
   end(): void {
     this.images.end();
     this.texts.end();
+    this.shapes.end();
   }
 
   destroy(): void {
-    this.g.destroy?.();
-    this.fg.destroy?.();
+    this.under.destroy?.();
+    this.over.destroy?.();
     this.images.destroy();
     this.texts.destroy();
+    this.shapes.destroy();
+  }
+
+  /** What is drawn outside the elements (text(), icon(), panel()) goes over them. */
+  private extras(): void {
+    this.d = this.depth + 0.9;
+    this.a = 1;
   }
 
   /** Size of a picture (a project image or a built-in sprite), or null. */
@@ -129,65 +182,70 @@ export class LayoutPainter {
     return src && src.width > 0 && src.height > 0 ? { w: src.width, h: src.height } : null;
   }
 
-  /** `focus`: the selected button of a screen (drawn with its selected look). */
-  paint(layout: UiLayout, values: LayoutValues, fonts: Record<string, string>, area: PaintArea, focus = ""): Painted {
+  paint(layout: UiLayout, values: LayoutValues, fonts: Record<string, string>, area: PaintArea, opts: PaintOptions = {}): Painted {
     this.ox = area.x;
     this.oy = area.y;
     this.k = area.k;
     const viewW = Math.floor(area.w / area.k);
     const viewH = Math.floor(area.h / area.k);
     const out: Painted = { boxes: {}, viewW, viewH, topEdge: 0, bottomEdge: viewH };
-    for (const e of layout.elements) {
-      if (!isShown(e, values)) continue;
+    layout.elements.forEach((e, i) => {
+      if (!isShown(e, values)) return;
       const p = anchorPoint(e.anchor, viewW, viewH);
-      const box = this.element(e, { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h }, values, fonts, layout, e.id === focus);
+      const fx = effectAt(e.effect, opts.time ?? 0);
+      this.d = this.depth + (i + 1) * STEP;
+      this.a = e.alpha * fx.alpha;
+      this.back = this.front = null;
+      const placed = { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h };
+      const drawn = this.element(e, { ...placed, x: placed.x + fx.dx, y: placed.y + fx.dy }, values, fonts, layout, e.id === opts.focus, opts.minimap ?? null);
+      // Hit boxes stay where the element is placed (the effect only moves the drawing).
+      const box = { ...drawn, x: drawn.x - fx.dx, y: drawn.y - fx.dy };
       out.boxes[e.id] = box;
       if (box.y + box.h <= viewH / 2) out.topEdge = Math.max(out.topEdge, box.y + box.h);
       else if (box.y >= viewH / 2) out.bottomEdge = Math.min(out.bottomEdge, box.y);
-    }
+    });
+    this.extras();
     return out;
   }
 
-  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean): Box {
+  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean, minimap: MinimapData | null): Box {
     switch (e.type) {
       case "image":
-        if (!this.picture(e.image, b, e.mode, e.slice) && e.color) this.rect(b, color(e.color, "#000000"));
+        if (!this.picture(e.image, b, e.mode, e.slice, e.rotation) && e.color) this.rect(b, color(e.color, "#000000"));
         return b;
       case "text": {
         const family = fonts[e.font || layout.theme.font] ?? "monospace";
-        const t = this.text(textWithValues(e.text, values), family, e.size, e.color || layout.theme.textColor);
-        const x = e.align === "center" ? b.x + (b.w - t.width / this.k) / 2 : e.align === "right" ? b.x + b.w - t.width / this.k : b.x;
-        t.setPosition(Math.round(this.ox + x * this.k), Math.round(this.oy + b.y * this.k));
+        const t = this.text(textWithValues(e.text, values), family, e.size, e.color || layout.theme.textColor, 0, e.stroke ? { color: e.stroke, width: e.strokeWidth } : null);
+        const w = t.width / this.k;
+        const h = t.height / this.k;
+        const x = e.align === "center" ? b.x + (b.w - w) / 2 : e.align === "right" ? b.x + b.w - w : b.x;
+        if (e.rotation) t.setOrigin(0.5, 0.5).setRotation((e.rotation * Math.PI) / 180).setPosition(Math.round(this.sx(x + w / 2)), Math.round(this.sy(b.y + h / 2)));
+        else t.setPosition(Math.round(this.sx(x)), Math.round(this.sy(b.y)));
         return b;
       }
       case "bar":
-        this.bar(e, b, values);
+        this.bar(e, b, values, fonts, layout);
         return b;
       case "hearts":
         return this.hearts(e, b, values);
       case "counter":
         return this.counter(e, b, values);
       case "item":
-        this.item(e, b, values);
+        this.item(e.frame, b, String(values["item.icon"] ?? ""));
+        return b;
+      case "icon":
+        this.iconCell(e, b);
+        return b;
+      case "slot":
+        this.slot(e, b, values, fonts, layout);
+        return b;
+      case "minimap":
+        this.minimap(e, b, minimap);
         return b;
       case "button":
         this.button(e, b, values, fonts, layout, focused);
         return b;
     }
-  }
-
-  /** A button: its picture (the selected one while focused) or colour, a gold frame when selected without a selected picture, its text centred. */
-  private button(e: Extract<UiElement, { type: "button" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean): void {
-    const pic = focused && e.hover ? e.hover : e.image;
-    const mode = e.slice > 0 ? "nine" : "stretch";
-    const drawn = this.picture(pic, b, mode, e.slice);
-    if (!drawn) this.rect(b, color(focused ? e.hoverColor : e.color, "#1f1a24e6"));
-    // Selected without a picture of its own for it: a gold frame shows the selection.
-    if (focused && !(drawn && e.hover)) this.fg.lineStyle(this.k, 0xffd23a, 1).strokeRect(this.sx(b.x) + this.k / 2, this.sy(b.y) + this.k / 2, b.w * this.k - this.k, b.h * this.k - this.k);
-    if (!e.text) return;
-    const family = fonts[e.font || layout.theme.font] ?? "monospace";
-    const t = this.text(textWithValues(e.text, values), family, e.size, e.textColor || layout.theme.textColor);
-    t.setPosition(Math.round(this.sx(b.x) + (b.w * this.k - t.width) / 2), Math.round(this.sy(b.y) + (b.h * this.k - t.height) / 2));
   }
 
   private sx(x: number): number {
@@ -198,24 +256,51 @@ export class LayoutPainter {
     return this.oy + y * this.k;
   }
 
-  private rect(b: Box, c: { c: number; a: number }): void {
-    this.g.fillStyle(c.c, c.a).fillRect(this.sx(b.x), this.sy(b.y), b.w * this.k, b.h * this.k);
+  /** The element's graphics behind its pictures (or, `front`, over them). */
+  private gfx(front = false): any {
+    if (front) return (this.front ??= this.shapes.next().clear().setDepth(this.d + 0.003).setAlpha(1));
+    return (this.back ??= this.shapes.next().clear().setDepth(this.d).setAlpha(1));
   }
 
-  /** A picture over a box: stretched, 9-slice or fitted. False when the picture is missing. */
-  private picture(key: string, b: Box, mode: "stretch" | "nine" | "fit", slice = 0): boolean {
-    const size = this.picSize(key);
+  /** A pooled picture, reset to plain (origin top-left, no rotation or crop) at this element's depth and opacity. */
+  private img(tex: string, frame?: string): any {
+    return this.images.next().setTexture(tex, frame).setOrigin(0, 0).setRotation(0).setCrop().setAlpha(this.a).setDepth(this.d + 0.001);
+  }
+
+  private rect(b: Box, c: { c: number; a: number }): void {
+    this.gfx().fillStyle(c.c, c.a * this.a).fillRect(this.sx(b.x), this.sy(b.y), b.w * this.k, b.h * this.k);
+  }
+
+  private poly(g: any, pts: readonly Point[], c: { c: number; a: number }): void {
+    if (pts.length < 3) return;
+    g.fillStyle(c.c, c.a * this.a).fillPoints(pts.map((p) => ({ x: this.sx(p.x), y: this.sy(p.y) })), true);
+  }
+
+  private outline(g: any, pts: readonly Point[], c: { c: number; a: number }, width: number): void {
+    if (pts.length < 2 || width <= 0) return;
+    g.lineStyle(width * this.k, c.c, c.a * this.a).strokePoints(pts.map((p) => ({ x: this.sx(p.x), y: this.sy(p.y) })), true, true);
+  }
+
+  /** A picture over a box: stretched, 9-slice or fitted, turned by `rotation` degrees (not 9-slice). False when the picture is missing. */
+  private picture(key: string, b: Box, mode: "stretch" | "nine" | "fit", slice = 0, rotation = 0, frame?: string, frameSize?: { w: number; h: number }): boolean {
+    const size = frameSize ?? this.picSize(key);
     if (!size) return false;
     const tex = resolveTexture(this.scene.textures, key)!;
-    if (mode === "nine" && slice > 0) {
+    if (mode === "nine" && slice > 0 && !frame) {
       this.nineSlice(tex, size, slice, b);
       return true;
     }
-    const img = this.images.next().setTexture(tex).setCrop().setAlpha(1);
+    const img = this.img(tex, frame);
+    let w = b.w;
+    let h = b.h;
     if (mode === "fit") {
       const f = Math.min(b.w / size.w, b.h / size.h);
-      img.setScale(f * this.k).setPosition(Math.round(this.sx(b.x + (b.w - size.w * f) / 2)), Math.round(this.sy(b.y + (b.h - size.h * f) / 2)));
-    } else img.setScale((b.w * this.k) / size.w, (b.h * this.k) / size.h).setPosition(this.sx(b.x), this.sy(b.y));
+      w = size.w * f;
+      h = size.h * f;
+    }
+    img.setScale((w * this.k) / size.w, (h * this.k) / size.h);
+    if (rotation) img.setOrigin(0.5, 0.5).setRotation((rotation * Math.PI) / 180).setPosition(this.sx(b.x + b.w / 2), this.sy(b.y + b.h / 2));
+    else img.setPosition(Math.round(this.sx(b.x + (b.w - w) / 2)), Math.round(this.sy(b.y + (b.h - h) / 2)));
     return true;
   }
 
@@ -236,41 +321,40 @@ export class LayoutPainter {
         if (sw[col] <= 0 || sh[row] <= 0 || dw[col] <= 0 || dh[row] <= 0) continue;
         const name = `zmt9_${sl}_${row * 3 + col}`;
         if (!t.has?.(name)) t.add?.(name, 0, sx[col], sy[row], sw[col], sh[row]);
-        this.images
-          .next()
-          .setTexture(tex, name)
-          .setCrop()
-          .setAlpha(1)
+        this.img(tex, name)
           .setScale((dw[col] * this.k) / sw[col], (dh[row] * this.k) / sh[row])
           .setPosition(Math.round(this.sx(dx[col])), Math.round(this.sy(dy[row])));
       }
     }
   }
 
-  /** A text at a font size in layout pixels (the plain fallback font is bold to stay readable). */
-  text(value: string, family: string, size: number, fill: string, wrapW = 0): any {
+  /** A text at a font size in layout pixels (the plain fallback font is bold to stay readable), with an outline or a soft shadow. */
+  text(value: string, family: string, size: number, fill: string, wrapW = 0, stroke: { color: string; width: number } | null = null): any {
     const t = this.texts.next();
     const px = Math.max(1, Math.round(size * this.k));
     t.setStyle({ fontFamily: family, fontSize: `${px}px`, color: fill || "#ffffff", fontStyle: family === "monospace" ? "bold" : "normal", ...(wrapW > 0 ? { wordWrap: { width: wrapW, useAdvancedWrap: true } } : { wordWrap: null }) });
-    t.setShadow(1, 1, "#000000", 0, false, true);
-    // Pooled texts: a fading note may have left its alpha on this one.
-    t.setAlpha(1);
+    if (stroke) {
+      t.setStroke(cssColor(stroke.color, "#000000"), Math.max(1, stroke.width * this.k));
+      t.setShadow(0, 0, "#000000", 0, false, false);
+    } else {
+      t.setStroke("#000000", 0);
+      t.setShadow(1, 1, "#000000", 0, false, true);
+    }
+    // Pooled texts: a fading note or a turned label may have left its alpha, origin or angle.
+    t.setOrigin(0, 0).setRotation(0).setAlpha(this.a).setDepth(this.d + 0.002);
     t.setText(value);
     return t;
   }
 
-  private bar(e: Extract<UiElement, { type: "bar" }>, b: Box, values: LayoutValues): void {
+  private bar(e: Extract<UiElement, { type: "bar" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout): void {
     const max = Number(values[e.max]) || 0;
     const f = max > 0 ? Math.max(0, Math.min(1, (Number(values[e.value]) || 0) / max)) : 0;
     const k = this.k;
-    if (!this.picture(e.back, b, "stretch")) {
-      this.rect(b, color(e.backColor, "#000000d9"));
-      this.g.lineStyle(k, 0xf0f0e0, 1).strokeRect(this.sx(b.x) + k / 2, this.sy(b.y) + k / 2, b.w * k - k, b.h * k - k);
-    }
     const fill = this.picSize(e.fill);
+    const pictureBack = this.picture(e.back, b, "stretch");
     if (fill) {
       // The fill picture over the back, cut from the empty side.
-      const img = this.images.next().setTexture(resolveTexture(this.scene.textures, e.fill)!).setAlpha(1);
+      const img = this.img(resolveTexture(this.scene.textures, e.fill)!);
       img.setScale((b.w * k) / fill.w, (b.h * k) / fill.h).setPosition(this.sx(b.x), this.sy(b.y));
       const cw = Math.round(fill.w * f);
       const ch = Math.round(fill.h * f);
@@ -279,14 +363,32 @@ export class LayoutPainter {
       else if (e.dir === "left") img.setCrop(fill.w - cw, 0, cw, fill.h);
       else img.setCrop(0, 0, cw, fill.h);
       img.setVisible(f > 0);
-      return;
+    } else if (pictureBack || e.shape !== "rect") {
+      // A shape in colours: back, the level, the border.
+      const g = this.gfx();
+      const outline = shapePolygon(e.shape, b);
+      if (!pictureBack) this.poly(g, outline, color(e.backColor, "#000000d9"));
+      // Over a back picture a plain bar fills inside its 2-pixel frame, as the classic meter does.
+      const level = pictureBack && e.shape === "rect" ? { x: b.x + 2, y: b.y + 2, w: Math.max(0, b.w - 4), h: Math.max(0, b.h - 4) } : b;
+      this.poly(pictureBack ? this.gfx(true) : g, barFillPolygon(e.shape, level, e.dir, f), color(e.fillColor, "#3ad16b"));
+      if (e.border && !pictureBack) this.outline(g, outline, color(e.border, "#f0f0e0"), e.borderWidth);
+    } else {
+      // The classic meter: a framed box with the fill inside a 2-pixel inset.
+      this.rect(b, color(e.backColor, "#000000d9"));
+      if (e.border && e.borderWidth > 0) {
+        const bw = e.borderWidth * k;
+        this.gfx().lineStyle(bw, color(e.border, "#f0f0e0").c, this.a).strokeRect(this.sx(b.x) + bw / 2, this.sy(b.y) + bw / 2, b.w * k - bw, b.h * k - bw);
+      }
+      const inner = { x: b.x + 2, y: b.y + 2, w: Math.max(0, b.w - 4), h: Math.max(0, b.h - 4) };
+      const vertical = e.dir === "up" || e.dir === "down";
+      const len = (vertical ? inner.h : inner.w) * f;
+      const r = vertical ? { ...inner, y: e.dir === "up" ? inner.y + inner.h - len : inner.y, h: len } : { ...inner, x: e.dir === "left" ? inner.x + inner.w - len : inner.x, w: len };
+      if (len > 0) this.rect(r, color(e.fillColor, "#3ad16b"));
     }
-    // Built-in fill: inside a 2-pixel frame.
-    const inner = { x: b.x + 2, y: b.y + 2, w: Math.max(0, b.w - 4), h: Math.max(0, b.h - 4) };
-    const vertical = e.dir === "up" || e.dir === "down";
-    const len = (vertical ? inner.h : inner.w) * f;
-    const r = vertical ? { ...inner, y: e.dir === "up" ? inner.y + inner.h - len : inner.y, h: len } : { ...inner, x: e.dir === "left" ? inner.x + inner.w - len : inner.x, w: len };
-    if (len > 0) this.rect(r, color(e.fillColor, "#3ad16b"));
+    if (e.text) {
+      const t = this.text(textWithValues(e.text, values), fonts[layout.theme.font] ?? "monospace", e.size, layout.theme.textColor);
+      t.setPosition(Math.round(this.sx(b.x) + (b.w * k - t.width) / 2), Math.round(this.sy(b.y) + (b.h * k - t.height) / 2));
+    }
   }
 
   private hearts(e: Extract<UiElement, { type: "hearts" }>, b: Box, values: LayoutValues): Box {
@@ -318,15 +420,8 @@ export class LayoutPainter {
     const y = b.y + icon.h + 1;
     for (let d = 0; d < digits.length; d++) {
       const x = b.x + d * dw;
-      if (strip) {
-        this.images
-          .next()
-          .setTexture(resolveTexture(this.scene.textures, e.digits)!, `${DIGIT_FRAME}${digits[d]}`)
-          .setCrop()
-          .setAlpha(1)
-          .setScale(this.k)
-          .setPosition(this.sx(x), this.sy(y));
-      } else this.picture(`hud_digit_${digits[d]}`, { x, y, w: 6, h: 8 }, "stretch");
+      if (strip) this.img(resolveTexture(this.scene.textures, e.digits)!, `${DIGIT_FRAME}${digits[d]}`).setScale(this.k).setPosition(this.sx(x), this.sy(y));
+      else this.picture(`hud_digit_${digits[d]}`, { x, y, w: 6, h: 8 }, "stretch");
     }
     return { x: b.x, y: b.y, w, h: icon.h + 1 + dh };
   }
@@ -341,19 +436,89 @@ export class LayoutPainter {
     return tex.has?.(`${DIGIT_FRAME}0`) ? { w, h: size.h } : null;
   }
 
-  private item(e: Extract<UiElement, { type: "item" }>, b: Box, values: LayoutValues): void {
+  /** A frame (picture, else the classic double border) with an icon fitted inside. */
+  private item(frame: string, b: Box, icon: string): void {
     const k = this.k;
-    if (!this.picture(e.frame, b, "fit")) {
+    if (!this.picture(frame, b, "fit")) {
+      const g = this.gfx();
       const X = this.sx(b.x);
       const Y = this.sy(b.y);
-      this.g.fillStyle(0x000000, 0.8).fillRect(X, Y, b.w * k, b.h * k);
-      this.g.lineStyle(k, 0xf0f0e0, 1).strokeRect(X + k / 2, Y + k / 2, b.w * k - k, b.h * k - k);
-      this.g.lineStyle(k, 0x6070c0, 1).strokeRect(X + k + k / 2, Y + k + k / 2, (b.w - 2) * k - k, (b.h - 2) * k - k);
+      g.fillStyle(0x000000, 0.8 * this.a).fillRect(X, Y, b.w * k, b.h * k);
+      g.lineStyle(k, 0xf0f0e0, this.a).strokeRect(X + k / 2, Y + k / 2, b.w * k - k, b.h * k - k);
+      g.lineStyle(k, 0x6070c0, this.a).strokeRect(X + k + k / 2, Y + k + k / 2, (b.w - 2) * k - k, (b.h - 2) * k - k);
     }
-    const icon = String(values["item.icon"] ?? "");
     if (!icon) return;
     const size = Math.max(8, Math.min(b.w, b.h) - 6);
     this.icon(icon, b.x + (b.w - size) / 2, b.y + (b.h - size) / 2, size);
+  }
+
+  /** One cell of an icon sheet, fitted into the box. */
+  private iconCell(e: Extract<UiElement, { type: "icon" }>, b: Box): void {
+    const size = this.picSize(e.image);
+    if (!size) {
+      this.rect(b, color("#00000066", "#00000066"));
+      return;
+    }
+    if (!e.cellW || !e.cellH) {
+      this.picture(e.image, b, "fit", 0, e.rotation);
+      return;
+    }
+    const cols = Math.max(1, Math.floor(size.w / e.cellW));
+    const col = e.index % cols;
+    const row = Math.floor(e.index / cols);
+    if ((row + 1) * e.cellH > size.h) return;
+    const tex = resolveTexture(this.scene.textures, e.image)!;
+    const name = `zmt_icon_${e.cellW}x${e.cellH}_${e.index}`;
+    const t = this.scene.textures.get(tex);
+    if (!t.has?.(name)) t.add?.(name, 0, col * e.cellW, row * e.cellH, e.cellW, e.cellH);
+    this.picture(e.image, b, "fit", 0, e.rotation, name, { w: e.cellW, h: e.cellH });
+  }
+
+  private slot(e: Extract<UiElement, { type: "slot" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout): void {
+    const selected = !!Number(values[`slot.${e.index}.sel`]);
+    this.item(selected && e.selected ? e.selected : e.frame, b, String(values[`slot.${e.index}.icon`] ?? ""));
+    // Selected without a picture for it: a gold frame.
+    if (selected && !e.selected) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(b.x) + this.k / 2, this.sy(b.y) + this.k / 2, b.w * this.k - this.k, b.h * this.k - this.k);
+    if (e.keyLabel) this.text(String(e.index), fonts[layout.theme.font] ?? "monospace", 6, layout.theme.textColor, 0, { color: "#000000", width: 1 }).setPosition(Math.round(this.sx(b.x + 1)), Math.round(this.sy(b.y)));
+  }
+
+  /** The world around the player squeezed into the box, cut to its shape. */
+  private minimap(e: Extract<UiElement, { type: "minimap" }>, b: Box, data: MinimapData | null): void {
+    const g = this.gfx();
+    const shape = shapePolygon(e.shape === "circle" ? "circle" : "rect", b);
+    this.poly(g, shape, color(e.backColor, "#1f1a24d9"));
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    const s = Math.min(b.w, b.h) / 2 / e.range;
+    const at = (x: number, y: number): Point => ({ x: cx + (x - (data?.x ?? 0)) * s, y: cy + (y - (data?.y ?? 0)) * s });
+    if (data) {
+      const wall = color(e.wallColor, "#8e9aa8");
+      for (const w of data.walls) {
+        const p = at(w.x - w.hw, w.y - w.hh);
+        const r = { x: p.x, y: p.y, w: w.hw * 2 * s, h: w.hh * 2 * s };
+        if (r.x > b.x + b.w || r.y > b.y + b.h || r.x + r.w < b.x || r.y + r.h < b.y) continue;
+        this.poly(g, clipPolygon(shapePolygon("rect", r), shape), wall);
+      }
+      for (const d of data.dots) {
+        const p = at(d.x, d.y);
+        const dot = { x: p.x - 1, y: p.y - 1, w: 2, h: 2 };
+        this.poly(g, clipPolygon(shapePolygon("rect", dot), shape), color(d.kind === "enemy" ? e.enemyColor : e.objectColor, "#ffffff"));
+      }
+    }
+    this.poly(g, shapePolygon("rect", { x: cx - 1.5, y: cy - 1.5, w: 3, h: 3 }), color(e.playerColor, "#ff3040"));
+    if (e.border) this.outline(g, shape, color(e.border, "#f0f0e0"), e.borderWidth);
+  }
+
+  /** A button: its picture (the selected one while focused) or colour, a gold frame when selected without a selected picture, its text centred. */
+  private button(e: Extract<UiElement, { type: "button" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean): void {
+    const pic = focused && e.hover ? e.hover : e.image;
+    const drawn = this.picture(pic, b, e.slice > 0 ? "nine" : "stretch", e.slice);
+    if (!drawn) this.rect(b, color(focused ? e.hoverColor : e.color, "#1f1a24e6"));
+    if (focused && !(drawn && e.hover)) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(b.x) + this.k / 2, this.sy(b.y) + this.k / 2, b.w * this.k - this.k, b.h * this.k - this.k);
+    if (!e.text) return;
+    const family = fonts[e.font || layout.theme.font] ?? "monospace";
+    const t = this.text(textWithValues(e.text, values), family, e.size, e.textColor || layout.theme.textColor);
+    t.setPosition(Math.round(this.sx(b.x) + (b.w * this.k - t.width) / 2), Math.round(this.sy(b.y) + (b.h * this.k - t.height) / 2));
   }
 
   /** An item icon fitted into a square (layout pixels); a placeholder when the picture is missing. */

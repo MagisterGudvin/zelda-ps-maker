@@ -188,7 +188,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
     const { layout, error } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout").pluginParams.layout);
     assert.equal(error, null);
-    assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text"]);
+    assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text", "text"]);
     assert.equal(layout!.scale, 0);
     assert.equal(layout!.theme.font, DEMO_FONT.id);
     // The pause screen (Enter): its buttons run project events that exist.

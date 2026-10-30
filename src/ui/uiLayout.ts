@@ -10,16 +10,29 @@ export const LAYOUT_VERSION = 1;
 export type Anchor = "tl" | "t" | "tr" | "l" | "c" | "r" | "bl" | "b" | "br";
 export const ANCHORS: readonly Anchor[] = ["tl", "t", "tr", "l", "c", "r", "bl", "b", "br"];
 
-/** When an element shows: always, while a project variable is on, while the player has an item. */
+export const COMPARE_OPS = ["<", "<=", ">", ">=", "==", "!="] as const;
+export type CompareOp = (typeof COMPARE_OPS)[number];
+
+/**
+ * When an element shows: always, while a project variable is on, while the player has an item, or
+ * while a value compares to a number ("health" < 3).
+ */
 export interface Visibility {
-  when: "always" | "variable" | "item";
+  when: "always" | "variable" | "item" | "compare";
+  /** Variable id, item id or the compared value's binding. */
   id?: string;
+  op?: CompareOp;
+  value?: number;
   /** Hidden while a PS Maker dialogue is open. */
   hideInDialogue?: boolean;
 }
 
-export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "button";
-export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "button"];
+export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button";
+export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button"];
+
+/** A looping effect on an element while it shows. */
+export type Effect = "none" | "blink" | "pulse" | "bob" | "shake";
+export const EFFECTS: readonly Effect[] = ["none", "blink", "pulse", "bob", "shake"];
 
 interface Base {
   id: string;
@@ -31,6 +44,15 @@ interface Base {
   h: number;
   anchor: Anchor;
   show: Visibility;
+  /** Degrees, around the centre (pictures, texts and icons). */
+  rotation: number;
+  /** Opacity 0…1. */
+  alpha: number;
+  effect: Effect;
+  /** Elements with the same group are selected and moved together in the designer. */
+  group?: string;
+  /** Not picked by clicks on the map in the designer (the list still selects it). */
+  locked?: boolean;
 }
 
 /** A picture: stretched, 9-slice (corners `slice` pixels) or fitted; a colour where it has none. */
@@ -51,9 +73,18 @@ export interface TextElement extends Base {
   size: number;
   color: string;
   align: "left" | "center" | "right";
+  /** Outline colour ("" = a soft shadow instead) and its width in layout pixels. */
+  stroke: string;
+  strokeWidth: number;
 }
 
-/** A meter: the fill over the back, cut towards `dir` as `value` drops from `max`. */
+export type BarShape = "rect" | "round" | "circle" | "diamond" | "triangle" | "star" | "heart";
+export const BAR_SHAPES: readonly BarShape[] = ["rect", "round", "circle", "diamond", "triangle", "star", "heart"];
+
+/**
+ * A meter: the fill over the back, cut towards `dir` as `value` drops from `max`. Without pictures
+ * it is a shape (rectangle, pill, circle, diamond, triangle, star, heart) in colours with a border.
+ */
 export interface BarElement extends Base {
   type: "bar";
   value: string;
@@ -63,6 +94,13 @@ export interface BarElement extends Base {
   dir: "up" | "right" | "down" | "left";
   fillColor: string;
   backColor: string;
+  shape: BarShape;
+  /** Border colour ("" = none) and width (layout pixels). */
+  border: string;
+  borderWidth: number;
+  /** A label over the bar ("HP", "{health}/{maxHealth}"). */
+  text: string;
+  size: number;
 }
 
 /** Heart containers in rows: full, half and empty pictures by the player's health. */
@@ -88,6 +126,43 @@ export interface CounterElement extends Base {
 export interface ItemElement extends Base {
   type: "item";
   frame: string;
+}
+
+/** One icon of an icon sheet (cells of `cellW` × `cellH` pixels, numbered row by row from 0). */
+export interface IconElement extends Base {
+  type: "icon";
+  image: string;
+  cellW: number;
+  cellH: number;
+  index: number;
+}
+
+/**
+ * A quick-use slot: the `index`-th item the player can use from the item key (1 = first). Its key
+ * (1–9 by default) selects that item; the selected slot shows its own frame.
+ */
+export interface SlotElement extends Base {
+  type: "slot";
+  index: number;
+  frame: string;
+  selected: string;
+  /** Shows the slot's key in its corner. */
+  keyLabel: boolean;
+}
+
+/** A simplified map around the player: walls, enemies, objects. */
+export interface MinimapElement extends Base {
+  type: "minimap";
+  shape: "rect" | "circle";
+  /** Map pixels from the player to the edge. */
+  range: number;
+  backColor: string;
+  border: string;
+  borderWidth: number;
+  wallColor: string;
+  playerColor: string;
+  enemyColor: string;
+  objectColor: string;
 }
 
 /** What a button does: run a PS Maker event, open or close a screen, set a project variable. */
@@ -118,7 +193,7 @@ export interface ButtonElement extends Base {
   action: ButtonAction;
 }
 
-export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | ButtonElement;
+export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement;
 
 /** Look of things the toolkit draws around the layout (inventory panel, item icons, notes). */
 export interface LayoutTheme {
@@ -133,12 +208,19 @@ export interface LayoutTheme {
 
 /** How a screen (a layout with a name, opened over the game) behaves. */
 export interface ScreenSettings {
+  /** The screen takes the keys (a menu). Off: a layer over the HUD (boss bar, notice) that the game plays under. */
+  input: boolean;
   /** The game waits and the player stands still while the screen is open. */
   pause: boolean;
   /** Colour over the game behind the screen ("" = none). */
   dim: string;
   /** The Menu key (Enter) opens and closes this screen. */
   menuKey: boolean;
+  /** Project sounds: selection moves, a button is pressed, the screen opens, closes. */
+  soundMove: string;
+  soundPress: string;
+  soundOpen: string;
+  soundClose: string;
 }
 
 export interface UiLayout {
@@ -153,18 +235,32 @@ export interface UiLayout {
 /** A value an element shows, by its binding ("health", "rupees", "var:<id>"...). */
 export type LayoutValues = Record<string, number | string>;
 
+/** The world around the player for minimaps (map pixels). */
+export interface MinimapData {
+  x: number;
+  y: number;
+  walls: readonly { x: number; y: number; hw: number; hh: number }[];
+  dots: readonly { x: number; y: number; kind: "enemy" | "object" }[];
+}
+
 // ---- reading untrusted text ----------------------------------------------------------------
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === "object" && !Array.isArray(v);
 const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
 const str = (v: unknown, d = "") => (typeof v === "string" ? v : d);
+const int = (v: unknown, d: number, min: number, max = Infinity) => Math.min(max, Math.max(min, Math.round(num(v, d))));
 const oneOf = <T extends string>(v: unknown, list: readonly T[], d: T): T => (list.includes(v as T) ? (v as T) : d);
 
 function visibility(v: unknown): Visibility {
   const o = isObj(v) ? v : {};
-  const when = oneOf(o.when, ["always", "variable", "item"] as const, "always");
-  return { when, ...(when !== "always" ? { id: str(o.id) } : {}), ...(o.hideInDialogue === true ? { hideInDialogue: true } : {}) };
+  const when = oneOf(o.when, ["always", "variable", "item", "compare"] as const, "always");
+  return {
+    when,
+    ...(when !== "always" ? { id: str(o.id) } : {}),
+    ...(when === "compare" ? { op: oneOf(o.op, COMPARE_OPS, "<"), value: num(o.value, 0) } : {}),
+    ...(o.hideInDialogue === true ? { hideInDialogue: true } : {}),
+  };
 }
 
 /** One element with every field checked and defaulted; null for an unknown type. */
@@ -176,40 +272,78 @@ export function readElement(v: unknown, index = 0): UiElement | null {
     id: str(v.id) || `${type}${index + 1}`,
     x: Math.round(num(v.x, 0)),
     y: Math.round(num(v.y, 0)),
-    w: Math.max(1, Math.round(num(v.w, 16))),
-    h: Math.max(1, Math.round(num(v.h, 16))),
+    w: int(v.w, 16, 1),
+    h: int(v.h, 16, 1),
     anchor: oneOf(v.anchor, ANCHORS, "tl"),
     show: visibility(v.show),
+    rotation: ((Math.round(num(v.rotation, 0)) % 360) + 360) % 360,
+    alpha: Math.min(1, Math.max(0, num(v.alpha, 1))),
+    effect: oneOf(v.effect, EFFECTS, "none"),
+    ...(typeof v.group === "string" && v.group ? { group: v.group } : {}),
+    ...(v.locked === true ? { locked: true } : {}),
   };
   switch (type) {
     case "image":
-      return { ...base, type, image: str(v.image), mode: oneOf(v.mode, ["stretch", "nine", "fit"] as const, "stretch"), slice: Math.max(0, Math.round(num(v.slice, 4))), color: str(v.color) };
+      return { ...base, type, image: str(v.image), mode: oneOf(v.mode, ["stretch", "nine", "fit"] as const, "stretch"), slice: int(v.slice, 4, 0), color: str(v.color) };
     case "text":
-      return { ...base, type, text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), align: oneOf(v.align, ["left", "center", "right"] as const, "left") };
+      return { ...base, type, text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), align: oneOf(v.align, ["left", "center", "right"] as const, "left"), stroke: str(v.stroke), strokeWidth: Math.max(0, num(v.strokeWidth, 1)) };
     case "bar":
-      return { ...base, type, value: str(v.value, "magic"), max: str(v.max, "maxMagic"), fill: str(v.fill), back: str(v.back), dir: oneOf(v.dir, ["up", "right", "down", "left"] as const, "right"), fillColor: str(v.fillColor, "#3ad16b"), backColor: str(v.backColor, "#000000d9") };
+      return {
+        ...base,
+        type,
+        value: str(v.value, "magic"),
+        max: str(v.max, "maxMagic"),
+        fill: str(v.fill),
+        back: str(v.back),
+        dir: oneOf(v.dir, ["up", "right", "down", "left"] as const, "right"),
+        fillColor: str(v.fillColor, "#3ad16b"),
+        backColor: str(v.backColor, "#000000d9"),
+        shape: oneOf(v.shape, BAR_SHAPES, "rect"),
+        border: str(v.border, "#f0f0e0"),
+        borderWidth: Math.max(0, num(v.borderWidth, 1)),
+        text: str(v.text),
+        size: Math.max(1, num(v.size, 6)),
+      };
     case "hearts":
-      return { ...base, type, full: str(v.full), half: str(v.half), empty: str(v.empty), perRow: Math.max(1, Math.round(num(v.perRow, 10))), gap: Math.max(0, Math.round(num(v.gap, 1))) };
+      return { ...base, type, full: str(v.full), half: str(v.half), empty: str(v.empty), perRow: int(v.perRow, 10, 1), gap: int(v.gap, 1, 0) };
     case "counter":
-      return { ...base, type, value: str(v.value, "rupees"), icon: str(v.icon), digits: str(v.digits), places: Math.min(6, Math.max(1, Math.round(num(v.places, 2)))) };
+      return { ...base, type, value: str(v.value, "rupees"), icon: str(v.icon), digits: str(v.digits), places: int(v.places, 2, 1, 6) };
     case "item":
       return { ...base, type, frame: str(v.frame) };
+    case "icon":
+      return { ...base, type, image: str(v.image), cellW: int(v.cellW, 16, 0), cellH: int(v.cellH, 16, 0), index: int(v.index, 0, 0) };
+    case "slot":
+      return { ...base, type, index: int(v.index, 1, 1, 9), frame: str(v.frame), selected: str(v.selected), keyLabel: v.keyLabel !== false };
+    case "minimap":
+      return {
+        ...base,
+        type,
+        shape: oneOf(v.shape, ["rect", "circle"] as const, "circle"),
+        range: int(v.range, 160, 16),
+        backColor: str(v.backColor, "#1f1a24d9"),
+        border: str(v.border, "#f0f0e0"),
+        borderWidth: Math.max(0, num(v.borderWidth, 1)),
+        wallColor: str(v.wallColor, "#8e9aa8"),
+        playerColor: str(v.playerColor, "#ff3040"),
+        enemyColor: str(v.enemyColor, "#ffd23a"),
+        objectColor: str(v.objectColor, "#5ad8ff"),
+      };
     case "button": {
       const a = isObj(v.action) ? v.action : {};
       const action: ButtonAction = { kind: oneOf(a.kind, BUTTON_ACTIONS, "none"), id: str(a.id), value: str(a.value) };
-      return { ...base, type, image: str(v.image), hover: str(v.hover), slice: Math.max(0, Math.round(num(v.slice, 4))), color: str(v.color, "#1f1a24e6"), hoverColor: str(v.hoverColor, "#4a3f58f0"), text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), textColor: str(v.textColor), action };
+      return { ...base, type, image: str(v.image), hover: str(v.hover), slice: int(v.slice, 4, 0), color: str(v.color, "#1f1a24e6"), hoverColor: str(v.hoverColor, "#4a3f58f0"), text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), textColor: str(v.textColor), action };
     }
   }
 }
 
 export function defaultScreen(): ScreenSettings {
-  return { pause: true, dim: "#00000080", menuKey: false };
+  return { input: true, pause: true, dim: "#00000080", menuKey: false, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" };
 }
 
 function readScreen(v: unknown): ScreenSettings {
   const o = isObj(v) ? v : {};
   const d = defaultScreen();
-  return { pause: o.pause !== false, dim: str(o.dim, d.dim), menuKey: o.menuKey === true };
+  return { input: o.input !== false, pause: o.pause !== false, dim: str(o.dim, d.dim), menuKey: o.menuKey === true, soundMove: str(o.soundMove), soundPress: str(o.soundPress), soundOpen: str(o.soundOpen), soundClose: str(o.soundClose) };
 }
 
 export function defaultTheme(): LayoutTheme {
@@ -221,7 +355,7 @@ function readTheme(v: unknown): LayoutTheme {
   const icons: Record<string, string> = {};
   if (isObj(o.icons)) for (const [k, x] of Object.entries(o.icons)) if (typeof x === "string" && x) icons[k] = x;
   const d = defaultTheme();
-  return { font: str(o.font), textColor: str(o.textColor, d.textColor), icons, panel: str(o.panel), panelSlice: Math.max(0, Math.round(num(o.panelSlice, d.panelSlice))), cursor: str(o.cursor) };
+  return { font: str(o.font), textColor: str(o.textColor, d.textColor), icons, panel: str(o.panel), panelSlice: int(o.panelSlice, d.panelSlice, 0), cursor: str(o.cursor) };
 }
 
 /** A layout from its text (the designer's saved field); null with a reason when unusable. */
@@ -245,7 +379,7 @@ export function parseLayout(text: string): { layout: UiLayout | null; error: str
     e.id = id;
     seen.add(id);
   }
-  return { layout: { v: LAYOUT_VERSION, scale: Math.max(0, Math.round(num(data.scale, 0))), theme: readTheme(data.theme), screen: readScreen(data.screen), elements }, error: null };
+  return { layout: { v: LAYOUT_VERSION, scale: int(data.scale, 0, 0), theme: readTheme(data.theme), screen: readScreen(data.screen), elements }, error: null };
 }
 
 // ---- values ----------------------------------------------------------------------------------
@@ -259,9 +393,11 @@ export function layoutBindings(layout: UiLayout): Set<string> {
     if (e.type === "bar") (out.add(e.value), out.add(e.max));
     if (e.type === "counter") out.add(e.value);
     if (e.type === "item") (out.add("item.icon"), out.add("item.count"));
-    if (e.type === "text" || e.type === "button") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
+    if (e.type === "slot") (out.add(`slot.${e.index}.icon`), out.add(`slot.${e.index}.sel`));
+    if (e.type === "text" || e.type === "button" || e.type === "bar") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
     if (e.show.when === "variable" && e.show.id) out.add(`var:${e.show.id}`);
     if (e.show.when === "item" && e.show.id) out.add(`owned:${e.show.id}`);
+    if (e.show.when === "compare" && e.show.id) out.add(e.show.id);
   }
   return out;
 }
@@ -273,17 +409,67 @@ export function textWithValues(text: string, values: LayoutValues): string {
   });
 }
 
+function compare(a: number, op: CompareOp, b: number): boolean {
+  switch (op) {
+    case "<":
+      return a < b;
+    case "<=":
+      return a <= b;
+    case ">":
+      return a > b;
+    case ">=":
+      return a >= b;
+    case "==":
+      return a === b;
+    case "!=":
+      return a !== b;
+  }
+}
+
 export function isShown(e: UiElement, values: LayoutValues): boolean {
   if (e.show.hideInDialogue && values.dialogue) return false;
   if (e.show.when === "variable") return !!e.show.id && !!values[`var:${e.show.id}`] && values[`var:${e.show.id}`] !== "0";
   if (e.show.when === "item") return !!e.show.id && !!values[`owned:${e.show.id}`];
+  if (e.show.when === "compare") return !!e.show.id && compare(Number(values[e.show.id]) || 0, e.show.op ?? "<", e.show.value ?? 0);
   return true;
 }
 
-/** The pictures an element uses (built-in sprites like "hud_rupee" included). */
+/** The pictures an element uses (built-in sprites like "hud_rupee" left out). */
 export function pictureKeys(e: UiElement): string[] {
-  const keys = e.type === "image" ? [e.image] : e.type === "bar" ? [e.fill, e.back] : e.type === "hearts" ? [e.full, e.half, e.empty] : e.type === "counter" ? [e.icon, e.digits] : e.type === "item" ? [e.frame] : e.type === "button" ? [e.image, e.hover] : [];
+  const keys =
+    e.type === "image" || e.type === "icon"
+      ? [e.image]
+      : e.type === "bar"
+        ? [e.fill, e.back]
+        : e.type === "hearts"
+          ? [e.full, e.half, e.empty]
+          : e.type === "counter"
+            ? [e.icon, e.digits]
+            : e.type === "item"
+              ? [e.frame]
+              : e.type === "slot"
+                ? [e.frame, e.selected]
+                : e.type === "button"
+                  ? [e.image, e.hover]
+                  : [];
   return keys.filter((k) => k && !k.startsWith("hud_") && !k.startsWith("icon_"));
+}
+
+/** Offset (layout pixels) and opacity factor of an effect at a time (ms). */
+export function effectAt(effect: Effect, timeMs: number): { dx: number; dy: number; alpha: number } {
+  const t = timeMs / 1000;
+  switch (effect) {
+    case "blink":
+      return { dx: 0, dy: 0, alpha: Math.floor(t * 4) % 2 === 0 ? 1 : 0 };
+    case "pulse":
+      return { dx: 0, dy: 0, alpha: 0.55 + 0.45 * Math.cos(t * Math.PI * 2) };
+    case "bob":
+      return { dx: 0, dy: Math.round(Math.sin(t * Math.PI * 2) * 2), alpha: 1 };
+    case "shake":
+      return { dx: Math.round(Math.sin(t * 50) * 1.5), dy: 0, alpha: 1 };
+    default:
+      return { dx: 0, dy: 0, alpha: 1 };
+  }
 }
 
 // ---- geometry ----------------------------------------------------------------------------------
@@ -295,12 +481,17 @@ export interface Box {
   h: number;
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
 /** The anchor point of the game window (layout pixels). */
-export function anchorPoint(anchor: Anchor, viewW: number, viewH: number): { x: number; y: number } {
+export function anchorPoint(anchor: Anchor, viewW: number, viewH: number): Point {
   const x = anchor.endsWith("l") ? 0 : anchor.endsWith("r") ? viewW : viewW / 2;
   const y = anchor.startsWith("t") ? 0 : anchor.startsWith("b") ? viewH : viewH / 2;
-  if (anchor === "l") return { x: 0, y: viewH / 2 };
-  if (anchor === "r") return { x: viewW, y: viewH / 2 };
+  if (anchor === "l") return { x: 0, y: Math.round(viewH / 2) };
+  if (anchor === "r") return { x: viewW, y: Math.round(viewH / 2) };
   return { x: Math.round(x), y: Math.round(y) };
 }
 
@@ -339,9 +530,113 @@ export function nextButton(boxes: Record<string, Box>, ids: readonly string[], f
 }
 
 /** The element's top-left from a point on the game window (the inverse of placing it). */
-export function offsetFrom(anchor: Anchor, left: number, top: number, viewW: number, viewH: number): { x: number; y: number } {
+export function offsetFrom(anchor: Anchor, left: number, top: number, viewW: number, viewH: number): Point {
   const p = anchorPoint(anchor, viewW, viewH);
   return { x: Math.round(left - p.x), y: Math.round(top - p.y) };
+}
+
+/** The outline of a bar shape in a box (points in order around it). */
+export function shapePolygon(shape: BarShape, b: Box): Point[] {
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const ring = (n: number, r: (i: number) => number) =>
+    Array.from({ length: n }, (_, i) => {
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      return { x: cx + Math.cos(a) * r(i) * (b.w / 2), y: cy + Math.sin(a) * r(i) * (b.h / 2) };
+    });
+  switch (shape) {
+    case "circle":
+      return ring(32, () => 1);
+    case "diamond":
+      return [{ x: cx, y: b.y }, { x: b.x + b.w, y: cy }, { x: cx, y: b.y + b.h }, { x: b.x, y: cy }];
+    case "triangle":
+      return [{ x: cx, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h }];
+    case "star":
+      return ring(10, (i) => (i % 2 === 0 ? 1 : 0.45));
+    case "heart": {
+      // The classic parametric heart curve, fitted into the box.
+      const pts: Point[] = [];
+      for (let i = 0; i < 32; i++) {
+        const t = (i / 32) * Math.PI * 2;
+        const x = 16 * Math.sin(t) ** 3;
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        pts.push({ x: cx + (x / 16) * (b.w / 2), y: b.y + ((12 - y) / 29) * b.h });
+      }
+      return pts;
+    }
+    case "round": {
+      // A pill: half circles at the short ends.
+      const r = Math.min(b.w, b.h) / 2;
+      const pts: Point[] = [];
+      const arc = (ax: number, ay: number, from: number) => {
+        for (let i = 0; i <= 8; i++) {
+          const a = from + (i / 8) * Math.PI;
+          pts.push({ x: ax + Math.cos(a) * r, y: ay + Math.sin(a) * r });
+        }
+      };
+      if (b.w >= b.h) {
+        arc(b.x + b.w - r, cy, -Math.PI / 2);
+        arc(b.x + r, cy, Math.PI / 2);
+      } else {
+        arc(cx, b.y + b.h - r, 0);
+        arc(cx, b.y + r, Math.PI);
+      }
+      return pts;
+    }
+    default:
+      return [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h }];
+  }
+}
+
+/** The part of a polygon inside a convex polygon (Sutherland–Hodgman clipping). */
+export function clipPolygon(subject: readonly Point[], clip: readonly Point[]): Point[] {
+  let out = subject.slice();
+  // The clip polygon's winding decides which side of each edge is inside.
+  let area = 0;
+  for (let i = 0; i < clip.length; i++) {
+    const a = clip[i];
+    const b = clip[(i + 1) % clip.length];
+    area += a.x * b.y - b.x * a.y;
+  }
+  const sign = area >= 0 ? 1 : -1;
+  for (let i = 0; i < clip.length && out.length; i++) {
+    const a = clip[i];
+    const b = clip[(i + 1) % clip.length];
+    const inside = (p: Point) => sign * ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) >= 0;
+    const cross = (p: Point, q: Point): Point => {
+      const d = (q.x - p.x) * (b.y - a.y) - (q.y - p.y) * (b.x - a.x);
+      const t = d === 0 ? 0 : ((a.x - p.x) * (b.y - a.y) - (a.y - p.y) * (b.x - a.x)) / d;
+      return { x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t };
+    };
+    const input = out;
+    out = [];
+    for (let j = 0; j < input.length; j++) {
+      const p = input[j];
+      const q = input[(j + 1) % input.length];
+      if (inside(q)) {
+        if (!inside(p)) out.push(cross(p, q));
+        out.push(q);
+      } else if (inside(p)) out.push(cross(p, q));
+    }
+  }
+  return out;
+}
+
+/** The filled part of a bar shape: the shape cut at the level `f` (0…1), filling towards `dir`. */
+export function barFillPolygon(shape: BarShape, b: Box, dir: "up" | "right" | "down" | "left", f: number): Point[] {
+  if (f <= 0) return [];
+  const poly = shapePolygon(shape, b);
+  if (f >= 1) return poly;
+  const r: Box =
+    dir === "up"
+      ? { x: b.x - 1, y: b.y + b.h * (1 - f), w: b.w + 2, h: b.h * f + 1 }
+      : dir === "down"
+        ? { x: b.x - 1, y: b.y - 1, w: b.w + 2, h: b.h * f + 1 }
+        : dir === "left"
+          ? { x: b.x + b.w * (1 - f), y: b.y - 1, w: b.w * f + 1, h: b.h + 2 }
+          : { x: b.x - 1, y: b.y - 1, w: b.w * f + 1, h: b.h + 2 };
+  // Stars and hearts are not convex: clip the shape by the (convex) level rectangle.
+  return clipPolygon(poly, shapePolygon("rect", r));
 }
 
 // ---- the classic HUD ----------------------------------------------------------------------------
@@ -356,22 +651,21 @@ export function classicLayout(options: { magic?: boolean; bottom?: boolean } = {
   const bottom = options.bottom === true;
   const top = (y: number, h: number) => (bottom ? -(y + h) : y);
   const a = (side: "l" | "r"): Anchor => ((bottom ? "b" : "t") + side) as Anchor;
-  const show: Visibility = { when: "always" };
-  const elements: UiElement[] = [];
+  const raw: Raw[] = [];
   let x = 6;
   if (magic) {
-    elements.push({ id: "magic", type: "bar", x, y: top(4, 30), w: 8, h: 30, anchor: a("l"), show, value: "magic", max: "maxMagic", fill: "", back: "", dir: "up", fillColor: "#3ad16b", backColor: "#000000d9" });
+    raw.push({ id: "magic", type: "bar", x, y: top(4, 30), w: 8, h: 30, anchor: a("l"), value: "magic", max: "maxMagic", dir: "up" });
     x += 12;
   }
-  elements.push({ id: "item", type: "item", x, y: top(6, 22), w: 22, h: 22, anchor: a("l"), show, frame: "" });
+  raw.push({ id: "item", type: "item", x, y: top(6, 22), w: 22, h: 22, anchor: a("l") });
   x += 30;
   for (const [id, places] of [["rupees", 3], ["bombs", 2], ["arrows", 2], ["key", 1]] as const) {
     const w = Math.max(8, places * 6);
-    elements.push({ id, type: "counter", x, y: top(6, 17), w, h: 17, anchor: a("l"), show, value: id, icon: `hud_${id === "key" ? "key" : id.replace(/s$/, "")}`, digits: "", places });
+    raw.push({ id, type: "counter", x, y: top(6, 17), w, h: 17, anchor: a("l"), value: id, icon: `hud_${id === "key" ? "key" : id.replace(/s$/, "")}`, places });
     x += w + 8;
   }
   // Ten hearts a row, 8 pixels apart, right-aligned 30 pixels in (the gear sits in the corner).
-  elements.push({ id: "life", type: "text", x: -110, y: top(3, 8), w: 80, h: 8, anchor: a("r"), show, text: "{t:hud.life}", font: "", size: 7, color: "", align: "center" });
-  elements.push({ id: "hearts", type: "hearts", x: -110, y: top(13, 16), w: 80, h: 16, anchor: a("r"), show, full: "", half: "", empty: "", perRow: 10, gap: 1 });
-  return { v: LAYOUT_VERSION, scale: 0, theme: defaultTheme(), screen: defaultScreen(), elements };
+  raw.push({ id: "life", type: "text", x: -110, y: top(3, 8), w: 80, h: 8, anchor: a("r"), text: "{t:hud.life}", size: 7, align: "center" });
+  raw.push({ id: "hearts", type: "hearts", x: -110, y: top(13, 16), w: 80, h: 16, anchor: a("r"), perRow: 10, gap: 1 });
+  return { v: LAYOUT_VERSION, scale: 0, theme: defaultTheme(), screen: defaultScreen(), elements: raw.map((r) => readElement(r)!) };
 }

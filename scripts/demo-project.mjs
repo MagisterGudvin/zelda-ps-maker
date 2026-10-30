@@ -158,6 +158,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "rightPanel", type: "image", x: -116, y: 2, w: 92, h: 32, anchor: "tr", show: always, image: "zelda-ui-hud-bar", mode: "nine", slice: 4, color: "" },
       { id: "life", type: "text", x: -112, y: 4, w: 84, h: 8, anchor: "tr", show: always, text: "{t:hud.life}", font: "", size: 7, color: "", align: "center" },
       { id: "hearts", type: "hearts", x: -112, y: 13, w: 84, h: 17, anchor: "tr", show: always, full: "zelda-ui-heart-full", half: "zelda-ui-heart-half", empty: "zelda-ui-heart-empty", perRow: 8, gap: 1 },
+      // A warning that blinks while the player is down to one heart (health 2 or less).
+      { id: "lowHealth", type: "text", x: -112, y: 36, w: 84, h: 8, anchor: "tr", show: { when: "compare", id: "health", op: "<=", value: 2 }, effect: "blink", text: "LOW HEALTH", font: "", size: 7, color: "#ff5060", align: "center", stroke: "#1f1a24", strokeWidth: 1 },
     ],
   };
   // A pause screen (Enter) made of the same pictures: its buttons close it or run project events

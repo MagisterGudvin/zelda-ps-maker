@@ -206,6 +206,17 @@ await check("HUD (Zelda: UI Layout): hearts, counters, item box, magic and 9-sli
   });
   await wait(300);
   const after = await hud();
+  // One heart left: the demo's "LOW HEALTH" warning shows and blinks (its opacity changes over time).
+  await ev(() => {
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    tk.state.player.hp = 2;
+    tk.bus.emit("zelda:player:healthChanged", { hp: 2, maxHp: tk.state.player.maxHp, delta: 0 });
+  });
+  const blink = [];
+  for (let i = 0; i < 6; i++) {
+    await wait(130);
+    blink.push(await ev(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.find((o) => o.type === "Text" && o.visible && o.text === "LOW HEALTH")?.alpha ?? -1));
+  }
   await ev(() => {
     // The checks spend a while near the start (sign, villager) while the field's enemies roam: a
     // larger health reserve keeps the player from dying and respawning in the middle of a check.
@@ -216,7 +227,8 @@ await check("HUD (Zelda: UI Layout): hearts, counters, item box, magic and 9-sli
   for (const k of ["zelda-ui-heart-full", "zelda-ui-rupee", "zelda-ui-digits", "zelda-ui-item-box", "zelda-ui-magic-frame", "zelda-ui-hud-bar"]) expect(before.keys.includes(k), `${k} not drawn (${before.keys.join(", ")})`);
   expect(before.heartScale === before.zoom, `a heart pixel is ${before.heartScale} screen px, a map pixel ${before.zoom}`);
   expect(before.full === 3 && after.full === 1 && after.half === 1 && after.empty === 1, `hearts ${JSON.stringify([before, after].map((h) => [h.full, h.half, h.empty]))}`);
-  return `heart pixel = map pixel = ${before.zoom} screen px; 3 hearts → 1 + half`;
+  expect(blink.every((a) => a >= 0) && blink.includes(0) && blink.includes(1), `LOW HEALTH opacity over time: ${blink}`);
+  return `heart pixel = map pixel = ${before.zoom} screen px; 3 hearts → 1 + half; LOW HEALTH blinks at one heart (${blink.join(",")})`;
 });
 /** Whether a font draws Cyrillic itself: its width of "Жыщ" differs from that of the fallback alone. */
 const cyrillicIn = (family) =>

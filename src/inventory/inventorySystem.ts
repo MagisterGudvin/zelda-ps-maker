@@ -1,4 +1,5 @@
 import type { Session } from "../core/session.ts";
+import { HOTBAR_ACTIONS } from "../host/types.ts";
 
 /**
  * Input side of the inventory: quick-item cycling and the item panel.
@@ -23,6 +24,13 @@ export class InventorySystem {
     if (this.s.isPaused() && !this.open) return;
     if (input.pressed("nextItem")) inv.cycle(1);
     if (input.pressed("prevItem")) inv.cycle(-1);
+    // Slot keys (1…9) select the item of a quick-use slot, while the HUD has Slot elements.
+    const slots = this.s.hud?.layout().elements.filter((e) => e.type === "slot") ?? [];
+    for (const e of slots) {
+      if (e.type !== "slot" || !input.pressed(HOTBAR_ACTIONS[e.index - 1])) continue;
+      const id = inv.quickItems()[e.index - 1];
+      if (id) inv.equip(id);
+    }
   }
 
   setOpen(open: boolean): void {

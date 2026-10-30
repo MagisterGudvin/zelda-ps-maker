@@ -65,6 +65,8 @@ export interface ToolkitConfig {
     inventory: string[];
     /** Opens and closes the UI screen marked "Menu key" (Zelda: UI Layout). */
     menu: string[];
+    /** Keys of the quick-use slots 1…9 (Slot elements of the HUD): each selects its slot's item. */
+    hotbar: string[];
     /** Movement keys of the PS Maker controller, read only as a facing hint. */
     move: { up: string[]; down: string[]; left: string[]; right: string[] };
     gamepad: {
@@ -296,6 +298,7 @@ export function createDefaultConfig(): ToolkitConfig {
       prevItem: ["KeyQ"],
       inventory: ["KeyI"],
       menu: ["Enter"],
+      hotbar: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"],
       move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
       gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
     },

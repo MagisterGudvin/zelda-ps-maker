@@ -563,6 +563,60 @@ await check("UI Layout theme: own icons for built-in items (item box, inventory)
   return `own icon ×${r.icons}, panel in ${r.panel} pieces, cursor, title visible`;
 });
 
+await check("UI Layout 0.24 elements: a shape bar drawn over the panel before it, a turned picture, an icon from a sheet, a quick slot, a minimap, an outlined text", async () => {
+  const r = await ev(async () => {
+    const H = window.__harness;
+    const scene = H.scene();
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 16;
+    const g = c.getContext("2d");
+    for (let i = 0; i < 4; i++) ((g.fillStyle = ["#f00", "#0f0", "#00f", "#ff0"][i]), g.fillRect(i * 16, 0, 16, 16));
+    if (!scene.textures.exists("IMG_SHEET")) scene.textures.addCanvas("IMG_SHEET", c);
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    tk.inventory.give("boomerang", 1, { silent: true });
+    const layout = {
+      v: 1,
+      scale: 2,
+      elements: [
+        { id: "panel", type: "image", x: 4, y: 4, w: 120, h: 60, image: "IMG_BAR", mode: "nine", slice: 4 },
+        { id: "hp", type: "bar", x: 10, y: 10, w: 60, h: 10, value: "health", max: "maxHealth", shape: "round", fillColor: "#e04050", border: "#000000", text: "HP" },
+        { id: "turned", type: "image", x: 80, y: 10, w: 16, h: 16, image: "IMG_SHEET", rotation: 90 },
+        { id: "icon", type: "icon", x: 10, y: 30, w: 16, h: 16, image: "IMG_SHEET", cellW: 16, cellH: 16, index: 2 },
+        { id: "slot", type: "slot", x: 30, y: 30, w: 20, h: 20, index: 1 },
+        { id: "map", type: "minimap", x: 60, y: 28, w: 32, h: 32 },
+        { id: "label", type: "text", x: 100, y: 30, text: "Hi", stroke: "#000000", strokeWidth: 1 },
+      ],
+    };
+    H.run("Zelda: UI Layout", { layout: JSON.stringify(layout) });
+    await new Promise((ok) => setTimeout(ok, 300));
+    const hud = H.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    const panel = shown.filter((o) => o.texture?.key === "IMG_BAR");
+    const shapes = shown.filter((o) => o.type === "Graphics" && o.depth > 0 && o.depth < 0.9);
+    const turned = shown.find((o) => o.texture?.key === "IMG_SHEET" && Math.abs(o.rotation - Math.PI / 2) < 1e-6);
+    const icon = shown.find((o) => o.texture?.key === "IMG_SHEET" && o.frame?.name === "zmt_icon_16x16_2");
+    const label = shown.find((o) => o.type === "Text" && o.text === "Hi");
+    const hp = shown.find((o) => o.type === "Text" && o.text === "HP");
+    return {
+      panelDepth: Math.max(...panel.map((o) => o.depth)),
+      shapeDepths: shapes.map((o) => o.depth).sort(),
+      turned: !!turned,
+      icon: !!icon,
+      // Slot 1 shows the first quick-use item (whichever the earlier checks gave).
+      slotIcon: shown.some((o) => /(^|_)icon_/.test(o.texture?.key ?? "") && !/^zmt_icon_\d/.test(o.frame?.name ?? "")),
+      stroke: label?.style?.strokeThickness ?? 0,
+      hp: !!hp,
+    };
+  });
+  await page.screenshot({ path: `${ARTIFACTS}ui-layout-024.png` });
+  await ev(() => window.__harness.run("Zelda: UI Layout", {}));
+  assert(r.shapeDepths.length >= 2 && r.shapeDepths[0] > r.panelDepth, `the bar's graphics (${r.shapeDepths}) over the panel (${r.panelDepth})`);
+  assert(r.turned && r.icon && r.slotIcon && r.hp, JSON.stringify(r));
+  assert(r.stroke >= 2, `outline ${r.stroke}`);
+  return `bar over the panel (depth ${r.shapeDepths[0].toFixed(3)} > ${r.panelDepth.toFixed(3)}), turned picture, icon #2 of the sheet, slot with an item icon, minimap, outline ${r.stroke}px`;
+});
+
 await check("UI screens: Enter opens the menu screen (game paused, player still), arrows and Z press a button that runs a PS Maker event, a click closes it", async () => {
   await ev(() => {
     const H = window.__harness;

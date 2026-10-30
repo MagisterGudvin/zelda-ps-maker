@@ -1,6 +1,6 @@
 import type { Session } from "../core/session.ts";
 import type { HudItemSlot, HudModel } from "../host/types.ts";
-import { classicLayout, layoutBindings, type LayoutValues, type UiLayout } from "./uiLayout.ts";
+import { classicLayout, isShown, layoutBindings, type LayoutValues, type MinimapData, type UiLayout } from "./uiLayout.ts";
 
 const MAX_MESSAGES = 3;
 
@@ -42,8 +42,11 @@ export class HudSystem {
   tick(dtMs: number): void {
     const hud = this.s.host.hud;
     if (!hud) return;
-    // Project variables change without toolkit events: a layout showing one is redrawn a few times a second.
-    if (++this.ticks % 15 === 0 && this.showsVariables()) this.dirty = true;
+    // Project variables change without toolkit events (a few redraws a second do); effects move every
+    // tick, a minimap follows the player at 20 frames a second.
+    const live = this.liveness();
+    this.ticks++;
+    if ((live.effects && this.effectShown()) || (live.minimap && this.ticks % 3 === 0) || (live.vars && this.ticks % 15 === 0)) this.dirty = true;
     if (this.messages.length > 0) {
       for (const m of this.messages) m.remainingMs -= dtMs;
       while (this.messages.length > 0 && this.messages[0].remainingMs <= 0) this.messages.shift();
@@ -56,10 +59,47 @@ export class HudSystem {
 
   private ticks = 0;
 
-  private showsVariables(): boolean {
-    const shows = (l: UiLayout | undefined) => !!l && [...layoutBindings(l)].some((k) => k.startsWith("var:"));
-    const screen = this.s.screens?.current;
-    return shows(this.layout()) || shows(screen?.layout);
+  private readonly live = new WeakMap<UiLayout, { vars: boolean; effects: boolean; minimap: boolean }>();
+
+  /** What makes the shown layouts change without toolkit events. */
+  private liveness(): { vars: boolean; effects: boolean; minimap: boolean } {
+    const out = { vars: false, effects: false, minimap: false };
+    for (const l of this.shownLayouts()) {
+      let f = this.live.get(l);
+      if (!f) {
+        f = { vars: [...layoutBindings(l)].some((k) => k.startsWith("var:")), effects: l.elements.some((e) => e.effect !== "none"), minimap: l.elements.some((e) => e.type === "minimap") };
+        this.live.set(l, f);
+      }
+      out.vars ||= f.vars;
+      out.effects ||= f.effects;
+      out.minimap ||= f.minimap;
+    }
+    return out;
+  }
+
+  /** An element with an effect is on screen now (effects redraw the HUD every tick only then). */
+  private effectShown(): boolean {
+    return this.shownLayouts().some((l) => {
+      const fx = l.elements.filter((e) => e.effect !== "none");
+      if (!fx.length) return false;
+      const values = this.values(l);
+      return fx.some((e) => isShown(e, values));
+    });
+  }
+
+  private shownLayouts(): UiLayout[] {
+    const sc = this.s.screens;
+    return [this.layout(), ...(sc?.layers ?? []).map((l) => l.layout), ...(sc?.current ? [sc.current.layout] : [])];
+  }
+
+  /** The world around the player for minimaps: the map's walls, live enemies and solid objects. */
+  private minimapData(): MinimapData | null {
+    if (!this.liveness().minimap) return null;
+    const s = this.s;
+    const dots: MinimapData["dots"][number][] = [];
+    for (const e of s.world.list("enemy")) if (e.alive && !e.removed) dots.push({ x: e.x, y: e.y, kind: "enemy" });
+    for (const e of s.world.list("object")) if (!e.removed && e.solid) dots.push({ x: e.x, y: e.y, kind: "object" });
+    return { x: s.player.box.x, y: s.player.box.y, walls: s.host.mapWalls?.() ?? [], dots };
   }
 
   /** The layout the HUD shows: the designer's (Zelda: UI Layout) or the classic one. */
@@ -90,6 +130,12 @@ export class HudSystem {
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
       else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
       else if (key === "item.count") out[key] = s.statValue("itemCount");
+      else if (key.startsWith("slot.")) {
+        // slot.<n>.icon / slot.<n>.sel: the n-th quick-use item.
+        const [, n, what] = key.split(".");
+        const id = s.toolkit.inventory.quickItems()[Number(n) - 1];
+        out[key] = what === "sel" ? (id && id === st.inventory.activeItem ? 1 : 0) : id && s.feature("inventory") ? this.iconOf(id, layout) : "";
+      }
       else out[key] = s.statValue(key);
     }
     return out;
@@ -136,6 +182,9 @@ export class HudSystem {
         const cur = s.screens?.current;
         return cur ? { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus } : null;
       })(),
+      layers: (s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
+      time: s.tick * (1000 / s.config.world.fixedStepHz),
+      minimap: this.minimapData(),
     };
   }
 

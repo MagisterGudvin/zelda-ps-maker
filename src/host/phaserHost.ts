@@ -892,6 +892,10 @@ export class PhaserHost implements HostAdapter, DepthSource {
     }
   }
 
+  mapWalls(): readonly AABB[] {
+    return this.staticPool;
+  }
+
   isMapBlocked(box: AABB): boolean {
     const c = this.candidates;
     c.length = 0;

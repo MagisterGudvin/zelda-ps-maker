@@ -2,7 +2,7 @@ import { createDefaultConfig } from "../core/config.ts";
 import { layoutScale } from "../host/layoutPainter.ts";
 import type { PsStory } from "../host/psmakerAssets.ts";
 import { I18n } from "../ui/i18n.ts";
-import { classicLayout, layoutBindings, parseLayout, readElement, type Box, type ElementType, type LayoutValues, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
+import { classicLayout, layoutBindings, offsetFrom, parseLayout, readElement, type Anchor, type Box, type ElementType, type LayoutValues, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 
 /**
  * What the UI designer edits, without Phaser or the page: where the game window sits on the map,
@@ -181,16 +181,20 @@ export function freeId(layout: UiLayout, base: string): string {
 const NEW: Record<ElementType, Raw> = {
   image: { w: 48, h: 16, color: "#000000aa", mode: "stretch" },
   text: { w: 64, h: 10, text: "Text", size: 8 },
-  bar: { w: 40, h: 6, value: "health", max: "maxHealth", dir: "right" },
+  bar: { w: 48, h: 8, value: "health", max: "maxHealth", dir: "right", shape: "round", fillColor: "#e04050", backColor: "#2a2030e6", border: "#000000" },
   hearts: { w: 80, h: 16 },
   counter: { w: 18, h: 17, value: "rupees", icon: "hud_rupee", places: 3 },
   item: { w: 22, h: 22 },
-  button: { w: 72, h: 16, text: "Button", anchor: "c", x: -36, y: -8 },
+  icon: { w: 16, h: 16, cellW: 16, cellH: 16 },
+  slot: { w: 20, h: 20, index: 1 },
+  minimap: { w: 64, h: 64, shape: "circle" },
+  button: { w: 72, h: 16, text: "Button", anchor: "c" },
 };
 
-/** A new element of a type with its defaults, its top-left at a point of the game window. */
-export function newElement(layout: UiLayout, type: ElementType, x: number, y: number): UiElement {
-  return readElement({ x: Math.round(x), y: Math.round(y), ...NEW[type], type, id: freeId(layout, type) })!;
+/** A new element of a type with its defaults, its top-left at a point of the game window (view size for its anchor). */
+export function newElement(layout: UiLayout, type: ElementType, left: number, top: number, viewW = 0, viewH = 0): UiElement {
+  const anchor = (NEW[type].anchor as Anchor | undefined) ?? "tl";
+  return readElement({ ...NEW[type], ...offsetFrom(anchor, left, top, viewW, viewH), type, id: freeId(layout, type) })!;
 }
 
 /** A copy of the layout (the designer never changes a layout it has handed out). */
@@ -220,6 +224,189 @@ export function withField(e: UiElement, path: string, value: unknown): UiElement
 export function savedText(layout: UiLayout): { text: string; error: string | null } {
   const text = JSON.stringify(layout);
   return { text, error: text.length > LAYOUT_MAX_CHARS ? `the layout is ${text.length} characters, the field keeps ${LAYOUT_MAX_CHARS}` : null };
+}
+
+// ---- selection, snapping, arranging ------------------------------------------------------------
+
+/** The box around several boxes, or null. */
+export function boundsOf(boxes: readonly Box[]): Box | null {
+  if (!boxes.length) return null;
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
+}
+
+/** Ids of the element's group (all members), or just the element. */
+export function withGroup(layout: UiLayout, id: string): string[] {
+  const g = layout.elements.find((e) => e.id === id)?.group;
+  return g ? layout.elements.filter((e) => e.group === g).map((e) => e.id) : [id];
+}
+
+export interface Guide {
+  axis: "x" | "y";
+  /** Position of the line (layout pixels). */
+  at: number;
+}
+
+/**
+ * How far to move a box so its edges or centre land on the grid, on the game window's edges and
+ * centre or on other elements' edges and centres (whichever is nearest within `threshold`), and the
+ * guide lines that show it.
+ */
+export function snapMove(box: Box, others: readonly Box[], viewW: number, viewH: number, threshold: number, grid = 0): { dx: number; dy: number; guides: Guide[] } {
+  const guides: Guide[] = [];
+  const axis = (pos: number, size: number, lines: number[], name: "x" | "y"): number => {
+    let best = Infinity;
+    let line = 0;
+    for (const l of lines)
+      for (const p of [pos, pos + size / 2, pos + size]) {
+        const d = l - p;
+        if (Math.abs(d) < Math.abs(best) && Math.abs(d) <= threshold) (best = d), (line = l);
+      }
+    if (best !== Infinity) {
+      guides.push({ axis: name, at: line });
+      return Math.round(best);
+    }
+    return grid > 1 ? Math.round(pos / grid) * grid - pos : 0;
+  };
+  const xs = [0, Math.round(viewW / 2), viewW, ...others.flatMap((o) => [o.x, Math.round(o.x + o.w / 2), o.x + o.w])];
+  const ys = [0, Math.round(viewH / 2), viewH, ...others.flatMap((o) => [o.y, Math.round(o.y + o.h / 2), o.y + o.h])];
+  return { dx: axis(box.x, box.w, xs, "x"), dy: axis(box.y, box.h, ys, "y"), guides };
+}
+
+export type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+/** A box resized by dragging one of its handles by (dx, dy); `keepRatio` keeps its proportions (corner handles). */
+export function resizeBox(b: Box, handle: Handle, dx: number, dy: number, keepRatio = false): Box {
+  let { x, y, w, h } = b;
+  if (handle.includes("e")) w = b.w + dx;
+  if (handle.includes("w")) (x = b.x + dx), (w = b.w - dx);
+  if (handle.includes("s")) h = b.h + dy;
+  if (handle.includes("n")) (y = b.y + dy), (h = b.h - dy);
+  if (keepRatio && handle.length === 2 && b.w > 0 && b.h > 0) {
+    const f = Math.max(w / b.w, h / b.h);
+    const nw = b.w * f;
+    const nh = b.h * f;
+    if (handle.includes("w")) x = b.x + b.w - nw;
+    if (handle.includes("n")) y = b.y + b.h - nh;
+    (w = nw), (h = nh);
+  }
+  // Never smaller than a pixel; the opposite edge stays put.
+  if (w < 1) {
+    if (handle.includes("w")) x = b.x + b.w - 1;
+    w = 1;
+  }
+  if (h < 1) {
+    if (handle.includes("n")) y = b.y + b.h - 1;
+    h = 1;
+  }
+  return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+}
+
+/** Moves elements by (dx, dy) layout pixels. */
+export function moveElements(layout: UiLayout, ids: readonly string[], dx: number, dy: number): UiLayout {
+  const next = cloneLayout(layout);
+  for (const e of next.elements) if (ids.includes(e.id)) (e.x += dx), (e.y += dy);
+  return next;
+}
+
+export type Align = "left" | "center" | "right" | "top" | "middle" | "bottom" | "spreadX" | "spreadY";
+
+/** Lines up elements by their boxes (the edges or centres of the box around them), or spaces them evenly. */
+export function alignElements(layout: UiLayout, ids: readonly string[], boxes: Record<string, Box>, how: Align): UiLayout {
+  const list = ids.filter((id) => boxes[id]);
+  const all = boundsOf(list.map((id) => boxes[id]));
+  if (!all || list.length < 2) return layout;
+  const next = cloneLayout(layout);
+  const shift = (id: string, dx: number, dy: number) => {
+    const e = next.elements.find((x) => x.id === id);
+    if (e) (e.x += Math.round(dx)), (e.y += Math.round(dy));
+  };
+  if (how === "spreadX" || how === "spreadY") {
+    const horiz = how === "spreadX";
+    const sorted = [...list].sort((a, b) => (horiz ? boxes[a].x - boxes[b].x : boxes[a].y - boxes[b].y));
+    const total = sorted.reduce((t, id) => t + (horiz ? boxes[id].w : boxes[id].h), 0);
+    const gap = ((horiz ? all.w : all.h) - total) / (sorted.length - 1);
+    let at = horiz ? all.x : all.y;
+    for (const id of sorted) {
+      const b = boxes[id];
+      if (horiz) shift(id, at - b.x, 0);
+      else shift(id, 0, at - b.y);
+      at += (horiz ? b.w : b.h) + gap;
+    }
+    return next;
+  }
+  for (const id of list) {
+    const b = boxes[id];
+    if (how === "left") shift(id, all.x - b.x, 0);
+    if (how === "center") shift(id, all.x + all.w / 2 - (b.x + b.w / 2), 0);
+    if (how === "right") shift(id, all.x + all.w - (b.x + b.w), 0);
+    if (how === "top") shift(id, 0, all.y - b.y);
+    if (how === "middle") shift(id, 0, all.y + all.h / 2 - (b.y + b.h / 2));
+    if (how === "bottom") shift(id, 0, all.y + all.h - (b.y + b.h));
+  }
+  return next;
+}
+
+/** Changes the drawing order of elements (later = on top), keeping the order among them. */
+export function reorderElements(layout: UiLayout, ids: readonly string[], how: "front" | "back" | "forward" | "backward"): UiLayout {
+  const next = cloneLayout(layout);
+  const picked = next.elements.filter((e) => ids.includes(e.id));
+  const rest = next.elements.filter((e) => !ids.includes(e.id));
+  if (how === "front") next.elements = [...rest, ...picked];
+  else if (how === "back") next.elements = [...picked, ...rest];
+  else {
+    const list = next.elements;
+    const step = how === "forward" ? 1 : -1;
+    const order = how === "forward" ? [...list.keys()].reverse() : [...list.keys()];
+    for (const i of order) {
+      const j = i + step;
+      if (!ids.includes(list[i].id) || j < 0 || j >= list.length || ids.includes(list[j].id)) continue;
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+  }
+  return next;
+}
+
+/** Puts elements into one new group (or takes them out of their groups). */
+export function groupElements(layout: UiLayout, ids: readonly string[], on: boolean): UiLayout {
+  const next = cloneLayout(layout);
+  const used = new Set(next.elements.map((e) => e.group).filter(Boolean));
+  let g = "g1";
+  for (let n = 2; used.has(g); n++) g = `g${n}`;
+  for (const e of next.elements) {
+    if (!ids.includes(e.id)) continue;
+    if (on) e.group = g;
+    else delete e.group;
+  }
+  return next;
+}
+
+/** Adds copies of elements with new names (and new groups for copied groups), moved by (dx, dy). The ids of the copies. */
+export function pasteElements(layout: UiLayout, copies: readonly UiElement[], dx: number, dy: number): { layout: UiLayout; ids: string[] } {
+  const next = cloneLayout(layout);
+  const groups = new Map<string, string>();
+  const used = new Set(next.elements.map((e) => e.group).filter(Boolean));
+  const ids: string[] = [];
+  for (const c of copies) {
+    const e: UiElement = JSON.parse(JSON.stringify(c));
+    e.id = freeId(next, c.id.replace(/\d+$/, "") || c.type);
+    e.x += dx;
+    e.y += dy;
+    delete e.locked;
+    if (c.group) {
+      if (!groups.has(c.group)) {
+        let g = "g1";
+        for (let n = 2; used.has(g); n++) g = `g${n}`;
+        used.add(g);
+        groups.set(c.group, g);
+      }
+      e.group = groups.get(c.group);
+    }
+    next.elements.push(e);
+    ids.push(e.id);
+  }
+  return { layout: next, ids };
 }
 
 /** Undo and redo of whole layouts. */

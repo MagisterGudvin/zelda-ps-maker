@@ -1015,12 +1015,13 @@ const openUiScreen = defineEvent({
 
 const closeUiScreen = defineEvent({
   name: "Zelda: Close UI Screen",
-  description: "Closes the open UI screen (back to the one it was opened from), or all of them. / Закрывает экран меню.",
+  description: "Closes a UI screen or layer by its name, else the open screen (back to the one it was opened from); or all of them. / Закрывает экран меню или слой.",
   parameterDefs: {
-    all: bool("All screens", "Close every open screen, not just the top one. / Закрыть все экраны.", false),
+    name: str("Screen name", "Empty = the open screen. A layer (a screen that does not take the keys) closes only by its name. / Имя экрана или слоя.", ""),
+    all: bool("All screens", "Close every open screen and layer. / Закрыть все экраны и слои.", false),
   },
   execute(params, ctx) {
-    run("Zelda: Close UI Screen", ctx, params, (s) => s.screens?.close(params.all === true));
+    run("Zelda: Close UI Screen", ctx, params, (s) => s.screens?.close(params.all === true, textOf((params as Record<string, unknown>).name).trim()));
   },
 });
 

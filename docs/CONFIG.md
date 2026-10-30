@@ -29,7 +29,7 @@
 ### `controls` — привязка кнопок (в редакторе — `Zelda: Set Controls`)
 `controls.move` — клавиши движения PS Maker (по умолчанию стрелки и WASD): игрока ими двигает PS Maker; Toolkit использует их как подсказку направления, чтобы игрок мог «повернуться» к стене/сундуку, не сдвигаясь (`player.facingFromInput`), и для выбора кнопок на экранах меню.
 
-Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory, menu` (`menu`, по умолчанию Enter, открывает экран меню с отметкой *Menu key opens it*). Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory, menu}` — индексы кнопок стандартной раскладки (крестовина 12–15 выбирает кнопки экранов); работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
+Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory, menu` (`menu`, по умолчанию Enter, открывает экран меню с отметкой *Menu key opens it*). `controls.hotbar` — девять клавиш слотов быстрого доступа (по умолчанию `Digit1`…`Digit9`): клавиша берёт в руку предмет своего слота, пока в HUD есть элементы *Quick slot*. Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory, menu}` — индексы кнопок стандартной раскладки (крестовина 12–15 выбирает кнопки экранов); работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
 
 ```json
 {"controls":{"sword":["Space","KeyJ"],"useItem":["KeyK"],"action":["KeyZ","KeyL"]}}

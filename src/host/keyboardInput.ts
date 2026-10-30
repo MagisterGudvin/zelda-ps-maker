@@ -1,5 +1,5 @@
 import type { ToolkitConfig } from "../core/config.ts";
-import { INPUT_ACTIONS, type InputAction, type InputSource } from "./types.ts";
+import { HOTBAR_ACTIONS, INPUT_ACTIONS, type InputAction, type InputSource } from "./types.ts";
 import type { Facing } from "../core/math.ts";
 
 /** Minimal event-emitter surface (Phaser's KeyboardPlugin / Game events). */
@@ -145,6 +145,7 @@ export class KeyboardInput implements InputSource {
     add("prevItem", c.prevItem);
     add("inventory", c.inventory);
     add("menu", c.menu);
+    HOTBAR_ACTIONS.forEach((a, i) => add(a, c.hotbar[i] ? [c.hotbar[i]] : []));
     add("up", c.move.up);
     add("down", c.move.down);
     add("left", c.move.left);

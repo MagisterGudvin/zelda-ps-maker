@@ -6,12 +6,14 @@ import { isShown, layoutBoxes, nextButton, type ButtonElement, type UiLayout } f
  * Screen, a button or the Menu key. Arrow keys move the selection between the buttons, the action
  * key or a click presses one, the sword or inventory key (or Menu, for the menu screen) goes back.
  * A screen opened from another goes back to it. Runs while the game is paused, like the
- * inventory panel.
+ * inventory panel. A screen that does not take the keys is a layer over the HUD (a boss bar, a
+ * notice): the game plays on under it until it is closed by name.
  */
 export class UiScreenSystem {
   readonly name = "screens";
   private readonly s: Session;
   private readonly stack: { name: string; focus: string }[] = [];
+  private readonly layerNames: string[] = [];
   private readonly offPointer: () => void;
 
   constructor(session: Session) {
@@ -26,23 +28,58 @@ export class UiScreenSystem {
     return top && layout ? { name: top.name, layout, focus: top.focus } : null;
   }
 
+  /** Open layers (screens that do not take the keys), oldest first. */
+  get layers(): { name: string; layout: UiLayout }[] {
+    return this.layerNames.flatMap((name) => {
+      const layout = this.s.toolkit.uiScreens.get(name);
+      return layout ? [{ name, layout }] : [];
+    });
+  }
+
   open(name: string): boolean {
     const layout = this.s.toolkit.uiScreens.get(name);
     if (!layout) {
       this.s.logger.warnOnce(`screen-${name}`, `UI screen "${name}" is not defined (Zelda: UI Layout with this screen name, run before).`);
       return false;
     }
+    if (!layout.screen.input) {
+      if (!this.layerNames.includes(name)) this.layerNames.push(name);
+      this.s.hud?.markDirty();
+      this.s.bus.emit("zelda:ui:screen", { name, open: true });
+      return true;
+    }
     if (this.current?.name === name) return true;
     this.stack.push({ name, focus: this.buttons(layout)[0]?.id ?? "" });
+    this.sound(layout.screen.soundOpen);
     this.changed(name, true);
     return true;
   }
 
-  /** Closes the top screen (back to the one under it), or every screen. */
-  close(all = false): void {
+  /** Closes a screen or layer by name, else the top screen (back to the one under it); `all` closes every screen and layer. */
+  close(all = false, name = ""): void {
+    if (all) {
+      for (const n of this.layerNames.splice(0)) this.s.bus.emit("zelda:ui:screen", { name: n, open: false });
+      this.s.hud?.markDirty();
+    } else if (name && this.layerNames.includes(name)) {
+      this.layerNames.splice(this.layerNames.indexOf(name), 1);
+      this.s.hud?.markDirty();
+      this.s.bus.emit("zelda:ui:screen", { name, open: false });
+      return;
+    }
     if (this.stack.length === 0) return;
-    const names = all ? this.stack.splice(0).map((t) => t.name) : [this.stack.pop()!.name];
-    for (const n of names.reverse()) this.changed(n, false);
+    let closed: string[];
+    if (all) closed = this.stack.splice(0).map((t) => t.name);
+    else if (name) {
+      const i = this.stack.findIndex((t) => t.name === name);
+      if (i < 0) return;
+      closed = this.stack.splice(i).map((t) => t.name);
+    } else closed = [this.stack.pop()!.name];
+    this.sound(this.s.toolkit.uiScreens.get(closed[0])?.screen.soundClose ?? "");
+    for (const n of closed.reverse()) this.changed(n, false);
+  }
+
+  private sound(id: string): void {
+    if (id) this.s.host.playSound(id, 1);
   }
 
   private changed(name: string, open: boolean): void {
@@ -87,6 +124,7 @@ export class UiScreenSystem {
       const next = nextButton(this.boxes(cur.layout), ids, top.focus, dir);
       if (next !== top.focus) {
         top.focus = next;
+        this.sound(cur.layout.screen.soundMove);
         this.s.hud?.markDirty();
       }
     }
@@ -109,6 +147,7 @@ export class UiScreenSystem {
     const top = this.stack.at(-1)!;
     if (top.focus !== hit.id) {
       top.focus = hit.id;
+      if (type === "move") this.sound(cur.layout.screen.soundMove);
       this.s.hud?.markDirty();
     }
     if (type === "down") this.press(hit.id);
@@ -120,6 +159,7 @@ export class UiScreenSystem {
     const b = cur?.layout.elements.find((e): e is ButtonElement => e.id === id && e.type === "button");
     if (!cur || !b) return;
     this.s.bus.emit("zelda:ui:button", { screen: cur.name, id });
+    this.sound(cur.layout.screen.soundPress);
     const a = b.action;
     switch (a.kind) {
       case "event":
@@ -140,6 +180,7 @@ export class UiScreenSystem {
 
   dispose(): void {
     this.offPointer();
+    this.layerNames.length = 0;
     if (this.stack.length) {
       this.stack.length = 0;
       this.s.setPaused("screen", false);

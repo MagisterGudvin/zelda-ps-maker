@@ -329,7 +329,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
   },
   "Zelda: Close UI Screen": {
     keywords: ["menu", "screen", "ui", "close", "back"],
-    preview: (p) => (p.all === true ? "all" : "top screen"),
+    preview: (p) => (p.all === true ? "all" : set(p.name) ? String(p.name) : "top screen"),
   },
   "Zelda: Message Style": {
     keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign"],

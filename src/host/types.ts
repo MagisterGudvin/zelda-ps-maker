@@ -1,4 +1,4 @@
-import type { LayoutValues, UiLayout } from "../ui/uiLayout.ts";
+import type { LayoutValues, MinimapData, UiLayout } from "../ui/uiLayout.ts";
 import type { AABB, Facing } from "../core/math.ts";
 
 /**
@@ -41,6 +41,8 @@ export interface HostAdapter {
   setVariable?(id: string, value: string | number | boolean): boolean;
   /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does. False when it cannot. */
   runStoryEvent?(eventId: string): boolean;
+  /** Optional: the map's collision boxes (for minimaps). */
+  mapWalls?(): readonly AABB[];
   /** Optional: true while the engine shows a dialogue (combat pauses, see combat.pauseDuringDialogue). */
   isDialogueOpen?(): boolean;
   /** Host facts for the diagnostics panel (scene, camera, player). */
@@ -70,10 +72,13 @@ export interface HostAdapter {
   dispose(): void;
 }
 
-/** Toolkit keys; "up"…"right" are the movement keys, read only by UI screens (PS Maker moves the player). */
-export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | "debug" | "diagnostics";
+export type HotbarAction = "slot1" | "slot2" | "slot3" | "slot4" | "slot5" | "slot6" | "slot7" | "slot8" | "slot9";
+export const HOTBAR_ACTIONS: readonly HotbarAction[] = ["slot1", "slot2", "slot3", "slot4", "slot5", "slot6", "slot7", "slot8", "slot9"];
 
-export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", "debug", "diagnostics"];
+/** Toolkit keys; "up"…"right" are the movement keys, read only by UI screens (PS Maker moves the player). */
+export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | HotbarAction | "debug" | "diagnostics";
+
+export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", ...HOTBAR_ACTIONS, "debug", "diagnostics"];
 
 /**
  * Edge-aware input. `latch()` is called once per fixed tick; presses that
@@ -175,6 +180,12 @@ export interface HudModel {
   deathText: string;
   /** The open UI screen over the game (its selected button), or null. */
   screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string } | null;
+  /** Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the screen. */
+  layers: { name: string; layout: UiLayout; values: LayoutValues }[];
+  /** Milliseconds of play, for element effects. */
+  time: number;
+  /** The world around the player, when a layout has a minimap. */
+  minimap: MinimapData | null;
 }
 
 export interface HudSink {

@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.23.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.24.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
@@ -422,11 +422,12 @@ Opens a UI screen made with Zelda: UI Layout (by its screen name) over the game.
 
 ## Zelda: Close UI Screen
 
-Closes the open UI screen (back to the one it was opened from), or all of them. / Закрывает экран меню.
+Closes a UI screen or layer by its name, else the open screen (back to the one it was opened from); or all of them. / Закрывает экран меню или слой.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `all` (All screens) | boolean | `false` | Close every open screen, not just the top one. / Закрыть все экраны. |
+| `name` (Screen name) | string | `""` | Empty = the open screen. A layer (a screen that does not take the keys) closes only by its name. / Имя экрана или слоя. |
+| `all` (All screens) | boolean | `false` | Close every open screen and layer. / Закрыть все экраны и слои. |
 
 ## Zelda: Show Stat In Variable
 

@@ -31,7 +31,8 @@ export class PhaserHud implements HudSink {
   private pending: HudModel | null = null;
   private visible = true;
   private painter: LayoutPainter | null = null;
-  /** The open UI screen, above the HUD. */
+  /** Layers (screens without keys) over the HUD, and the open screen over them. */
+  private layerPainter: LayoutPainter | null = null;
   private screenPainter: LayoutPainter | null = null;
   private screenK = 0;
   private pointerHandler: ((type: "move" | "down", x: number, y: number) => void) | null = null;
@@ -70,6 +71,7 @@ export class PhaserHud implements HudSink {
           create(this: any) {
             self.scene = this;
             self.painter = new LayoutPainter(this, 0);
+            self.layerPainter = new LayoutPainter(this, 3);
             self.screenPainter = new LayoutPainter(this, 5);
             // Pointer over an open screen: hover and click its buttons (in its layout pixels).
             const pointer = (type: "move" | "down") => (p: { x: number; y: number }) => {
@@ -102,7 +104,7 @@ export class PhaserHud implements HudSink {
     const { W, H } = this.screen();
     const k = layoutScale(model.layout.scale || model.scale, model.mapZoom, W, H);
     p.begin();
-    const painted = p.paint(model.layout, model.values, model.fonts, { x: 0, y: 0, w: W, h: H, k });
+    const painted = p.paint(model.layout, model.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { time: model.time, minimap: model.minimap });
     const font = model.fonts[model.layout.theme.font] ?? "monospace";
     this.drawMessages(model, painted, k, font);
     if (model.dead) {
@@ -114,19 +116,30 @@ export class PhaserHud implements HudSink {
     this.drawScreen(model);
   }
 
-  /** The open screen over the game: the dim colour, then its layout with the selected button. */
+  /** Layers, then the open screen over the game: its dim colour, its layout with the selected button. */
   private drawScreen(model: HudModel): void {
+    const lp = this.layerPainter;
     const sp = this.screenPainter;
-    if (!sp) return;
+    if (!sp || !lp) return;
+    const { W, H } = this.screen();
+    const dim = (p: LayoutPainter, value: string) => {
+      const m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(value.trim());
+      if (m) p.backdrop.fillStyle(parseInt(m[1], 16), m[2] ? parseInt(m[2], 16) / 255 : 1).fillRect(0, 0, W, H);
+    };
+    // One painter for every layer: they are few and rarely overlap.
+    lp.begin();
+    for (const l of model.layers) {
+      const k = layoutScale(l.layout.scale || model.scale, model.mapZoom, W, H);
+      lp.paint(l.layout, l.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { time: model.time, minimap: model.minimap });
+    }
+    lp.end();
     sp.begin();
     const sc = model.screen;
     this.screenK = 0;
     if (sc) {
-      const { W, H } = this.screen();
       const k = layoutScale(sc.layout.scale || model.scale, model.mapZoom, W, H);
-      const dim = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(sc.layout.screen.dim.trim());
-      if (dim) sp.graphics.fillStyle(parseInt(dim[1], 16), dim[2] ? parseInt(dim[2], 16) / 255 : 1).fillRect(0, 0, W, H);
-      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, sc.focus);
+      dim(sp, sc.layout.screen.dim);
+      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { focus: sc.focus, time: model.time, minimap: model.minimap });
       this.screenK = k;
     }
     sp.end();
