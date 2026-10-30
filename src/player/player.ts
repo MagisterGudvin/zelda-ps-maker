@@ -4,7 +4,7 @@ import { type AABB, copyBox, type Facing, FACING_VECTORS, facingFromVector, isIn
 import type { Damageable, DamageInfo, HitResult } from "../core/types.ts";
 import { changeHealth, changeMagic } from "./health.ts";
 import { buildOverlay, OVERLAY_PRIORITY } from "./overlay.ts";
-import type { OverlayLayer } from "../host/types.ts";
+import type { EntityView, OverlayLayer } from "../host/types.ts";
 
 export type PlayerState = "normal" | "dead";
 
@@ -75,6 +75,8 @@ export class PlayerSystem implements SessionSystem, Damageable {
   private tinted = false;
   private overlayReq: { prio: number; layers: OverlayLayer[] } | null = null;
   private overlayShown = false;
+  /** The built-in shield drawn in front of the player while it is held up (no Shield up animation). */
+  private shieldView: EntityView | null = null;
   private hurtMs = -1;
   /** One-shot body animation (item use, lift, throw, item get) and its clock. */
   private pose: { anim: string; ms: number; durationMs: number; lock: boolean } | null = null;
@@ -213,6 +215,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
       const pose = this.s.interactions?.isCarrying() ? sp.carry : this.s.interactions?.isPushing() ? sp.push : this.shieldRaised() ? sp.shield : "";
       if (pose) this.requestOverlay(OVERLAY_PRIORITY.pose, buildOverlay(cfg, pose, "", this.facing, pose === sp.push ? this.clockMs : this.isMoving ? this.walkMs : 0));
     }
+    this.updateShieldView();
     const req = this.overlayReq;
     this.overlayReq = null;
     if (req) {
@@ -406,6 +409,27 @@ export class PlayerSystem implements SessionSystem, Damageable {
     }
   }
 
+  /**
+   * Without a "Shield up" animation the raised shield is the built-in shield icon, held on the side
+   * the player faces (behind the player when facing up, as seen from above).
+   */
+  private updateShieldView(): void {
+    const sp = this.s.config.player.sprites;
+    const show = this.state !== "dead" && this.shieldRaised() && !(sp.shield && this.s.config.sprites.animations[sp.shield]);
+    if (!show) {
+      this.shieldView?.setVisible(false);
+      return;
+    }
+    this.shieldView ??= this.s.host.renderer.createView({ sprite: "icon_shield", layer: 1, scale: 0.75 });
+    const v = FACING_VECTORS[this.facing];
+    const x = this.box.x + v.x * (this.box.hw + 2);
+    const y = this.box.y + (v.y > 0 ? this.box.hh - 3 : v.y < 0 ? -this.box.hh : 0);
+    this.shieldView.setVisible(true);
+    this.shieldView.setPosition(x, y);
+    this.shieldView.setFlipX(this.facing === "left");
+    this.shieldView.setDepthY?.(v.y < 0 ? this.box.y - this.box.hh - 1 : this.box.y + this.box.hh + 1);
+  }
+
   /** The shield is held up with its button (shield on a button). */
   private shieldRaised(): boolean {
     const cfg = this.s.config.shield;
@@ -555,6 +579,8 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.offs.length = 0;
     this.locks.clear();
     if (this.overlayShown) this.s.host.setPlayerOverlay(null);
+    this.shieldView?.destroy();
+    this.shieldView = null;
     this.s.host.setPlayerLocked(false);
     this.s.host.setPlayerBlink(true);
     this.s.host.setPlayerTint(null);

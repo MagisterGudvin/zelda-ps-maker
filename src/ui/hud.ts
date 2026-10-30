@@ -130,7 +130,15 @@ export class HudSystem {
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
       else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
       else if (key === "item.count") out[key] = s.statValue("itemCount");
-      else if (key.startsWith("slot.")) {
+      else if (key === "message" || key === "message.ready" || key === "message.more") {
+        // The message screen: its text as typed so far, whether it waits for a key, more pages.
+        const m = s.screens?.messageView() ?? { text: "", ready: false, more: false };
+        out[key] = key === "message" ? m.text : key === "message.ready" ? (m.ready ? 1 : 0) : m.more ? 1 : 0;
+      } else if (key.startsWith("inv.")) {
+        // The item under an inventory screen's cursor.
+        const id = s.screens?.cursorItem() ?? null;
+        out[key] = !id ? "" : key === "inv.name" ? s.toolkit.inventory.displayName(id) : key === "inv.description" ? s.toolkit.inventory.displayDescription(id) : (this.countOf(id) ?? "");
+      } else if (key.startsWith("slot.")) {
         // slot.<n>.icon / slot.<n>.sel: the n-th quick-use item.
         const [, n, what] = key.split(".");
         const id = s.toolkit.inventory.quickItems()[Number(n) - 1];
@@ -139,6 +147,13 @@ export class HudSystem {
       else out[key] = s.statValue(key);
     }
     return out;
+  }
+
+  /** The ammunition count an item shows (bombs, arrows), or null. */
+  private countOf(id: string): number | null {
+    const def = this.s.toolkit.items.get(id);
+    const counter = def?.counter ?? def?.resource;
+    return counter && counter !== "magic" ? this.s.toolkit.inventory.count(counter) : null;
   }
 
   /** An item's icon: the layout theme's picture for it, its own (Define Item), or the built-in one. */
@@ -153,18 +168,14 @@ export class HudSystem {
     const open = s.inventoryUi?.open ?? false;
     const activeId = st.inventory.activeItem;
     const layout = this.layout();
-    const slot = (id: string): HudItemSlot => {
-      const def = s.toolkit.items.get(id);
-      const counter = def?.counter ?? def?.resource;
-      return {
-        itemId: id,
-        name: inv.displayName(id),
-        description: inv.displayDescription(id),
-        icon: this.iconOf(id, layout),
-        count: counter && counter !== "magic" ? inv.count(counter) : null,
-        selected: id === activeId,
-      };
-    };
+    const slot = (id: string): HudItemSlot => ({
+      itemId: id,
+      name: inv.displayName(id),
+      description: inv.displayDescription(id),
+      icon: this.iconOf(id, layout),
+      count: this.countOf(id),
+      selected: id === activeId,
+    });
     return {
       visible: true,
       layout,
@@ -178,9 +189,13 @@ export class HudSystem {
       inventory: open ? [...st.inventory.owned.filter((id) => s.toolkit.items.has(id)).map(slot)] : [],
       dead: s.player.isDead,
       deathText: s.i18n.t("hud.dead"),
+      hudHidden: s.screens?.titleOpen ?? false,
       screen: (() => {
         const cur = s.screens?.current;
-        return cur ? { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus } : null;
+        if (!cur) return null;
+        const grid = cur.layout.elements.some((e) => e.type === "inventory");
+        const inventory = grid ? { cells: s.screens!.gridItems().map((id) => ({ icon: this.iconOf(id, cur.layout), count: this.countOf(id) })), cursor: cur.cursor } : null;
+        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus, inventory };
       })(),
       layers: (s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
       time: s.tick * (1000 / s.config.world.fixedStepHz),

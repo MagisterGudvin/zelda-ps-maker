@@ -1,4 +1,4 @@
-import type { LayoutValues, MinimapData, UiLayout } from "../ui/uiLayout.ts";
+import type { InventoryCell, LayoutValues, MinimapData, UiLayout } from "../ui/uiLayout.ts";
 import type { AABB, Facing } from "../core/math.ts";
 
 /**
@@ -41,6 +41,11 @@ export interface HostAdapter {
   setVariable?(id: string, value: string | number | boolean): boolean;
   /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does. False when it cannot. */
   runStoryEvent?(eventId: string): boolean;
+  /**
+   * Optional: while `wants()` is true, the Menu key (controls.menu, Escape) goes to the toolkit and
+   * PS Maker does not open its options menu on it. Returns the unsubscribe.
+   */
+  claimMenuKeys?(wants: () => boolean): () => void;
   /** Optional: the map's collision boxes (for minimaps). */
   mapWalls?(): readonly AABB[];
   /** Optional: true while the engine shows a dialogue (combat pauses, see combat.pauseDuringDialogue). */
@@ -178,8 +183,10 @@ export interface HudModel {
   inventory: HudItemSlot[];
   dead: boolean;
   deathText: string;
-  /** The open UI screen over the game (its selected button), or null. */
-  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string } | null;
+  /** A title screen is open: the HUD layout and its notes are hidden. */
+  hudHidden: boolean;
+  /** The open UI screen over the game (its selected button; an inventory screen's grid), or null. */
+  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null } | null;
   /** Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the screen. */
   layers: { name: string; layout: UiLayout; values: LayoutValues }[];
   /** Milliseconds of play, for element effects. */
@@ -193,6 +200,8 @@ export interface HudSink {
   setVisible(visible: boolean): void;
   /** Diagnostics text block (null hides it). */
   setDiagnostics(lines: string[] | null): void;
+  /** Optional: draws the last model again (a font it uses has loaded). */
+  redraw?(): void;
   /** Optional: the size of the game window in a layout's pixels. */
   viewSize?(layout: UiLayout): { w: number; h: number };
   /** Optional: pointer moves and clicks over an open screen, in its layout pixels. Returns the unsubscribe. */

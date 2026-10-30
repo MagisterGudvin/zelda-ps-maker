@@ -2,7 +2,8 @@ import type { Session } from "../core/session.ts";
 import { HOTBAR_ACTIONS } from "../host/types.ts";
 
 /**
- * Input side of the inventory: quick-item cycling and the item panel.
+ * Input side of the inventory: quick-item cycling and the item panel (or the inventory screen made
+ * in the UI Designer).
  * Runs even while the session is paused so the panel can be closed.
  */
 export class InventorySystem {
@@ -19,7 +20,15 @@ export class InventorySystem {
     const inv = this.s.toolkit.inventory;
     // A UI screen has the keys while it is open.
     if (this.s.isPaused("screen")) return;
-    if (input.pressed("inventory") && this.s.config.ui.inventoryPanel) this.setOpen(!this.open);
+    if (input.pressed("inventory")) {
+      // The inventory screen made in the UI Designer (role Inventory), else the built-in panel.
+      const screen = this.open ? null : this.s.screens?.withRole("inventory");
+      if (screen && !this.s.isPaused()) {
+        this.s.screens!.open(screen);
+        return;
+      }
+      if (this.s.config.ui.inventoryPanel) this.setOpen(!this.open);
+    }
     // Cycling is blocked during other pauses (cutscenes) but allowed inside the panel.
     if (this.s.isPaused() && !this.open) return;
     if (input.pressed("nextItem")) inv.cycle(1);

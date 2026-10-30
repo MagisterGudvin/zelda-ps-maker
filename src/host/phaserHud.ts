@@ -97,6 +97,10 @@ export class PhaserHud implements HudSink {
     return { W: this.game.scale?.width ?? this.game.config?.width ?? 320, H: this.game.scale?.height ?? this.game.config?.height ?? 240 };
   }
 
+  redraw(): void {
+    if (this.pending) this.render(this.pending);
+  }
+
   render(model: HudModel): void {
     this.pending = model;
     const p = this.painter;
@@ -104,6 +108,11 @@ export class PhaserHud implements HudSink {
     const { W, H } = this.screen();
     const k = layoutScale(model.layout.scale || model.scale, model.mapZoom, W, H);
     p.begin();
+    if (model.hudHidden) {
+      p.end();
+      this.drawScreen(model);
+      return;
+    }
     const painted = p.paint(model.layout, model.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { time: model.time, minimap: model.minimap });
     const font = model.fonts[model.layout.theme.font] ?? "monospace";
     this.drawMessages(model, painted, k, font);
@@ -139,7 +148,7 @@ export class PhaserHud implements HudSink {
     if (sc) {
       const k = layoutScale(sc.layout.scale || model.scale, model.mapZoom, W, H);
       dim(sp, sc.layout.screen.dim);
-      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { focus: sc.focus, time: model.time, minimap: model.minimap });
+      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { focus: sc.focus, time: model.time, minimap: model.minimap, inventory: sc.inventory });
       this.screenK = k;
     }
     sp.end();

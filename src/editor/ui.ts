@@ -132,7 +132,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
       magicBar: { group: "Interface" },
       hudBottom: { group: "Interface" },
       language: { group: "Interface", ui: "radio" },
-      shieldButton: { group: "Game" },
+      shieldMode: { group: "Game" },
       progressVariable: { group: "Game" },
       tileUnits: { group: "Debug" },
       debugHitboxes: { group: "Debug" },
@@ -331,10 +331,6 @@ export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Close UI Screen": {
     keywords: ["menu", "screen", "ui", "close", "back"],
     preview: (p) => (p.all === true ? "all" : set(p.name) ? String(p.name) : "top screen"),
-  },
-  "Zelda: Message Style": {
-    keywords: ["message", "dialogue", "dialog", "box", "text", "style", "sign"],
-    preview: (p, show) => join([set(p.layout) ? show("layout") : "default layout", Array.isArray(p.kinds) ? `${p.kinds.length} kinds` : undefined]),
   },
   "Zelda: Show Message": {
     keywords: ["message", "text", "toast", "notification", "say"],

@@ -1,36 +1,36 @@
 import type { Session } from "../core/session.ts";
 import type { MessageKind } from "../core/events.ts";
 
-/** Zelda: Message Style. Without it every toolkit message is a short note in the HUD. */
-export interface MessageBoxSettings {
-  /** Dialogue layout id ("" = the project's default layout). */
-  layoutId: string;
-  /** Message kinds shown as a dialogue ("box" = Show Message with "As a dialogue" always is). */
-  kinds: MessageKind[];
-}
-
 /**
- * Toolkit messages (signs, "You got...") as PS Maker's own Dialogue: queued one at a time; the game
- * waits while one is open. Where the engine cannot show a dialogue, the message is a HUD note.
+ * Toolkit messages (signs, "You got...") in the project's message screen: a UI Layout screen with
+ * the role Message, made in the UI Designer, whose texts show {message}. Its kinds say which
+ * messages it shows; the others stay short HUD notes. Queued one at a time; the game waits while
+ * one is open. "Show Message" as a box always waits for a key: in the message screen, else in
+ * PS Maker's own dialogue, else (no dialogue in the engine) as a HUD note.
  */
 export class MessageBoxSystem {
   private readonly s: Session;
-  private readonly queue: string[] = [];
+  private readonly queue: { text: string; kind: MessageKind }[] = [];
   private current: { done: boolean } | null = null;
   private readonly off: () => void;
 
   constructor(session: Session) {
     this.s = session;
     this.off = session.bus.on("zelda:message", (m) => {
-      if (this.accepts(m.kind)) this.queue.push(m.text);
+      if (this.accepts(m.kind)) this.queue.push({ text: m.text, kind: m.kind ?? "info" });
     });
   }
 
-  /** True when a message of this kind is shown as a dialogue (the HUD then does not show it). */
+  /** The message screen of the project (role Message), or null. */
+  private screen(): { name: string; kinds: readonly string[] } | null {
+    for (const [name, layout] of this.s.toolkit.uiScreens) if (layout.screen.role === "message") return { name, kinds: layout.screen.kinds };
+    return null;
+  }
+
+  /** True when a message of this kind waits for a key in a box (the HUD then does not show it). */
   accepts(kind: MessageKind | undefined): boolean {
-    const st = this.s.toolkit.messageBox;
     if (kind === "box") return true;
-    return !!st && st.kinds.includes(kind ?? "info");
+    return !!this.screen()?.kinds.includes(kind ?? "info");
   }
 
   get isOpen(): boolean {
@@ -43,11 +43,12 @@ export class MessageBoxSystem {
       if (this.current.done) this.close();
       return;
     }
-    const text = this.queue.shift();
-    if (text === undefined) return;
-    const shown = this.s.host.playDialogue?.(dialogueSourceOf(text, this.s.toolkit.messageBox?.layoutId ?? ""));
+    const next = this.queue.shift();
+    if (next === undefined) return;
+    const screen = this.screen();
+    const shown = screen && this.s.screens ? this.s.screens.showMessage(screen.name, next.text) : this.s.host.playDialogue?.(dialogueSourceOf(next.text));
     if (!shown) {
-      this.s.hud?.note(text);
+      this.s.hud?.note(next.text);
       return;
     }
     const state = { done: false };
@@ -58,7 +59,7 @@ export class MessageBoxSystem {
 
   private close(): void {
     this.current = null;
-    // The press that closed the dialogue must not read the sign again in this same tick.
+    // The press that closed the message must not read the sign again in this same tick.
     this.s.host.input.reset();
     if (this.queue.length === 0) this.setHold(false);
   }
@@ -78,16 +79,18 @@ export class MessageBoxSystem {
 }
 
 /**
- * A toolkit message as PS Maker dialogue source (dialogueSourceParser.ts): the chosen layout as a
- * command, then the text with PS Maker's syntax escaped — "Name: text" lines and "@" commands get a
- * leading backslash, markup characters (* _ { } and the backslash itself) one each — so the text
- * shows as written. A blank line still starts a new page.
+ * A toolkit message as PS Maker dialogue source (dialogueSourceParser.ts): the text with PS Maker's
+ * syntax escaped — "Name: text" lines and "@" commands get a leading backslash, markup characters
+ * (* _ { } and the backslash itself) one each — so the text shows as written. A blank line still
+ * starts a new page.
  */
-export function dialogueSourceOf(text: string, layoutId = ""): string {
-  const lines = text.split("\n").map((line) => {
-    const escaped = line.replace(/[\\*_{}]/g, (c) => `\\${c}`);
-    const t = escaped.trimStart();
-    return t.startsWith("@") || t.indexOf(": ") > 0 ? `\\${escaped}` : escaped;
-  });
-  return [...(layoutId ? [`@dialogue_layout ${layoutId}`] : []), ...lines].join("\n");
+export function dialogueSourceOf(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => {
+      const escaped = line.replace(/[\\*_{}]/g, (c) => `\\${c}`);
+      const t = escaped.trimStart();
+      return t.startsWith("@") || t.indexOf(": ") > 0 ? `\\${escaped}` : escaped;
+    })
+    .join("\n");
 }

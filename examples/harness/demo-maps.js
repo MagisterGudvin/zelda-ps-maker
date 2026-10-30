@@ -33,10 +33,10 @@ export const MAPS = {
     ],
     npcs: [{ name: "npc_guard", x: 120, y: 184, color: "#d9822b" }],
     onLoad: [
-      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldMode: "hold", hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
-      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC: use the item. Q/E: switch items. I: all items. Enter: pause. Esc: menu and save." }],
+      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC: use the item. Q/E: switch items. I: all items. V: hold up the shield (in the chest below). Esc: pause." }],
       // 3. Sword targets and enemies (several types); group 1 = the field.
       ["Zelda: Create Enemy", { template: "slime", position: { x: 230, y: 120 }, group: "1" }],
       ["Zelda: Create Enemy", { template: "slime", position: { x: 260, y: 160 }, group: "1" }],
@@ -56,7 +56,8 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "pot", position: { x: 56, y: 200 } }],
       ["Zelda: Create Object", { type: "pot", position: { x: 72, y: 200 } }],
       ["Zelda: Create Object", { type: "rock", position: { x: 120, y: 128 } }],
-      // 9. Items in chests.
+      // 9. Items in chests; the shield first, near the start (held up with V).
+      ["Zelda: Create Chest", { position: { x: 88, y: 176 }, item: "shield", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 200, y: 40 }, item: "boomerang", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 140, y: 200 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 248, y: 40 }, item: "bow", count: 1, requiresBigKey: false, hidden: false }],
@@ -99,7 +100,7 @@ export const MAPS = {
     ],
     npcs: [],
     onLoad: [
-      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldButton: false, hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldMode: "hold", hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "dungeon_1", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 40, y: 200 } }],
       // 8. Block + pressure plate opens the puzzle shutter.

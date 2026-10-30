@@ -125,6 +125,19 @@ export class KeyboardInput implements InputSource {
     blurSource?.on("resume", this.onResume);
   }
 
+  /**
+   * A key press the toolkit took from the page before Phaser saw it (Phaser skips key events whose
+   * default was prevented); counted like any other press.
+   */
+  inject(event: KeyboardEvent): void {
+    this.onDown(event);
+  }
+
+  /** True when this key code is bound to the action. */
+  isBound(code: string, action: InputAction): boolean {
+    return this.bindings.get(normalizeKey(code))?.includes(action) ?? false;
+  }
+
   /** Rebuilds the key map from configuration (called on Configure). */
   rebind(): void {
     this.bindings.clear();

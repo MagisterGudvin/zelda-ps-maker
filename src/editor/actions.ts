@@ -14,15 +14,14 @@ import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/he
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
-import { fontFamilyCss } from "../host/psmakerAssets.ts";
-import type { MessageKind } from "../core/events.ts";
+import { useLayoutFonts } from "./projectUi.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import type { Facing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, dialogLayoutField, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -235,7 +234,7 @@ const startToolkit = defineEvent({
     swordDamage: num("Sword damage", "Damage of one sword hit (a slime has 2 HP). / Урон меча.", 2),
     hud: bool("Show HUD", "Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit.", true),
     magicBar: bool("Magic bar", "Show the magic meter (needed for magic items). / Шкала магии.", true),
-    shieldButton: bool("Shield on a button", "Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке.", false),
+    shieldMode: choice("Shield", "The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят.", [["hold", "Hold its key to block"], ["passive", "Always up (blocks shots from the front)"]], "hold"),
     hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
     progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
@@ -262,7 +261,8 @@ const startToolkit = defineEvent({
         {
           player: hearts > 0 ? { maxHealth: health, startHealth: health, respawnHealth: health } : {},
           sword: numOr(params.swordDamage, 0) > 0 ? { damage: numOr(params.swordDamage, 0) } : {},
-          shield: has("shieldButton") ? { mode: boolOr(params.shieldButton, false) ? "hold" : "passive" } : {},
+          // 0.25 and older saved "Shield on a button" (off = always up); only a ticked one carries over.
+          shield: has("shieldMode") ? { mode: textOf(old.shieldMode) === "passive" ? "passive" : "hold" } : old.shieldButton === true ? { mode: "hold" } : {},
           ui: {
             ...(has("hud") ? { enabled: boolOr(params.hud, true) } : {}),
             ...(has("magicBar") ? { showMagic: boolOr(params.magicBar, true) } : {}),
@@ -296,16 +296,16 @@ const CONTROL_ACTIONS = ["sword", "useItem", "shield", "action", "nextItem", "pr
 
 const setControls = defineEvent({
   name: "Zelda: Set Controls",
-  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Enter. / Клавиши Toolkit (пусто — не менять).",
+  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Escape. / Клавиши Toolkit (пусто — не менять).",
   parameterDefs: {
     sword: keys("Sword", "Default: X."),
     useItem: keys("Use item", "Default: C."),
-    shield: keys("Shield", "Only with Shield on a button. Default: V."),
+    shield: keys("Shield", "Hold it to raise the shield (Start Toolkit: Shield). Default: V."),
     action: keys("Action", "Open, lift, read. Default: Z."),
     nextItem: keys("Next item", "Default: E."),
     prevItem: keys("Previous item", "Default: Q."),
     inventory: keys("Inventory", "Default: I."),
-    menu: keys("Menu", "Opens the UI screen marked Menu key. Default: Enter."),
+    menu: keys("Menu", "Opens and closes the pause menu (UI screen with the role Menu). Default: Escape (PS Maker's options menu opens from the pause menu's Settings button then)."),
   },
   execute(params, ctx) {
     run("Zelda: Set Controls", ctx, params, (s, tk) => {
@@ -767,7 +767,7 @@ const setPlayerSprites = defineEvent({
     chargeWalk: playerAnim("Walking while charging", "Optional: walking with the sword held, e.g. Sword Walk; empty = normal walk with the built-in blade. / Ходьба с заряженным мечом."),
     hurt: playerAnim("Hurt", "Optional, e.g. Sword Hurt. / Получение урона."),
     death: playerAnim("Death", "Optional, e.g. Sword Death; the last frame stays until respawn. / Смерть."),
-    shield: playerAnim("Shield up", "Optional: while the shield button is held (Start Toolkit: Shield on a button). / Щит поднят."),
+    shield: playerAnim("Shield up", "Optional: while the shield key is held; empty = the built-in shield in front of the player. / Щит поднят."),
     bow: playerAnim("Bow", "Optional: shooting an arrow; empty = Use item. / Лук."),
     boomerang: playerAnim("Boomerang", "Optional: throwing the boomerang; empty = Use item. / Бумеранг."),
     bomb: playerAnim("Bomb", "Optional: placing a bomb; empty = Use item. / Бомба."),
@@ -972,7 +972,7 @@ const setAbility = defineEvent({
 
 const uiLayout = defineEvent({
   name: "Zelda: UI Layout",
-  description: "Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or the Menu key. Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.",
+  description: "Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or its role (pause menu on Escape, inventory on I, message box, title screen). Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.",
   parameterDefs: {
     name: str("Screen name", "Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key, on any map. / Пусто — HUD; имя — экран меню.", ""),
     thisMapOnly: bool("This map only", "Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт).", false),
@@ -991,11 +991,7 @@ const uiLayout = defineEvent({
       // A second shared HUD: the project's first one (by map order) stays, so every map shows the same HUD.
       else s.logger.warnOnce(`second-hud-${shared.actionId}`, `UI Layout on this map is a second shared HUD; the shared HUD on map "${shared.mapName}" is shown. Delete this one, or tick "This map only" to use it here.`);
       const story = psStory(s, "UI Layout");
-      // Fonts of the texts: PS Maker loads a project font only when it first shows its own text.
-      for (const id of new Set([layout.theme.font, ...layout.elements.map((e) => (e.type === "text" || e.type === "button" ? e.font : ""))].filter(Boolean))) {
-        tk.uiFonts[id] = fontFamilyCss(story, id);
-        s.host.loadProjectFont?.(id);
-      }
+      useLayoutFonts(tk, story, s.host, layout);
       for (const e of layout.elements) {
         for (const key of pictureKeys(e)) if (s.host.textureSize && !s.host.textureSize(key)) s.logger.warnOnce(`ui-pic-${key}`, `UI Layout: picture "${key}" (${e.id}) is not loaded; the built-in look is shown.`);
       }
@@ -1029,36 +1025,13 @@ const closeUiScreen = defineEvent({
   },
 });
 
-const MESSAGE_KINDS = [["sign", "Signs and object texts"], ["item", "Item received (chests, big items)"], ["hint", "Hints (locked, need an item, too heavy)"], ["info", "Short notes (saved, rupees and other pickups)"]] as const;
-
-const messageStyle = defineEvent({
-  name: "Zelda: Message Style",
-  description: "Shows toolkit messages (signs, \"You got...\") as PS Maker dialogues, with everything their dialogue layout has (Game UI → Dialogue layouts: background, font, name box, portrait, typing sound). The game waits while one is open. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.",
-  parameterDefs: {
-    layout: dialogLayoutField("Dialogue layout", "Which dialogue layout of the project the messages use. / Макет диалога PS Maker."),
-    kinds: { ...multi("Messages as dialogues", "Which toolkit messages are dialogues; the others stay short HUD notes. / Какие сообщения показывать диалогом.", MESSAGE_KINDS), defaultValue: ["sign", "item"] },
-  },
-  execute(params, ctx) {
-    run("Zelda: Message Style", ctx, params, (s, tk) => {
-      const p = params as Record<string, unknown>;
-      const story = psStory(s, "Message Style");
-      const raw = Array.isArray(p.kinds) ? p.kinds : ["sign", "item"];
-      const kinds = raw.filter((k): k is MessageKind => typeof k === "string" && MESSAGE_KINDS.some(([v]) => v === k));
-      const layout = textOf(p.layout);
-      const layouts = (story?.gameUI?.dialogLayouts ?? []) as { id?: string }[];
-      if (layout && !layouts.some((l) => l?.id === layout)) s.logger.warn(`Message Style: dialogue layout "${layout}" is not in the project; the default one is used.`);
-      tk.messageBox = { layoutId: layout, kinds };
-    });
-  },
-});
-
 const showMessage = defineEvent({
   name: "Zelda: Show Message",
-  description: "Shows a toolkit message: a short HUD note, or a PS Maker dialogue (layout from Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.",
+  description: "Shows a toolkit message: a short HUD note, or a box that waits for a key (the message screen made in the UI Designer, else a PS Maker dialogue). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.",
   parameterDefs: {
     text: str("Text", "Message to show. / Текст сообщения.", ""),
     durationMs: num("Duration (ms)", "How long a short note stays: 1000 = one second. / Сколько показывать.", 2200),
-    box: bool("As a dialogue", "Show it as a PS Maker dialogue (closed with the action key) instead of a note. / Диалогом.", false),
+    box: bool("In a message box", "Show it in the message screen (UI Designer, role Message; else a PS Maker dialogue), closed with the action key, instead of a note. / В окне сообщения.", false),
   },
   execute(params, ctx) {
     run("Zelda: Show Message", ctx, params, (s) => s.bus.emit("zelda:message", { text: s.i18n.text(params.text), durationMs: params.durationMs, ...(boolOr(params.box, false) ? { kind: "box" as const } : {}) }));
@@ -1256,7 +1229,6 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   changePlayerStats,
   setAbility,
   showMessage,
-  messageStyle,
   uiLayout,
   openUiScreen,
   closeUiScreen,

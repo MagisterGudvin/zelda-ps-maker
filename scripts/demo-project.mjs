@@ -122,20 +122,6 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
   };
   const ownedStoryEvents = [];
   const uiFont = DEMO_FONT;
-  const ui = { w: source.gameConfig?.width ?? 1280, h: source.gameConfig?.height ?? 720 };
-  const textStyles = (size, color, align = "center", stroke = 0) => ({
-    fontFamily: uiFont.name,
-    fontAssetId: uiFont.id,
-    fontSize: size,
-    fontWeight: 400,
-    lineHeightPercent: 120,
-    letterSpacingPercent: 0,
-    color,
-    strokeWidth: stroke,
-    strokeColor: "#1F1A24",
-    outlineOrder: "below-text",
-    textAlign: align,
-  });
   // The toolkit HUD (Zelda: UI Layout, as the designer saves it) on the demo's own UI pictures:
   // two 9-slice panels, the magic meter, the item box and the counters on the left, "- LIFE -" and
   // the hearts on the right (clear of PS Maker's settings gear). Scale 0: like the map.
@@ -162,8 +148,9 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "lowHealth", type: "text", x: -112, y: 36, w: 84, h: 8, anchor: "tr", show: { when: "compare", id: "health", op: "<=", value: 2 }, effect: "blink", text: "LOW HEALTH", font: "", size: 7, color: "#ff5060", align: "center", stroke: "#1f1a24", strokeWidth: 1 },
     ],
   };
-  // A pause screen (Enter) made of the same pictures: its buttons close it or run project events
-  // (PS Maker's options menu with saving, the main menu).
+  // Screens made in the UI Designer on the same pictures (Zelda: UI Layout with a screen name and
+  // a role). The pause menu (Escape): its buttons close it or run project events (PS Maker's
+  // options menu with saving, the main menu).
   const globalStoryEvents = [
     { name: "Pause: settings", id: "zelda-pause-settings", actions: [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: true }], hidden: false },
     {
@@ -173,18 +160,46 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       hidden: false,
     },
   ];
-  const pauseButton = (id, text, y, action) => ({ id, type: "button", x: -48, y, w: 96, h: 18, anchor: "c", show: always, image: "zelda-ui-button", hover: "", slice: 6, color: "", hoverColor: "", text, font: "", size: 8, textColor: "", action: { value: "", ...action } });
+  const screen = (role, more = {}) => ({ role, input: true, pause: true, dim: "#1f1a24a0", kinds: ["sign", "item"], typing: 40, soundMove: "", soundPress: "", soundOpen: "", soundClose: "", ...more });
+  const button = (id, text, y, action) => ({ id, type: "button", x: -48, y, w: 96, h: 18, anchor: "c", show: always, image: "zelda-ui-button", hover: "", slice: 6, color: "", hoverColor: "", text, font: "", size: 8, textColor: "", action: { value: "", ...action } });
   const pauseLayout = {
     v: 1,
     scale: 0,
     theme: hudLayout.theme,
-    screen: { pause: true, dim: "#1f1a24a0", menuKey: true },
+    screen: screen("menu"),
     elements: [
       { id: "panel", type: "image", x: -60, y: -50, w: 120, h: 100, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
       { id: "title", type: "text", x: -60, y: -43, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
-      pauseButton("continue", "Continue", -26, { kind: "close", id: "" }),
-      pauseButton("settings", "Settings", -4, { kind: "event", id: "zelda-pause-settings" }),
-      pauseButton("title", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
+      button("continue", "Continue", -26, { kind: "close", id: "" }),
+      button("settings", "Settings", -4, { kind: "event", id: "zelda-pause-settings" }),
+      button("title", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
+    ],
+  };
+  // The message box: signs and items received, typed out on the panel at the bottom; a blinking
+  // "Z" while the page waits for the key.
+  const messageLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("message", { dim: "" }),
+    elements: [
+      { id: "panel", type: "image", x: -140, y: -58, w: 280, h: 52, anchor: "b", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "text", type: "text", x: -128, y: -50, w: 256, h: 36, anchor: "b", show: always, text: "{message}", font: "", size: 8, color: "", align: "left", wrap: true },
+      { id: "next", type: "text", x: 120, y: -18, w: 8, h: 8, anchor: "b", show: { when: "compare", id: "message.ready", op: "==", value: 1 }, effect: "blink", text: "Z", font: "", size: 7, color: "#ffd23a", align: "center" },
+    ],
+  };
+  // The inventory (I): the items in a grid, the name and description of the one under the cursor.
+  const inventoryLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("inventory"),
+    elements: [
+      { id: "panel", type: "image", x: -84, y: -60, w: 168, h: 120, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -84, y: -53, w: 168, h: 10, anchor: "c", show: always, text: "{t:hud.inventory}", font: "", size: 9, color: "", align: "center" },
+      { id: "items", type: "inventory", x: -71, y: -38, w: 142, h: 46, anchor: "c", show: always, cols: 6, cell: 22, gap: 2, frame: "zelda-ui-item-box", cursor: "zelda-ui-cursor", counts: true },
+      { id: "name", type: "text", x: -72, y: 14, w: 144, h: 10, anchor: "c", show: always, text: "{inv.name}", font: "", size: 8, color: "#ffd23a", align: "left" },
+      { id: "description", type: "text", x: -72, y: 26, w: 144, h: 26, anchor: "c", show: always, text: "{inv.description}", font: "", size: 7, color: "", align: "left", wrap: true },
     ],
   };
   const mapIds = Object.fromEntries(Object.keys(maps).map((key) => [key, `zelda-demo-${key}`]));
@@ -318,12 +333,13 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
-        // The HUD and the pause screen are made once, on the first map: the other maps use them from the project.
+        // The HUD and the screens are made once, on the first map: the other maps use them from the project.
         if (key === Object.keys(maps)[0]) {
           zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "message", layout: JSON.stringify(messageLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "inventory", layout: JSON.stringify(inventoryLayout) }));
         }
-        zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }
@@ -349,31 +365,30 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     };
   });
 
-  // ---- title map: the main menu, built with PS Maker's own UI ---------------------------------
-  // PS Maker has no title screen: the starting map is one. "Add UI" buttons run hidden events owned
-  // by the button (relation "button-click"), like the editor saves them.
+  // ---- title map: the title screen, made in the UI Designer ----------------------------------
+  // PS Maker has no title screen: the starting map is one. The toolkit starts on it and opens the
+  // "title" screen (role Title: the HUD hidden, no key closes it); its buttons run project events.
   const first = Object.keys(maps)[0];
-  const menuActionId = makeId();
-  const buttonEvent = (label, actions) => {
-    const componentId = `ui-component-${makeId()}`;
-    const eventId = makeId();
-    ownedStoryEvents.push({ name: `${label} button`, id: eventId, actions, hidden: true, owner: { type: "action", actionId: menuActionId, actionType: "addUiComponentsAction", relation: "button-click", componentId } });
-    return { componentId, eventId };
+  const titleEvent = (id, name, actions) => (globalStoryEvents.push({ name, id, actions, hidden: false }), id);
+  const titleLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("title", { dim: "" }),
+    elements: [
+      { id: "name", type: "text", x: -150, y: -70, w: 300, h: 24, anchor: "c", show: always, text: name, font: "", size: 20, color: "#f8e0a0", align: "center", stroke: "#1f1a24", strokeWidth: 2 },
+      { id: "subtitle", type: "text", x: -150, y: -46, w: 300, h: 10, anchor: "c", show: always, text: "Zelda Maker Toolkit · PS Maker", font: "", size: 8, color: "#f2e4bb", align: "center", stroke: "#1f1a24", strokeWidth: 1 },
+      button("newGame", "New game", -20, { kind: "event", id: titleEvent("zelda-title-new", "Title: new game", [{ id: makeId(), name: "Change map", type: "changeActiveMapAction", destination: { mapId: mapIds[first], position: { ...maps[first].spawn } }, faceDirection: "down", fadeOutDuration: 500, fadeInDuration: 500, fadeInTiming: "beforeMapStart", skipFadeIn: false }]) }),
+      button("continue", "Continue", 2, { kind: "event", id: titleEvent("zelda-title-continue", "Title: continue", [{ id: makeId(), name: "Open load game menu", type: "openLoadGameMenuAction" }]) }),
+      button("settings", "Settings", 24, { kind: "event", id: titleEvent("zelda-title-settings", "Title: settings", [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: false }]) }),
+      button("exit", "Exit", 46, { kind: "event", id: titleEvent("zelda-title-exit", "Title: exit", [{ id: makeId(), name: "Exit game", type: "exitGameAction" }]) }),
+    ],
   };
-  const MENU = [
-    ["New game", [{ id: makeId(), name: "Change map", type: "changeActiveMapAction", destination: { mapId: mapIds[first], position: { ...maps[first].spawn } }, faceDirection: "down", fadeOutDuration: 500, fadeInDuration: 500, fadeInTiming: "beforeMapStart", skipFadeIn: false }]],
-    ["Continue", [{ id: makeId(), name: "Open load game menu", type: "openLoadGameMenuAction" }]],
-    ["Settings", [{ id: makeId(), name: "Open game options menu", type: "openOptionsMenuAction", showExitGameButton: false, showSaveGameButton: false }]],
-    ["Exit", [{ id: makeId(), name: "Exit game", type: "exitGameAction" }]],
-  ];
-  const text = (label, y, size, color, height, stroke) => ({ type: "text", componentId: `ui-component-${makeId()}`, label, opacity: 100, backgroundEnabled: false, background: { type: "plain", backgroundOpacity: 100, backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, borderRadius: 26 }, textStyles: textStyles(size, color, "center", stroke), position: { x: ui.w / 2, y }, size: { width: ui.w - 160, height }, rotation: 0, zIndex: 0, sizeAnchor: "center" });
-  const components = [
-    text(name, ui.h * 0.2, 96, "#F8E0A0", 130, 8),
-    text("Zelda Maker Toolkit · PS Maker", ui.h * 0.2 + 90, 36, CREAM, 50, 5),
-    ...MENU.map(([label, actions], i) => {
-      const { componentId, eventId } = buttonEvent(label, actions);
-      return { type: "button", componentId, styleId: BUTTON_STYLE_ID, label, opacity: 100, disabled: false, storyEventId: eventId, position: { x: ui.w / 2, y: ui.h * 0.47 + i * 90 }, size: { width: 400, height: 76 }, rotation: 0, zIndex: 0, sizeAnchor: "center" };
-    }),
+  const startParams = maps[first].onLoad.find(([n]) => n === "Zelda: Start Toolkit")[1];
+  const titleActions = [
+    pluginAction("Zelda: Start Toolkit", { ...startParams, progressVariable: PROGRESS_VARIABLE.id }),
+    pluginAction("Zelda: UI Layout", { name: "title", layout: JSON.stringify(titleLayout) }),
+    pluginAction("Zelda: Open UI Screen", { name: "title" }),
   ];
   const TW = 20;
   const TH = 12;
@@ -400,7 +415,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: makeId(), name: "Set player visibility", type: "setPlayerVisibilityAction", mode: "hide", opacity: 1, fadeEnabled: false, fadeDurationMs: 750, waitForCompletion: true },
       { id: makeId(), name: "Toggle player movement", type: "togglePlayerMovementAction", mode: "disable", applyToSpecificDirections: false, up: true, down: true, left: true, right: true },
     ],
-    initialActions: [{ id: menuActionId, name: "Add UI", type: "addUiComponentsAction", uiName: "Main menu", inGameUiId: `in-game-ui-${makeId()}`, fadeEnabled: true, fadeDurationMs: 400, waitForCompletion: false, components }],
+    initialActions: titleActions,
     enterActions: [],
     leaveActions: [],
     storyEvents: [],

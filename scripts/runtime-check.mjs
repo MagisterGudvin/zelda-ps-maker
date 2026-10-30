@@ -163,15 +163,36 @@ const dismiss = async () => {
   }
 };
 const button = (label) => page.locator("button", { hasText: label }).first();
-await check("the game opens on the main menu (PS Maker Add UI buttons); New game goes to the field", async () => {
-  await button("New game").waitFor({ state: "visible", timeout: 30000 });
-  await wait(800);
-  const onTitle = await ev(() => ({ map: window.game.scene.getScenes(true).find((m) => m.map)?.map.id, toolkit: !!window.ZeldaMakerToolkit?.session }));
-  expect(onTitle.map === "zelda-demo-title" && !onTitle.toolkit, JSON.stringify(onTitle));
+/** The toolkit's open screen and its selected button. */
+const screenNow = () => ev(() => ({ screen: window.ZeldaMakerToolkit?.session?.screens?.current?.name ?? null, focus: window.ZeldaMakerToolkit?.session?.screens?.current?.focus ?? null, paused: window.ZeldaMakerToolkit?.session?.isPaused("screen") ?? false }));
+/** Visible texts the toolkit draws (HUD scene). */
+const hudTexts = () => ev(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.filter((o) => o.type === "Text" && o.visible && o.text).map((o) => ({ text: o.text, font: o.style.fontFamily })));
+await check("the game opens on the title screen made in the UI Designer (toolkit on the title map, HUD hidden, player hidden); Z on New game goes to the field", async () => {
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.screens?.current?.name === "title", null, { timeout: 30000 });
+  await wait(1200);
+  const onTitle = await ev(() => {
+    const scene = window.game.scene.getScenes(true).find((m) => m.map);
+    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const shown = hud.children.list.filter((o) => o.visible);
+    return {
+      map: scene?.map.id,
+      hearts: shown.filter((o) => o.texture?.key === "zelda-ui-heart-full").length,
+      buttons: shown.filter((o) => o.texture?.key === "zelda-ui-button").length,
+      texts: shown.filter((o) => o.type === "Text").map((o) => o.text),
+      player: scene.player.visible && scene.player.alpha > 0,
+      domButtons: document.querySelectorAll("button").length,
+    };
+  });
+  const focus = (await screenNow()).focus;
   await page.screenshot({ path: path.join(OUT, "title.png") });
-  await button("New game").click();
+  expect(onTitle.map === "zelda-demo-title" && onTitle.hearts === 0 && onTitle.buttons >= 4 * 9, JSON.stringify(onTitle));
+  for (const t of ["New game", "Continue", "Settings", "Exit"]) expect(onTitle.texts.includes(t), `"${t}" not drawn (${onTitle.texts.join(", ")})`);
+  expect(!onTitle.player, "the player shows on the title");
+  expect(focus === "newGame", `selected ${focus}`);
+  await page.keyboard.press("z");
   await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-field", null, { timeout: 15000 });
   await wait(1500);
+  return `4 buttons in the demo's pictures (9-slice), no HUD; ${onTitle.domButtons} PS Maker buttons on the page`;
 });
 await check("the field starts: Toolkit, HUD, enemies from the PS Maker map start", async () => {
   const s = await state();
@@ -237,11 +258,9 @@ const cyrillicIn = (family) =>
     const width = (font) => ((c.font = font), c.measureText("ЖыщЮя").width);
     return width(`32px "${family}", monospace`) !== width("32px monospace");
   }, family);
-await check("the toolkit loads the project font itself when PS Maker has not; the demo font has Cyrillic, PixelOperator has not", async () => {
+await check("the toolkit loads the project fonts itself when PS Maker has not (the demo font since the title screen, PixelOperator on request); the demo font has Cyrillic, PixelOperator has not", async () => {
   const r = await ev(async () => {
     const family = "ps-maker-font-zelda-font-pixelify-sans";
-    for (const f of [...document.fonts]) if (f.family.replace(/["']/g, "") === family) document.fonts.delete(f);
-    window.ZeldaMakerToolkit.session.host.loadProjectFont("zelda-font-pixelify-sans");
     window.ZeldaMakerToolkit.session.host.loadProjectFont("font-pixel-operator");
     const loaded = (fam) => [...document.fonts].some((f) => f.family.replace(/["']/g, "") === fam && f.status === "loaded");
     for (let i = 0; i < 30 && !(loaded(family) && loaded("ps-maker-font-font-pixel-operator")); i++) await new Promise((ok) => setTimeout(ok, 100));
@@ -254,28 +273,37 @@ await check("the toolkit loads the project font itself when PS Maker has not; th
   expect(!operator, "PixelOperator draws Cyrillic (the cause of the wrong font is elsewhere)");
   return "Pixelify Sans loaded from game-assets, has Cyrillic; PixelOperator has none (falls back to another font)";
 });
-await check("Message Style: reading the sign shows its text as a PS Maker Dialogue (the project's layout); Z closes it, and the sign is not read again", async () => {
+await check("message screen (UI Designer, role Message): reading the sign types its text out in the designer's box in the demo font; Z turns the pages and closes it, and the sign is not read again", async () => {
   await tp(32, 142);
   await hold("ArrowUp", 200);
   await page.keyboard.press("z");
-  await page.waitForFunction(() => document.body.innerText.includes("Arrows: move"), null, { timeout: 6000 }).catch(() => {});
+  await wait(250);
+  const typing = (await hudTexts()).find((t) => "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.".startsWith(t.text));
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.endsWith("lift, talk.")), null, { timeout: 6000 }).catch(() => {});
   const open = await ev(() => ({
     dialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
-    text: document.body.innerText.includes("Arrows: move"),
+    screen: window.ZeldaMakerToolkit.session.screens.current?.name,
     paused: window.ZeldaMakerToolkit.session.isPaused("message"),
   }));
-  await page.screenshot({ path: path.join(OUT, "sign-dialogue.png") });
+  const page1 = (await hudTexts()).find((t) => t.text.startsWith("Arrows: move"));
+  await page.screenshot({ path: path.join(OUT, "sign-message.png") });
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("C: use")), null, { timeout: 6000 }).catch(() => {});
+  const page2 = (await hudTexts()).some((t) => t.text.startsWith("C: use"));
   let still = true;
-  for (let i = 0; i < 8 && still; i++) {
+  for (let i = 0; i < 6 && still; i++) {
     await page.keyboard.press("z");
     await wait(500);
-    still = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true);
+    still = await ev(() => window.ZeldaMakerToolkit.session.isPaused("message"));
   }
   await wait(600);
-  const again = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true || window.ZeldaMakerToolkit.session.isPaused("message"));
-  expect(open.dialogue && open.text && open.paused, JSON.stringify(open));
+  const again = await ev(() => window.ZeldaMakerToolkit.session.isPaused("message") || window.ZeldaMakerToolkit.session.screens.current !== null);
+  expect(typing && typing.text.length < 60, `typing ${JSON.stringify(typing)}`);
+  expect(!open.dialogue && open.screen === "message" && open.paused, JSON.stringify(open));
+  expect(page1 && /zelda-font-pixelify-sans/.test(page1.font), `page 1 ${JSON.stringify(page1)}`);
+  expect(page2, "the second page did not show");
   expect(!still && !again, `still open ${still}, opened again ${again}`);
-  return "shown as written (\"Arrows: move…\"), closed";
+  return `typed ("${typing.text}"), 2 pages, closed`;
 });
 await check("the villager talks with PS Maker's own Dialogue (styled panel); the toolkit waits meanwhile", async () => {
   await tp(80, 140);
@@ -316,42 +344,89 @@ await check("a chest opens with Z; the small note \"Получено: Бомбы
   expect(note && /zelda-font-pixelify-sans/.test(note.font), `note: ${JSON.stringify(note)}`);
   return `"${note.text}" in ${note.font.split(",")[0]}`;
 });
-await check("the boomerang chest: \"Получено: Бумеранг!\" is a PS Maker dialogue in the demo font, which draws its Cyrillic", async () => {
+await check("the boomerang chest: \"Получено: Бумеранг!\" shows in the message screen in the demo font, which draws its Cyrillic", async () => {
   await tp(200, 60);
   await hold("ArrowUp", 250);
   await page.keyboard.press("z");
-  await page.waitForFunction(() => document.body.innerText.includes("Получено"), null, { timeout: 6000 }).catch(() => {});
-  await wait(800);
-  const box = await textOnPage("Получено");
-  await page.screenshot({ path: path.join(OUT, "chest-dialogue.png") });
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.includes("Бумеранг")), null, { timeout: 6000 }).catch(() => {});
+  const box = (await hudTexts()).find((t) => t.text.includes("Бумеранг"));
+  const screen = (await screenNow()).screen;
+  await page.screenshot({ path: path.join(OUT, "chest-message.png") });
   await dismiss();
-  expect(box && /zelda-font-pixelify-sans/.test(box.font), `dialogue text: ${JSON.stringify(box)}`);
-  expect(await cyrillicIn("ps-maker-font-zelda-font-pixelify-sans"), "the dialogue font has no Cyrillic");
+  expect(screen === "message", `screen ${screen}`);
+  expect(box && /zelda-font-pixelify-sans/.test(box.font), `message text: ${JSON.stringify(box)}`);
+  expect(await cyrillicIn("ps-maker-font-zelda-font-pixelify-sans"), "the demo font has no Cyrillic");
   return `"${box.text}" in ${box.font.split(",")[0]}`;
 });
-await check("I opens the inventory on the demo's panel picture (9-slice) with its own cursor; the title is visible", async () => {
+await check("the shield: not owned at the start; the chest by the start gives it; V held up shows it in front of the player, released lowers it", async () => {
+  const owned = () => ev(() => window.ZeldaMakerToolkit.toolkit.state.inventory.owned.includes("shield"));
+  const before = await owned();
+  await tp(88, 198);
+  await hold("ArrowUp", 250);
+  await page.keyboard.press("z");
+  await wait(800);
+  await dismiss();
+  const after = await owned();
+  const shown = () => ev(() => window.game.scene.getScenes(true).find((m) => m.map).children.list.some((o) => o.visible && o.texture?.key?.includes("icon_shield")));
+  await hold("ArrowDown", 100);
+  await page.keyboard.down("v");
+  await wait(300);
+  const up = await shown();
+  await page.screenshot({ path: path.join(OUT, "shield-up.png") });
+  await page.keyboard.up("v");
+  await wait(300);
+  const down = await shown();
+  expect(!before && after, `owned before ${before}, after the chest ${after}`);
+  expect(up && !down, `held ${up}, released ${down}`);
+  return "picked up from the chest, drawn while V is held";
+});
+await check("I opens the inventory screen (UI Designer, role Inventory): the items in a grid of the demo's item boxes, the cursor, the selected item's name; arrows move it; I closes", async () => {
+  const look = () =>
+    ev(() => {
+      const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+      const shown = hud.children.list.filter((o) => o.visible);
+      const sc = window.ZeldaMakerToolkit.session.screens;
+      return {
+        screen: sc.current?.name ?? null,
+        cursor: sc.current?.cursor ?? -1,
+        items: sc.gridItems().length,
+        panel: shown.filter((o) => o.texture?.key === "zelda-ui-panel").length,
+        boxes: shown.filter((o) => o.texture?.key === "zelda-ui-item-box").length,
+        cursors: shown.filter((o) => o.texture?.key === "zelda-ui-cursor").length,
+        texts: shown.filter((o) => o.type === "Text").map((o) => o.text),
+        name: sc.cursorItem() ? window.ZeldaMakerToolkit.toolkit.inventory.displayName(sc.cursorItem()) : "",
+      };
+    });
   await page.keyboard.press("i");
   await wait(500);
-  const inv = await ev(() => {
-    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
-    const shown = hud.children.list.filter((o) => o.visible);
-    return {
-      open: window.ZeldaMakerToolkit.session.inventoryUi?.open === true,
-      panel: shown.filter((o) => o.texture?.key === "zelda-ui-panel").length,
-      cursor: shown.filter((o) => o.texture?.key === "zelda-ui-cursor").length,
-      title: shown.filter((o) => o.type === "Text" && o.alpha === 1 && /Предметы|Items/.test(o.text)).length,
-    };
-  });
+  const inv = await look();
   await page.screenshot({ path: path.join(OUT, "inventory.png") });
+  await page.keyboard.press("ArrowRight");
+  await wait(300);
+  const moved = await look();
   await page.keyboard.press("i");
   await wait(400);
-  const closed = await ev(() => window.ZeldaMakerToolkit.session.inventoryUi?.open === false);
-  expect(inv.open && inv.panel === 9 && inv.cursor === 1 && inv.title === 1, JSON.stringify(inv));
-  expect(closed, "the inventory did not close");
-  return "panel in 9 pieces, cursor on the selected item";
+  const closed = await screenNow();
+  expect(inv.screen === "inventory" && inv.panel === 9 && inv.boxes >= 12 && inv.cursors === 1 && inv.items >= 3, JSON.stringify(inv));
+  expect(inv.texts.some((t) => /Предметы|Items/.test(t)) && inv.texts.includes(inv.name), `texts ${inv.texts.join(", ")} (name ${inv.name})`);
+  expect(moved.cursor === inv.cursor + 1 || inv.cursor === inv.items - 1, `cursor ${inv.cursor} → ${moved.cursor}`);
+  expect(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
+  return `${inv.items} items, "${inv.name}", cursor ${inv.cursor} → ${moved.cursor}`;
 });
-await check("Escape opens the PS Maker options menu (game paused); Save game keeps the Toolkit's progress in the save", async () => {
+await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker's options menu; its Settings button opens PS Maker's options menu (game paused), where Save game keeps the Toolkit's progress; Escape closes the options, then the pause menu", async () => {
+  const player = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return `${Math.round(b.x)},${Math.round(b.y)}`; });
+  const options = () => button("Save game").isVisible();
   await page.keyboard.press("Escape");
+  await wait(400);
+  const opened = await screenNow();
+  const optionsOnEscape = await options();
+  const at = await player();
+  await page.keyboard.press("ArrowDown");
+  await wait(300);
+  const moved = await screenNow();
+  const still = (await player()) === at;
+  await page.screenshot({ path: path.join(OUT, "pause.png") });
+  await page.keyboard.press("z");
   await button("Save game").waitFor({ state: "visible", timeout: 5000 });
   const t0 = await ev(() => window.ZeldaMakerToolkit.session.tick);
   await wait(500);
@@ -363,38 +438,22 @@ await check("Escape opens the PS Maker options menu (game paused); Save game kee
   // Toolkit sounds are scaled by the menu's Sound Volume (PlayerAudioSettings.scaleSoundVolume).
   const volume = await ev(() => window.game.audioSettings?.scaleSoundVolume?.(0.5));
   await page.keyboard.press("Escape");
-  await wait(500);
-  expect(t1 === t0, `toolkit ran while the menu was open (${t0} → ${t1})`);
+  await wait(600);
+  const back = await screenNow();
+  const optionsAfter = await options();
+  await page.keyboard.press("Escape");
+  await wait(400);
+  const closed = await screenNow();
+  const optionsAtEnd = await options();
+  expect(opened.screen === "pause" && opened.paused && opened.focus === "continue" && !optionsOnEscape, `opened ${JSON.stringify(opened)}, PS Maker options ${optionsOnEscape}`);
+  expect(moved.focus === "settings", `down → ${moved.focus}`);
+  expect(still, "the player walked while the pause menu was open");
+  expect(t1 === t0, `toolkit ran while the options menu was open (${t0} → ${t1})`);
   expect(typeof volume === "number", "game.audioSettings.scaleSoundVolume is missing");
   expect(progress.state?.objects?.["zelda-demo-field/chest@140,200"] === "opened", `progress variable: ${JSON.stringify(progress.state?.objects)}`);
-  return "chest opened in the progress variable";
-});
-await check("Enter opens the pause screen (Zelda: UI Layout); its Settings button runs a project event that opens PS Maker's options menu; Enter closes it", async () => {
-  const state = () => ev(() => ({ screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null, focus: window.ZeldaMakerToolkit.session.screens.current?.focus ?? null, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
-  const player = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return `${Math.round(b.x)},${Math.round(b.y)}`; });
-  await page.keyboard.press("Enter");
-  await wait(400);
-  const opened = await state();
-  const at = await player();
-  await page.keyboard.press("ArrowDown");
-  await wait(300);
-  const moved = await state();
-  const still = (await player()) === at;
-  await page.screenshot({ path: path.join(OUT, "pause.png") });
-  await page.keyboard.press("z");
-  await button("Save game").waitFor({ state: "visible", timeout: 5000 });
-  await page.keyboard.press("Escape");
-  await wait(600);
-  const back = await state();
-  await page.keyboard.press("Enter");
-  await wait(400);
-  const closed = await state();
-  expect(opened.screen === "pause" && opened.paused && opened.focus === "continue", `opened ${JSON.stringify(opened)}`);
-  expect(moved.focus === "settings", `down → ${moved.focus}`);
-  expect(still, "the player walked while the pause screen was open");
-  expect(back.screen === "pause", `after the options menu: ${JSON.stringify(back)}`);
-  expect(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
-  return "pause → Settings → PS Maker options menu → back → closed";
+  expect(back.screen === "pause" && !optionsAfter, `after the options menu: ${JSON.stringify(back)}, options ${optionsAfter}`);
+  expect(closed.screen === null && !closed.paused && !optionsAtEnd, `closed ${JSON.stringify(closed)}, options ${optionsAtEnd}`);
+  return "Escape → pause → Settings → PS Maker options (saved) → Escape → pause → Escape → game";
 });
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.
@@ -448,13 +507,13 @@ await check("PS Maker Change map trigger takes the player to the dungeon", async
   await page.waitForFunction(() => window.ZeldaMakerToolkit.session?.mapId === "zelda-demo-dungeon", null, { timeout: 8000 });
   await wait(1000);
 });
-await check("the dungeon has no UI Layout of its own: it shows the project's shared HUD (made on the field) and its pause screen opens with Enter", async () => {
+await check("the dungeon has no UI Layout of its own: it shows the project's shared HUD (made on the field) and its pause menu opens with Escape", async () => {
   const keys = await ev(() => [...new Set(window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort());
   const own = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).map.initialActions.some((a) => a.actionName === "Zelda: UI Layout"));
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await wait(400);
   const screen = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.name ?? null);
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
   await wait(400);
   const closed = await ev(() => window.ZeldaMakerToolkit.session.screens.current);
   expect(!own, "the dungeon has its own UI Layout");
@@ -508,11 +567,14 @@ await check("back on the field (the map wakes up): enemies again, opened chest a
 });
 await check("reload, Continue, load the save: the Toolkit starts on the restored map with its progress", async () => {
   await page.reload();
-  await button("Continue").waitFor({ state: "visible", timeout: 30000 });
-  await wait(800);
-  const fresh = await ev(() => !!window.ZeldaMakerToolkit?.session);
-  expect(!fresh, "toolkit running on the menu after reload");
-  await button("Continue").click();
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.screens?.current?.name === "title", null, { timeout: 30000 });
+  await wait(1200);
+  // Continue: the second button of the title screen.
+  await page.keyboard.press("ArrowDown");
+  await wait(300);
+  const focus = (await screenNow()).focus;
+  expect(focus === "continue", `selected ${focus}`);
+  await page.keyboard.press("z");
   await wait(1000);
   await page.screenshot({ path: path.join(OUT, "load-menu.png") });
   await page.locator("button", { hasText: /Save 1/ }).first().click({ timeout: 5000 });

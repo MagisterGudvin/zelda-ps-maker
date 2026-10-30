@@ -1,4 +1,4 @@
-import { ANCHORS, BAR_SHAPES, COMPARE_OPS, EFFECTS, type ElementType, type UiElement } from "../ui/uiLayout.ts";
+import { ANCHORS, BAR_SHAPES, COMPARE_OPS, EFFECTS, type ElementType, type MessageKindName, type UiElement } from "../ui/uiLayout.ts";
 import { ABILITY_OPTIONS, ITEM_OPTIONS } from "./fields.ts";
 import { BINDING_OPTIONS, BUILT_IN_PICTURES, getField, type Align } from "./layoutEdit.ts";
 import type { UiDesigner } from "./uiDesigner.ts";
@@ -21,6 +21,7 @@ export const TYPE_ITEMS: readonly [ElementType, string][] = [
   ["slot", "Quick slot"],
   ["minimap", "Minimap"],
   ["button", "Button"],
+  ["inventory", "Inventory grid"],
 ];
 const TYPE_LABELS = Object.fromEntries(TYPE_ITEMS) as Record<ElementType, string>;
 const ROTATABLE: readonly ElementType[] = ["image", "text", "icon"];
@@ -35,6 +36,26 @@ interface FieldDef {
   kind: FieldKind;
   options?: readonly Opt[];
 }
+
+const ROLE_OPTIONS: readonly Opt[] = [
+  ["none", "Plain (Open UI Screen, buttons)"],
+  ["menu", "Pause menu (Escape opens and closes it)"],
+  ["message", "Message box (signs, items received)"],
+  ["inventory", "Inventory (I opens it)"],
+  ["title", "Title screen (hides the HUD)"],
+];
+const ROLE_HINTS: Record<string, string> = {
+  menu: "Escape (the Menu key) opens and closes it; PS Maker's options menu opens from a button that runs an event with \"Open options menu\".",
+  message: "Texts show {message} (tick \"Wrap lines\"); {message.ready} is 1 when the page waits for a key, {message.more} while more pages follow. Z, X or Escape: next page.",
+  inventory: "Add an Inventory grid: arrows move its cursor, Z takes the item in hand. Texts show {inv.name}, {inv.description}, {inv.count}. I, X or Escape close it.",
+  title: "Open it with Open UI Screen on the title map. Buttons run PS Maker events: change map (new game), open the load menu, the options menu, exit the game. No key closes it.",
+};
+const KIND_LABELS: readonly [MessageKindName, string][] = [
+  ["sign", "Signs and object texts"],
+  ["item", "Item received (chests, big items)"],
+  ["hint", "Hints (locked, need an item, too heavy)"],
+  ["info", "Short notes (saved, pickups)"],
+];
 
 const ANCHOR_LABELS: Record<string, string> = { tl: "Top left", t: "Top", tr: "Top right", l: "Left", c: "Centre", r: "Right", bl: "Bottom left", b: "Bottom", br: "Bottom right" };
 const EFFECT_LABELS: Record<string, string> = { none: "None", blink: "Blink", pulse: "Pulse (fade)", bob: "Float up and down", shake: "Shake" };
@@ -74,6 +95,7 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "align", label: "Align", kind: "choice", options: [["left", "Left"], ["center", "Centre"], ["right", "Right"]] },
     { path: "stroke", label: "Outline colour (empty = shadow)", kind: "color" },
     { path: "strokeWidth", label: "Outline width", kind: "num" },
+    { path: "wrap", label: "Wrap lines at the width", kind: "check" },
   ],
   bar: [
     { path: "value", label: "Value", kind: "bind" },
@@ -114,6 +136,14 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "frame", label: "Frame picture", kind: "pic" },
     { path: "selected", label: "Frame when selected", kind: "pic" },
     { path: "keyLabel", label: "Show its key", kind: "check" },
+  ],
+  inventory: [
+    { path: "cols", label: "Columns", kind: "num" },
+    { path: "cell", label: "Cell size", kind: "num" },
+    { path: "gap", label: "Gap", kind: "num" },
+    { path: "frame", label: "Cell picture", kind: "pic" },
+    { path: "cursor", label: "Cursor picture", kind: "pic" },
+    { path: "counts", label: "Show ammunition counts", kind: "check" },
   ],
   minimap: [
     { path: "shape", label: "Shape", kind: "choice", options: [["circle", "Circle"], ["rect", "Rectangle"]] },
@@ -377,13 +407,18 @@ export class DesignerPanel {
     this.body.append(this.el("div", CSS.head, this.d.isScreen ? "Screen" : "Layout"));
     const cur = () => this.d.current!;
     if (this.d.isScreen) {
-      this.field({ path: "screen.input", label: "Takes the keys (a menu)", kind: "check" }, () => cur().screen.input);
-      if (L.screen.input) {
-        this.field({ path: "screen.pause", label: "Pause the game", kind: "check" }, () => cur().screen.pause);
-        this.field({ path: "screen.menuKey", label: "Menu key opens it", kind: "check" }, () => cur().screen.menuKey);
+      this.field({ path: "screen.role", label: "Role", kind: "choice", options: ROLE_OPTIONS }, () => cur().screen.role);
+      const role = L.screen.role;
+      const takesKeys = role !== "none" || L.screen.input;
+      if (role === "none") this.field({ path: "screen.input", label: "Takes the keys (a menu)", kind: "check" }, () => cur().screen.input);
+      if (takesKeys) this.field({ path: "screen.pause", label: "Pause the game", kind: "check" }, () => cur().screen.pause);
+      if (role === "message") {
+        this.kinds();
+        this.field({ path: "screen.typing", label: "Typing (letters a second, 0 = at once)", kind: "num" }, () => cur().screen.typing);
       }
+      if (ROLE_HINTS[role]) this.body.append(this.el("div", "color:#999;margin:2px 0", ROLE_HINTS[role]));
       this.field({ path: "screen.dim", label: "Dim colour", kind: "color" }, () => cur().screen.dim);
-      if (L.screen.input) {
+      if (takesKeys) {
         this.field({ path: "screen.soundOpen", label: "Sound: opens", kind: "sound" }, () => cur().screen.soundOpen);
         this.field({ path: "screen.soundClose", label: "Sound: closes", kind: "sound" }, () => cur().screen.soundClose);
         this.field({ path: "screen.soundMove", label: "Sound: selection moves", kind: "sound" }, () => cur().screen.soundMove);
@@ -537,6 +572,26 @@ export class DesignerPanel {
   }
 
   /** One labelled field bound to a path of the selection or the layout. */
+  /** The message box's kinds: a checkbox for each kind of toolkit message. */
+  private kinds(): void {
+    this.body.append(this.el("div", "color:#ccc;margin:4px 0 0", "Shows these messages (the others stay short notes)"));
+    for (const [kind, label] of KIND_LABELS) {
+      const row = this.el("label", CSS.row);
+      const input = this.el("input");
+      input.type = "checkbox";
+      const read = () => this.d.current?.screen.kinds.includes(kind) ?? false;
+      input.checked = read();
+      input.addEventListener("change", () => {
+        const now = this.d.current?.screen.kinds ?? [];
+        this.d.remember();
+        this.d.setField("screen.kinds", input.checked ? [...now, kind] : now.filter((k) => k !== kind));
+      });
+      this.syncers.push(() => (input.checked = read()));
+      row.append(this.el("span", CSS.label, label), input);
+      this.body.append(row);
+    }
+  }
+
   private field(f: FieldDef, read: () => unknown, parent: any = this.body): void {
     const row = this.el("label", CSS.row);
     row.append(this.el("span", CSS.label, f.label));

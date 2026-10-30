@@ -617,19 +617,24 @@ await check("UI Layout 0.24 elements: a shape bar drawn over the panel before it
   return `bar over the panel (depth ${r.shapeDepths[0].toFixed(3)} > ${r.panelDepth.toFixed(3)}), turned picture, icon #2 of the sheet, slot with an item icon, minimap, outline ${r.stroke}px`;
 });
 
-await check("UI screens: Enter opens the menu screen (game paused, player still), arrows and Z press a button that runs a PS Maker event, a click closes it", async () => {
+await check("UI screens: Escape opens the pause menu (role Menu) and PS Maker's options menu does not (game paused, player still), arrows and Z press a button that runs a PS Maker event, a click closes it", async () => {
   await ev(() => {
     const H = window.__harness;
     window.__dialogues = [];
+    // PS Maker's options menu listens like this (SystemMenusOverlay: window keydown, skips prevented events).
+    window.__psOptions = 0;
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Escape" && !e.defaultPrevented && !e.repeat) window.__psOptions++;
+    });
     const button = (id, y, action) => ({ id, type: "button", anchor: "c", x: -40, y, w: 80, h: 16, text: id, action });
-    const layout = { v: 1, screen: { menuKey: true, dim: "#00000099" }, elements: [button("Continue", -30, { kind: "close" }), button("Hint", -8, { kind: "event", id: "ev-hint" })] };
+    const layout = { v: 1, screen: { role: "menu", dim: "#00000099" }, elements: [button("Continue", -30, { kind: "close" }), button("Hint", -8, { kind: "event", id: "ev-hint" })] };
     H.run("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(layout) });
   });
   const at = () => ev(() => window.__harness.player().body.center.x + "," + window.__harness.player().body.center.y);
   const before = await at();
-  await tapKey("Enter");
+  await tapKey("Escape");
   await new Promise((ok) => setTimeout(ok, 200));
-  const opened = await ev(() => ({ name: window.ZeldaMakerToolkit.session.screens.current?.name, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
+  const opened = await ev(() => ({ name: window.ZeldaMakerToolkit.session.screens.current?.name, paused: window.ZeldaMakerToolkit.session.isPaused("screen"), psOptions: window.__psOptions }));
   await page.keyboard.down("ArrowDown");
   await new Promise((ok) => setTimeout(ok, 250));
   await page.keyboard.up("ArrowDown");
@@ -651,31 +656,99 @@ await check("UI screens: Enter opens the menu screen (game paused, player still)
   await page.mouse.click(xy[0], xy[1]);
   await new Promise((ok) => setTimeout(ok, 200));
   const closed = await ev(() => ({ screen: window.ZeldaMakerToolkit.session.screens.current, paused: window.ZeldaMakerToolkit.session.isPaused("screen") }));
-  assert(opened.name === "pause" && opened.paused, `opened ${JSON.stringify(opened)}`);
+  // Without a pause menu Escape is PS Maker's again.
+  await ev(() => window.ZeldaMakerToolkit.toolkit.uiScreens.delete("pause"));
+  await tapKey("Escape");
+  await new Promise((ok) => setTimeout(ok, 100));
+  const psOptions = await ev(() => window.__psOptions);
+  assert(opened.name === "pause" && opened.paused && opened.psOptions === 0, `opened ${JSON.stringify(opened)}`);
+  assert(psOptions === 1, `without a pause menu PS Maker's options got Escape ${psOptions} times`);
   assert(focus === "Hint", `focus ${focus}`);
   assert(still, "the player moved while the menu was open");
   assert(ran.includes("runStoryEventAction:ev-hint"), `ran ${JSON.stringify(ran)}`);
   assert(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
-  return `opened by Enter, Down → Hint, Z ran ${ran.join(", ")}, click on Continue closed it`;
+  return `opened by Escape (PS Maker's options menu skipped it), Down → Hint, Z ran ${ran.join(", ")}, click on Continue closed it; without a pause menu Escape went to PS Maker`;
 });
 
-await check("Message Style: a toolkit message is a PS Maker Dialogue (storyRunner) in the chosen layout; the game waits until it closes", async () => {
-  const r = await ev(async () => {
-    const H = window.__harness;
+await check("message screen (role Message): a sign's text types out in the designer's box, Z shows it whole then closes it; the game waits", async () => {
+  const hudText = (t) => ev((t) => {
+    const hud = window.__harness.game.scene.getScene("ZeldaMakerToolkitHUD");
+    return hud.children.list.filter((o) => o.type === "Text" && o.visible && o.text.length > 0 && t.startsWith(o.text)).map((o) => o.text);
+  }, t);
+  await ev(() => {
+    const layout = { v: 1, screen: { role: "message", kinds: ["sign", "item"], typing: 20, dim: "" }, elements: [{ id: "panel", type: "image", anchor: "b", x: -100, y: -40, w: 200, h: 36, color: "#000000cc" }, { id: "text", type: "text", anchor: "b", x: -94, y: -36, w: 188, h: 28, text: "{message}", wrap: true }] };
+    window.__harness.run("Zelda: UI Layout", { name: "message", layout: JSON.stringify(layout) });
     window.__dialogues = [];
-    H.run("Zelda: Message Style", { layout: "wood", kinds: ["sign", "item"] });
-    H.run("Zelda: Show Message", { text: "Arrows: move. It's dangerous to go alone!", box: true });
-    await new Promise((ok) => setTimeout(ok, 200));
-    const played = window.__dialogues.map((d) => d.actions.map((a) => `${a.type}|${a.dialogueSource}`).join(";"));
-    const paused = window.ZeldaMakerToolkit.session.isPaused("message");
-    window.__dialogues[0]?.close();
-    await new Promise((ok) => setTimeout(ok, 200));
-    return { played, paused, after: window.ZeldaMakerToolkit.session.isPaused("message") };
+    window.ZeldaMakerToolkit.toolkit.bus.emit("zelda:message", { text: "It's dangerous to go alone! Take this.", durationMs: 1000, kind: "sign" });
   });
-  await ev(() => (window.ZeldaMakerToolkit.toolkit.messageBox = null));
-  assert(r.played.length === 1 && r.played[0] === "dialogueAction|@dialogue_layout wood\n\\Arrows: move. It's dangerous to go alone!", JSON.stringify(r.played));
-  assert(r.paused && !r.after, `paused ${r.paused} → ${r.after}`);
-  return "played as dialogueAction, the game waited";
+  await sleep(300);
+  const typing = await hudText("It's dangerous to go alone! Take this.");
+  const paused = await ev(() => window.ZeldaMakerToolkit.session.isPaused("message"));
+  await tapKey("z");
+  await sleep(150);
+  const whole = await hudText("It's dangerous to go alone! Take this.");
+  await page.screenshot({ path: `${ARTIFACTS}message-screen.png` });
+  await tapKey("z");
+  await sleep(250);
+  const after = await ev(() => ({ paused: window.ZeldaMakerToolkit.session.isPaused("message"), screen: window.ZeldaMakerToolkit.session.screens.current, dialogues: window.__dialogues.length }));
+  await ev(() => window.ZeldaMakerToolkit.toolkit.uiScreens.delete("message"));
+  assert(typing.length === 1 && typing[0].length < 38, `typing ${JSON.stringify(typing)}`);
+  assert(paused, "the game waits");
+  assert(whole.includes("It's dangerous to go alone! Take this."), `whole ${JSON.stringify(whole)}`);
+  assert(!after.paused && after.screen === null && after.dialogues === 0, JSON.stringify(after));
+  return `typed "${typing[0]}", Z: whole page, Z: closed; no PS Maker dialogue`;
+});
+
+await check("inventory screen (role Inventory): I opens it, arrows move the cursor over the items, Z takes one in hand, its name shows; I closes", async () => {
+  await ev(() => {
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    for (const id of ["boomerang", "bow"]) tk.inventory.give(id, 1, { silent: true });
+    const layout = { v: 1, screen: { role: "inventory" }, elements: [{ id: "grid", type: "inventory", anchor: "c", x: -60, y: -30, w: 120, h: 44, cols: 5, cell: 20, gap: 4 }, { id: "name", type: "text", anchor: "c", x: -60, y: 20, w: 120, h: 10, text: "{inv.name}" }] };
+    window.__harness.run("Zelda: UI Layout", { name: "items", layout: JSON.stringify(layout) });
+  });
+  await tapKey("i");
+  await sleep(150);
+  const opened = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.name);
+  const items = await ev(() => window.ZeldaMakerToolkit.session.screens.gridItems());
+  const target = items.indexOf("bow");
+  for (let n = 0; n < 12 && (await ev(() => window.ZeldaMakerToolkit.session.screens.current.cursor)) !== target; n++) {
+    const cur = await ev(() => window.ZeldaMakerToolkit.session.screens.current.cursor);
+    await tapKey(cur < target ? "ArrowRight" : "ArrowLeft");
+    await sleep(80);
+  }
+  await tapKey("z");
+  await sleep(150);
+  await page.screenshot({ path: `${ARTIFACTS}inventory-screen.png` });
+  const r = await ev(() => {
+    const hud = window.__harness.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    return { active: tk.state.inventory.activeItem, name: tk.inventory.displayName("bow"), texts: hud.children.list.filter((o) => o.type === "Text" && o.visible).map((o) => o.text), icons: hud.children.list.filter((o) => o.visible && /(^|_)icon_/.test(o.texture?.key ?? "")).length };
+  });
+  await tapKey("i");
+  await sleep(150);
+  const closed = await ev(() => ({ screen: window.ZeldaMakerToolkit.session.screens.current, paused: window.ZeldaMakerToolkit.session.isPaused() }));
+  await ev(() => window.ZeldaMakerToolkit.toolkit.uiScreens.delete("items"));
+  assert(opened === "items", `opened ${opened}`);
+  assert(r.active === "bow" && r.texts.includes(r.name), JSON.stringify(r));
+  assert(r.icons >= items.length, `icons ${r.icons} for ${items.length} items`);
+  assert(closed.screen === null && !closed.paused, JSON.stringify(closed));
+  return `${items.length} items, ${r.icons} icons; bow taken in hand, "${r.name}" shown; I closed it`;
+});
+
+await check("shield: none at the start of the demo; given, V held up shows the built-in shield in front of the player, released hides it", async () => {
+  const shieldShown = () => ev(() => window.__harness.scene().children.list.some((o) => o.visible && o.texture?.key?.includes("icon_shield")));
+  const start = await ev(() => window.ZeldaMakerToolkit.toolkit.config.player.startItems);
+  await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.give("shield", 1, { silent: true }));
+  await page.keyboard.down("v");
+  await sleep(200);
+  const up = await shieldShown();
+  await page.screenshot({ path: `${ARTIFACTS}shield-up.png` });
+  await page.keyboard.up("v");
+  await sleep(200);
+  const down = await shieldShown();
+  assert(!start.includes("shield"), `start items ${start}`);
+  assert(up && !down, `held ${up}, released ${down}`);
+  return "start items without the shield; shown while V is held";
 });
 
 await check("no page errors or console errors", async () => {

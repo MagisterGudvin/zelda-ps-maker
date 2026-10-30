@@ -63,7 +63,7 @@ export interface ToolkitConfig {
     nextItem: string[];
     prevItem: string[];
     inventory: string[];
-    /** Opens and closes the UI screen marked "Menu key" (Zelda: UI Layout). */
+    /** Opens and closes the pause menu (the UI screen with the role Menu); Escape takes it from PS Maker's options menu then. */
     menu: string[];
     /** Keys of the quick-use slots 1…9 (Slot elements of the HUD): each selects its slot's item. */
     hotbar: string[];
@@ -297,7 +297,7 @@ export function createDefaultConfig(): ToolkitConfig {
       nextItem: ["KeyE"],
       prevItem: ["KeyQ"],
       inventory: ["KeyI"],
-      menu: ["Enter"],
+      menu: ["Escape"],
       hotbar: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"],
       move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
       gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
@@ -321,7 +321,7 @@ export function createDefaultConfig(): ToolkitConfig {
       maxMagic: 32,
       startMagic: 32,
       magicRegenPerSecond: 0,
-      startItems: ["sword", "shield"],
+      startItems: ["sword"],
       startCounts: {},
       sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
     },
@@ -350,7 +350,7 @@ export function createDefaultConfig(): ToolkitConfig {
         pokeDamage: 1,
       },
     },
-    shield: { enabled: true, mode: "passive", blocks: ["projectile", "arrow"], frontalDot: 0.5, blockPushback: 60 },
+    shield: { enabled: true, mode: "hold", blocks: ["projectile", "arrow", "contact"], frontalDot: 0.5, blockPushback: 60 },
     combat: {
       enemyHitCooldownMs: 250,
       flashMs: 250,
@@ -474,7 +474,7 @@ export const CONFIG_PRESETS: Record<string, unknown> = {
   casual: {
     player: { maxHealth: 10, startHealth: 10, invulnerableMs: 1400, respawnHealth: 10 },
     sword: { range: 22, charge: { chargeMs: 500 } },
-    shield: { blocks: ["projectile", "arrow", "fire", "magic"] },
+    shield: { blocks: ["projectile", "arrow", "contact", "fire", "magic"] },
     combat: { bombsHurtPlayer: false },
   },
   hardcore: {

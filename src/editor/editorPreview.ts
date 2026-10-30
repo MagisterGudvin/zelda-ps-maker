@@ -4,7 +4,7 @@ import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
 import { characterFromParam, mapObjectLook, storyOfScene, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
 import { UiDesigner } from "./uiDesigner.ts";
 import { UI_LAYOUT_ACTION, designerSetup, openPanel } from "./layoutEdit.ts";
-import { areaOf, fillDialogLayoutOptions, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
+import { areaOf, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
 
 /**
  * Shows what the Zelda actions of a map will create, on the map in the PS Maker editor.
@@ -288,7 +288,6 @@ export function startEditorPreview(win: any = globalThis): void {
     if (opened && decodeURIComponent(opened) !== selected && zeldaActions(scene.map).some(({ action }) => action.id === decodeURIComponent(opened))) select(decodeURIComponent(opened));
     // The "Look (map object)" dropdowns list this project's map objects.
     fillMapObjectOptions(storyOfScene(scene)?.mapObjects);
-    fillDialogLayoutOptions(storyOfScene(scene)?.gameUI?.dialogLayouts as { id: string; name: string }[] | undefined);
     const sig = signature(scene.map);
     if (!overlay || overlay.scene !== scene || overlay.sig !== sig) {
       // The designer stays: its layout, selection and undo outlive a redraw of the pictures.

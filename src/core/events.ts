@@ -7,9 +7,9 @@ import type { Facing } from "./math.ts";
  * Authors can also emit their own `zelda:custom:<name>` events from rules.
  */
 /**
- * What a toolkit message is about (Zelda: Message Style picks which kinds go into the dialogue
- * box): a sign or an object's text, an item received, a hint (locked, need an item), a short note
- * (saved, rupees), or "box" (Show Message with "In a dialogue box").
+ * What a toolkit message is about (the message screen's kinds say which ones it shows): a sign or
+ * an object's text, an item received, a hint (locked, need an item), a short note (saved, rupees),
+ * or "box" (Show Message with "In a message box").
  */
 export type MessageKind = "sign" | "item" | "hint" | "info" | "box";
 

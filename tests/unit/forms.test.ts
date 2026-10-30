@@ -59,6 +59,7 @@ test("action names stay stable (PS Maker saves actions under a key derived from 
   const saved = ["Start Toolkit", "Set Controls", "Stop Toolkit", "Pause Combat", "Debug", "Create Enemy", "Enemy From NPC", "Create Object", "Create Chest", "Create Door", "Place Item", "Change Object", "Remove Target", "Damage Target", "Add Rule", "Run Actions", "Create Switch Sequence", "Create Wave Room", "Add Wave Enemy", "Enter Dungeon", "Give Item", "Spend Resource", "Remove Item", "Equip Item", "Change Player Stats", "Show Stat In Variable", "Set Ability", "Show Message", "Set Respawn Point", "Respawn Player", "Define Item", "Define Enemy", "Set Player Sprites", "Set Sound"];
   // Removed in 0.7.0 (PS Maker does it itself): Place Marker, Start Waves, Set Flag, Define Sprite Sheet, Define Animation, Preview Sprite Sheet.
   // Removed in 0.22.0 (PS Maker saves and the progress variable do it): Save Progress, Load Progress, Reset Progress; HUD Variables.
+  // Removed in 0.26.0: Message Style (the message screen is made in the UI Designer).
   for (const n of saved) assert.ok(names.has(`Zelda: ${n}`), `"Zelda: ${n}" was renamed or removed — saved projects would lose it`);
 });
 
@@ -72,6 +73,15 @@ test("Start Toolkit: game settings from numbers and checkboxes", async () => {
   assert.equal(tk.config.shield.mode, "hold");
   assert.equal(tk.config.ui.position, "bottom");
   done();
+});
+
+test("Start Toolkit: the shield is held on its key unless set to always up; an old unticked 'Shield on a button' no longer forces always up", async () => {
+  for (const [params, mode] of [[{}, "hold"], [{ shieldMode: "passive" }, "passive"], [{ shieldMode: "hold" }, "hold"], [{ shieldButton: false }, "hold"]] as const) {
+    const { tk, done } = await setup(params);
+    assert.equal(tk.config.shield.mode, mode, JSON.stringify(params));
+    assert.ok(!tk.state.inventory.owned.includes("shield"), "no shield at the start");
+    done();
+  }
 });
 
 test("dropdowns: difficulty, door lock; Position is a map picker", async () => {
@@ -92,7 +102,7 @@ test("dropdowns: difficulty, door lock; Position is a map picker", async () => {
 test("Start Toolkit saved by 0.5 (Difficulty as a number, no Hearts) keeps its preset values", async () => {
   const { tk, done } = await setup({ difficulty: 1 });
   assert.equal(tk.config.player.maxHealth, 10, "casual health is not reset by the new Hearts default");
-  assert.equal(tk.config.shield.mode, "passive");
+  assert.equal(tk.config.shield.mode, "hold", "0.26: the shield is held on its key unless set to always up");
   done();
 });
 

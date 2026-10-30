@@ -8,6 +8,7 @@ import {
   shapePolygon,
   textWithValues,
   type Box,
+  type InventoryCell,
   type LayoutValues,
   type MinimapData,
   type Point,
@@ -65,6 +66,8 @@ export interface PaintOptions {
   /** Milliseconds, for effects (blink, pulse…). */
   time?: number;
   minimap?: MinimapData | null;
+  /** Inventory grids: the owned items' cells and the cell under the cursor (-1 = no cursor). */
+  inventory?: { cells: InventoryCell[]; cursor: number } | null;
 }
 
 /** What a paint produced: each shown element's box (layout pixels) and the size of the game window. */
@@ -197,7 +200,7 @@ export class LayoutPainter {
       this.a = e.alpha * fx.alpha;
       this.back = this.front = null;
       const placed = { x: p.x + e.x, y: p.y + e.y, w: e.w, h: e.h };
-      const drawn = this.element(e, { ...placed, x: placed.x + fx.dx, y: placed.y + fx.dy }, values, fonts, layout, e.id === opts.focus, opts.minimap ?? null);
+      const drawn = this.element(e, { ...placed, x: placed.x + fx.dx, y: placed.y + fx.dy }, values, fonts, layout, e.id === opts.focus, opts);
       // Hit boxes stay where the element is placed (the effect only moves the drawing).
       const box = { ...drawn, x: drawn.x - fx.dx, y: drawn.y - fx.dy };
       out.boxes[e.id] = box;
@@ -208,14 +211,14 @@ export class LayoutPainter {
     return out;
   }
 
-  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean, minimap: MinimapData | null): Box {
+  private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean, opts: PaintOptions): Box {
     switch (e.type) {
       case "image":
         if (!this.picture(e.image, b, e.mode, e.slice, e.rotation) && e.color) this.rect(b, color(e.color, "#000000"));
         return b;
       case "text": {
         const family = fonts[e.font || layout.theme.font] ?? "monospace";
-        const t = this.text(textWithValues(e.text, values), family, e.size, e.color || layout.theme.textColor, 0, e.stroke ? { color: e.stroke, width: e.strokeWidth } : null);
+        const t = this.text(textWithValues(e.text, values), family, e.size, e.color || layout.theme.textColor, e.wrap ? e.w * this.k : 0, e.stroke ? { color: e.stroke, width: e.strokeWidth } : null);
         const w = t.width / this.k;
         const h = t.height / this.k;
         const x = e.align === "center" ? b.x + (b.w - w) / 2 : e.align === "right" ? b.x + b.w - w : b.x;
@@ -240,7 +243,10 @@ export class LayoutPainter {
         this.slot(e, b, values, fonts, layout);
         return b;
       case "minimap":
-        this.minimap(e, b, minimap);
+        this.minimap(e, b, opts.minimap ?? null);
+        return b;
+      case "inventory":
+        this.inventory(e, b, fonts, layout, opts.inventory ?? null);
         return b;
       case "button":
         this.button(e, b, values, fonts, layout, focused);
@@ -480,6 +486,28 @@ export class LayoutPainter {
     // Selected without a picture for it: a gold frame.
     if (selected && !e.selected) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(b.x) + this.k / 2, this.sy(b.y) + this.k / 2, b.w * this.k - this.k, b.h * this.k - this.k);
     if (e.keyLabel) this.text(String(e.index), fonts[layout.theme.font] ?? "monospace", 6, layout.theme.textColor, 0, { color: "#000000", width: 1 }).setPosition(Math.round(this.sx(b.x + 1)), Math.round(this.sy(b.y)));
+  }
+
+  /**
+   * An item grid: a cell frame for every cell that fits the box, the owned items' icons in them (with
+   * their ammunition count), the cursor's cell with its picture or a gold frame.
+   */
+  private inventory(e: Extract<UiElement, { type: "inventory" }>, b: Box, fonts: Record<string, string>, layout: UiLayout, data: { cells: InventoryCell[]; cursor: number } | null): void {
+    const step = e.cell + e.gap;
+    const rows = Math.max(1, Math.floor((b.h + e.gap) / step));
+    const cells = data?.cells ?? [];
+    const total = Math.max(rows * e.cols, Math.ceil(cells.length / e.cols) * e.cols);
+    for (let i = 0; i < total; i++) {
+      const cell = { x: b.x + (i % e.cols) * step, y: b.y + Math.floor(i / e.cols) * step, w: e.cell, h: e.cell };
+      const item = cells[i];
+      this.item(e.frame, cell, item?.icon ?? "");
+      if (item && e.counts && item.count !== null) {
+        const t = this.text(String(item.count), fonts[layout.theme.font] ?? "monospace", 6, layout.theme.textColor, 0, { color: "#000000", width: 1 });
+        t.setPosition(Math.round(this.sx(cell.x + cell.w) - t.width - this.k), Math.round(this.sy(cell.y + cell.h) - t.height));
+      }
+      if (i !== (data?.cursor ?? -1)) continue;
+      if (!this.picture(e.cursor, cell, "stretch")) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(cell.x) + this.k / 2, this.sy(cell.y) + this.k / 2, cell.w * this.k - this.k, cell.h * this.k - this.k);
+    }
   }
 
   /** The world around the player squeezed into the box, cut to its shape. */

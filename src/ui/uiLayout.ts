@@ -27,8 +27,8 @@ export interface Visibility {
   hideInDialogue?: boolean;
 }
 
-export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button";
-export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button"];
+export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button" | "inventory";
+export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button", "inventory"];
 
 /** A looping effect on an element while it shows. */
 export type Effect = "none" | "blink" | "pulse" | "bob" | "shake";
@@ -76,6 +76,8 @@ export interface TextElement extends Base {
   /** Outline colour ("" = a soft shadow instead) and its width in layout pixels. */
   stroke: string;
   strokeWidth: number;
+  /** Long text breaks into lines at the element's width (a message box). */
+  wrap: boolean;
 }
 
 export type BarShape = "rect" | "round" | "circle" | "diamond" | "triangle" | "star" | "heart";
@@ -193,7 +195,22 @@ export interface ButtonElement extends Base {
   action: ButtonAction;
 }
 
-export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement;
+/**
+ * The items the player owns, in a grid (an inventory screen). Arrow keys move the cursor, the
+ * action key takes the item in hand; texts show it with {inv.name}, {inv.description}, {inv.count}.
+ */
+export interface InventoryElement extends Base {
+  type: "inventory";
+  cols: number;
+  cell: number;
+  gap: number;
+  frame: string;
+  cursor: string;
+  /** Shows the count of items that use ammunition (bombs, arrows). */
+  counts: boolean;
+}
+
+export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement | InventoryElement;
 
 /** Look of things the toolkit draws around the layout (inventory panel, item icons, notes). */
 export interface LayoutTheme {
@@ -206,16 +223,29 @@ export interface LayoutTheme {
   cursor: string;
 }
 
+/**
+ * What a screen is for: a plain screen (opened by actions and buttons), the pause menu (the Menu
+ * key, Escape), the box for toolkit messages, the inventory (the inventory key, I), or the title
+ * screen (the HUD hidden, no key closes it).
+ */
+export type ScreenRole = "none" | "menu" | "message" | "inventory" | "title";
+export const SCREEN_ROLES: readonly ScreenRole[] = ["none", "menu", "message", "inventory", "title"];
+export const MESSAGE_KINDS = ["sign", "item", "hint", "info"] as const;
+export type MessageKindName = (typeof MESSAGE_KINDS)[number];
+
 /** How a screen (a layout with a name, opened over the game) behaves. */
 export interface ScreenSettings {
+  role: ScreenRole;
   /** The screen takes the keys (a menu). Off: a layer over the HUD (boss bar, notice) that the game plays under. */
   input: boolean;
   /** The game waits and the player stands still while the screen is open. */
   pause: boolean;
   /** Colour over the game behind the screen ("" = none). */
   dim: string;
-  /** The Menu key (Enter) opens and closes this screen. */
-  menuKey: boolean;
+  /** Message box: the toolkit messages it shows (signs, items received, hints, short notes). */
+  kinds: MessageKindName[];
+  /** Message box: letters a second as the text types out (0 = all at once). */
+  typing: number;
   /** Project sounds: selection moves, a button is pressed, the screen opens, closes. */
   soundMove: string;
   soundPress: string;
@@ -234,6 +264,20 @@ export interface UiLayout {
 
 /** A value an element shows, by its binding ("health", "rupees", "var:<id>"...). */
 export type LayoutValues = Record<string, number | string>;
+
+/** One cell of an inventory grid: the item's icon and, for ammunition, its count. */
+export interface InventoryCell {
+  icon: string;
+  count: number | null;
+}
+
+/** Index of the cell an arrow key moves an inventory cursor to (stays inside the grid). */
+export function moveInGrid(index: number, count: number, cols: number, dir: "up" | "down" | "left" | "right"): number {
+  if (count <= 0) return 0;
+  const i = Math.min(Math.max(0, index), count - 1);
+  const next = dir === "left" ? i - 1 : dir === "right" ? i + 1 : dir === "up" ? i - cols : i + cols;
+  return next < 0 || next >= count ? i : next;
+}
 
 /** The world around the player for minimaps (map pixels). */
 export interface MinimapData {
@@ -286,7 +330,7 @@ export function readElement(v: unknown, index = 0): UiElement | null {
     case "image":
       return { ...base, type, image: str(v.image), mode: oneOf(v.mode, ["stretch", "nine", "fit"] as const, "stretch"), slice: int(v.slice, 4, 0), color: str(v.color) };
     case "text":
-      return { ...base, type, text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), align: oneOf(v.align, ["left", "center", "right"] as const, "left"), stroke: str(v.stroke), strokeWidth: Math.max(0, num(v.strokeWidth, 1)) };
+      return { ...base, type, text: str(v.text), font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), align: oneOf(v.align, ["left", "center", "right"] as const, "left"), stroke: str(v.stroke), strokeWidth: Math.max(0, num(v.strokeWidth, 1)), wrap: v.wrap === true };
     case "bar":
       return {
         ...base,
@@ -328,6 +372,8 @@ export function readElement(v: unknown, index = 0): UiElement | null {
         enemyColor: str(v.enemyColor, "#ffd23a"),
         objectColor: str(v.objectColor, "#5ad8ff"),
       };
+    case "inventory":
+      return { ...base, type, cols: int(v.cols, 6, 1, 16), cell: int(v.cell, 20, 8), gap: int(v.gap, 2, 0), frame: str(v.frame), cursor: str(v.cursor), counts: v.counts !== false };
     case "button": {
       const a = isObj(v.action) ? v.action : {};
       const action: ButtonAction = { kind: oneOf(a.kind, BUTTON_ACTIONS, "none"), id: str(a.id), value: str(a.value) };
@@ -337,13 +383,16 @@ export function readElement(v: unknown, index = 0): UiElement | null {
 }
 
 export function defaultScreen(): ScreenSettings {
-  return { input: true, pause: true, dim: "#00000080", menuKey: false, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" };
+  return { role: "none", input: true, pause: true, dim: "#00000080", kinds: ["sign", "item"], typing: 40, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" };
 }
 
 function readScreen(v: unknown): ScreenSettings {
   const o = isObj(v) ? v : {};
   const d = defaultScreen();
-  return { input: o.input !== false, pause: o.pause !== false, dim: str(o.dim, d.dim), menuKey: o.menuKey === true, soundMove: str(o.soundMove), soundPress: str(o.soundPress), soundOpen: str(o.soundOpen), soundClose: str(o.soundClose) };
+  // 0.23–0.25 marked the pause menu with "menuKey".
+  const role = oneOf(o.role, SCREEN_ROLES, o.menuKey === true ? "menu" : "none");
+  const kinds = Array.isArray(o.kinds) ? MESSAGE_KINDS.filter((k) => (o.kinds as unknown[]).includes(k)) : d.kinds;
+  return { role, input: o.input !== false, pause: o.pause !== false, dim: str(o.dim, d.dim), kinds, typing: Math.max(0, num(o.typing, d.typing)), soundMove: str(o.soundMove), soundPress: str(o.soundPress), soundOpen: str(o.soundOpen), soundClose: str(o.soundClose) };
 }
 
 export function defaultTheme(): LayoutTheme {
@@ -394,6 +443,7 @@ export function layoutBindings(layout: UiLayout): Set<string> {
     if (e.type === "counter") out.add(e.value);
     if (e.type === "item") (out.add("item.icon"), out.add("item.count"));
     if (e.type === "slot") (out.add(`slot.${e.index}.icon`), out.add(`slot.${e.index}.sel`));
+    if (e.type === "inventory") (out.add("inv.name"), out.add("inv.description"), out.add("inv.count"));
     if (e.type === "text" || e.type === "button" || e.type === "bar") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
     if (e.show.when === "variable" && e.show.id) out.add(`var:${e.show.id}`);
     if (e.show.when === "item" && e.show.id) out.add(`owned:${e.show.id}`);
@@ -449,6 +499,8 @@ export function pictureKeys(e: UiElement): string[] {
               ? [e.frame]
               : e.type === "slot"
                 ? [e.frame, e.selected]
+                : e.type === "inventory"
+                  ? [e.frame, e.cursor]
                 : e.type === "button"
                   ? [e.image, e.hover]
                   : [];

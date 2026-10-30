@@ -169,6 +169,11 @@ export function sampleValues(layout: UiLayout, startParams: Record<string, unkno
     else if (key === "magic" || key === "maxMagic") out[key] = 1;
     else if (key === "magicPercent") out[key] = 100;
     else if (key === "item.icon" || key === "itemName") out[key] = "";
+    else if (key === "message") out[key] = "A message of the toolkit shows here: a sign, an item received.";
+    else if (key === "message.ready") out[key] = 1;
+    else if (key === "inv.name") out[key] = i18n.has("item.bow.name") ? i18n.t("item.bow.name") : "Bow";
+    else if (key === "inv.description") out[key] = i18n.has("item.bow.desc") ? i18n.t("item.bow.desc") : "";
+    else if (key === "inv.count") out[key] = 30;
     else out[key] = 0;
   }
   out.dialogue = 0;
@@ -193,6 +198,9 @@ export const BINDING_OPTIONS = [
   ["itemCount", "Selected item's count"],
   ["itemName", "Selected item's name"],
   ["enemies", "Enemies left"],
+  ["message.ready", "Message box: page waits for a key (1/0)"],
+  ["message.more", "Message box: more pages follow (1/0)"],
+  ["inv.count", "Inventory: ammo of the item under the cursor"],
 ] as const;
 
 /** Built-in pictures offered next to the project's images. */
@@ -216,6 +224,7 @@ const NEW: Record<ElementType, Raw> = {
   slot: { w: 20, h: 20, index: 1 },
   minimap: { w: 64, h: 64, shape: "circle" },
   button: { w: 72, h: 16, text: "Button", anchor: "c" },
+  inventory: { w: 130, h: 42, cols: 6, cell: 20, gap: 2, anchor: "c" },
 };
 
 /** A new element of a type with its defaults, its top-left at a point of the game window (view size for its anchor). */

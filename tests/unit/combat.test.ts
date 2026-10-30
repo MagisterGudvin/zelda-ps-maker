@@ -142,7 +142,7 @@ test("while the player blinks, an enemy walking into it is pushed out", () => {
   assert.ok(overlapX <= 0.01 || overlapY <= 0.01, "no overlap with the blinking player");
 });
 
-test("shield blocks a frontal projectile but not one from behind", () => {
+test("shield: none at the start; once picked up it blocks a frontal projectile only while held up, never one from behind", () => {
   const rig = createRig();
   const p = rig.host.player!;
   faceRight(rig);
@@ -152,13 +152,59 @@ test("shield blocks a frontal projectile but not one from behind", () => {
     );
   let blocked = 0;
   rig.tk.bus.on("zelda:player:blocked", () => blocked++);
+  const max = rig.tk.config.player.maxHealth;
+  assert.ok(!rig.tk.state.inventory.owned.includes("shield"), "no shield at the start");
+  rig.host.input.press("shield");
   shoot(p.x + 40);
   rig.run(400);
-  assert.equal(blocked, 1);
-  assert.equal(rig.tk.state.player.hp, rig.tk.config.player.maxHealth);
+  assert.equal(blocked, 0, "no shield to hold up");
+  assert.equal(rig.tk.state.player.hp, max - 2);
+  rig.run(1500); // invulnerability ends
+  rig.tk.inventory.give("shield", 1, { silent: true });
+  rig.host.input.release("shield");
+  rig.step();
+  shoot(p.x + 40);
+  rig.run(400);
+  assert.equal(blocked, 0, "not held up: the shot hits");
+  assert.equal(rig.tk.state.player.hp, max - 4);
+  rig.run(1500);
+  rig.host.input.press("shield");
+  shoot(p.x + 40);
+  rig.run(400);
+  assert.equal(blocked, 1, "held up, from the front");
+  assert.equal(rig.tk.state.player.hp, max - 4);
   shoot(p.x - 40);
   rig.run(400);
-  assert.equal(rig.tk.state.player.hp, rig.tk.config.player.maxHealth - 2);
+  assert.equal(rig.tk.state.player.hp, max - 6, "from behind it hits");
+});
+
+test("shield: always up (Start Toolkit) blocks frontal shots without its key", () => {
+  const rig = createRig({ shield: { mode: "passive" } });
+  rig.tk.inventory.give("shield", 1, { silent: true });
+  const p = rig.host.player!;
+  faceRight(rig);
+  let blocked = 0;
+  rig.tk.bus.on("zelda:player:blocked", () => blocked++);
+  rig.session.world.add(new Projectile(rig.session, { team: "enemy", ownerId: "e", x: p.x + 40, y: p.y, dirX: -1, dirY: 0, speed: 200, range: 200, sprite: "enemy_shot", damage: 2, damageType: "projectile", blockable: true }));
+  rig.run(400);
+  assert.equal(blocked, 1);
+});
+
+test("shield held up: the built-in shield is drawn in front of the player, hidden when lowered", () => {
+  const rig = createRig();
+  rig.tk.inventory.give("shield", 1, { silent: true });
+  faceRight(rig);
+  const before = rig.host.views.length;
+  rig.host.input.press("shield");
+  rig.step(2);
+  const view = rig.host.views.find((v) => v.sprite === "icon_shield");
+  assert.ok(view && rig.host.views.length > before, "a shield view");
+  if (!view) return;
+  assert.equal(view.visible, true);
+  assert.ok(view.x > rig.host.player!.x, "on the side the player faces");
+  rig.host.input.release("shield");
+  rig.step(2);
+  assert.equal(view.visible, false);
 });
 
 test("player death triggers respawn with configured health", () => {

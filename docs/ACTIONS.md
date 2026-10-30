@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.25.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.26.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **38**. Все имена начинаются с `Zelda: `.
+Всего действий: **37**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -33,7 +33,6 @@
 - [Zelda: Change Player Stats](#zelda-change-player-stats)
 - [Zelda: Set Ability](#zelda-set-ability)
 - [Zelda: Show Message](#zelda-show-message)
-- [Zelda: Message Style](#zelda-message-style)
 - [Zelda: UI Layout](#zelda-ui-layout)
 - [Zelda: Open UI Screen](#zelda-open-ui-screen)
 - [Zelda: Close UI Screen](#zelda-close-ui-screen)
@@ -56,7 +55,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `swordDamage` (Sword damage) | number | `2` | Damage of one sword hit (a slime has 2 HP). / Урон меча. |
 | `hud` (Show HUD) | boolean | `true` | Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit. |
 | `magicBar` (Magic bar) | boolean | `true` | Show the magic meter (needed for magic items). / Шкала магии. |
-| `shieldButton` (Shield on a button) | boolean | `false` | Off: the shield is raised whenever you are not attacking (classic). On: hold the shield key. / Щит по кнопке. |
+| `shieldMode` (Shield) | string-enum | `"hold"` | The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят. Варианты: Hold its key to block, Always up (blocks shots from the front). |
 | `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
 | `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
@@ -66,18 +65,18 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 
 ## Zelda: Set Controls
 
-Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Enter. / Клавиши Toolkit (пусто — не менять).
+Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Escape. / Клавиши Toolkit (пусто — не менять).
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `sword` (Sword) | key-bindings | `[]` | Default: X. |
 | `useItem` (Use item) | key-bindings | `[]` | Default: C. |
-| `shield` (Shield) | key-bindings | `[]` | Only with Shield on a button. Default: V. |
+| `shield` (Shield) | key-bindings | `[]` | Hold it to raise the shield (Start Toolkit: Shield). Default: V. |
 | `action` (Action) | key-bindings | `[]` | Open, lift, read. Default: Z. |
 | `nextItem` (Next item) | key-bindings | `[]` | Default: E. |
 | `prevItem` (Previous item) | key-bindings | `[]` | Default: Q. |
 | `inventory` (Inventory) | key-bindings | `[]` | Default: I. |
-| `menu` (Menu) | key-bindings | `[]` | Opens the UI screen marked Menu key. Default: Enter. |
+| `menu` (Menu) | key-bindings | `[]` | Opens and closes the pause menu (UI screen with the role Menu). Default: Escape (PS Maker's options menu opens from the pause menu's Settings button then). |
 
 ## Zelda: Stop Toolkit
 
@@ -386,26 +385,17 @@ Enables or disables an ability/item (sword, shield, bow, bomb...). / Включ�
 
 ## Zelda: Show Message
 
-Shows a toolkit message: a short HUD note, or a PS Maker dialogue (layout from Message Style). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.
+Shows a toolkit message: a short HUD note, or a box that waits for a key (the message screen made in the UI Designer, else a PS Maker dialogue). For conversations use PS Maker's Dialogue. / Сообщение Toolkit.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `text` (Text) | string | `""` | Message to show. / Текст сообщения. |
 | `durationMs` (Duration (ms)) | number | `2200` | How long a short note stays: 1000 = one second. / Сколько показывать. |
-| `box` (As a dialogue) | boolean | `false` | Show it as a PS Maker dialogue (closed with the action key) instead of a note. / Диалогом. |
-
-## Zelda: Message Style
-
-Shows toolkit messages (signs, "You got...") as PS Maker dialogues, with everything their dialogue layout has (Game UI → Dialogue layouts: background, font, name box, portrait, typing sound). The game waits while one is open. Put it after Start Toolkit. / Сообщения Toolkit диалогом PS Maker.
-
-| Параметр | Тип | По умолчанию | Описание |
-|---|---|---|---|
-| `layout` (Dialogue layout) | string-enum | `""` | Which dialogue layout of the project the messages use. / Макет диалога PS Maker. Варианты: Default layout. |
-| `kinds` (Messages as dialogues) | string-enum-multi | `["sign","item"]` | Which toolkit messages are dialogues; the others stay short HUD notes. / Какие сообщения показывать диалогом. Варианты: Signs and object texts, Item received (chests, big items), Hints (locked, need an item, too heavy), Short notes (saved, rupees and other pickups). |
+| `box` (In a message box) | boolean | `false` | Show it in the message screen (UI Designer, role Message; else a PS Maker dialogue), closed with the action key, instead of a note. / В окне сообщения. |
 
 ## Zelda: UI Layout
 
-Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or the Menu key. Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.
+Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or its role (pause menu on Escape, inventory on I, message box, title screen). Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
@@ -503,7 +493,7 @@ Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, 
 | `chargeWalk` (Walking while charging) | player-animation-picker | `""` | Optional: walking with the sword held, e.g. Sword Walk; empty = normal walk with the built-in blade. / Ходьба с заряженным мечом. |
 | `hurt` (Hurt) | player-animation-picker | `""` | Optional, e.g. Sword Hurt. / Получение урона. |
 | `death` (Death) | player-animation-picker | `""` | Optional, e.g. Sword Death; the last frame stays until respawn. / Смерть. |
-| `shield` (Shield up) | player-animation-picker | `""` | Optional: while the shield button is held (Start Toolkit: Shield on a button). / Щит поднят. |
+| `shield` (Shield up) | player-animation-picker | `""` | Optional: while the shield key is held; empty = the built-in shield in front of the player. / Щит поднят. |
 | `bow` (Bow) | player-animation-picker | `""` | Optional: shooting an arrow; empty = Use item. / Лук. |
 | `boomerang` (Boomerang) | player-animation-picker | `""` | Optional: throwing the boomerang; empty = Use item. / Бумеранг. |
 | `bomb` (Bomb) | player-animation-picker | `""` | Optional: placing a bomb; empty = Use item. / Бомба. |

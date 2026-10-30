@@ -6,7 +6,7 @@
 
 | Где | Поля |
 |---|---|
-| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield on a button, HUD at the bottom, Progress variable, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield (hold its key / always up), HUD at the bottom, Progress variable, Language, Positions in tiles, Show hitboxes, Show diagnostics |
 | `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря — штатным выбором клавиш PS Maker (можно выбрать и управление проекта, например Interact) |
 | `Zelda: Set Player Sprites` | анимации атаки из PS Maker, слой оружия, центр взмаха |
 | `Zelda: Set Sound` | звуки моментов |
@@ -29,7 +29,7 @@
 ### `controls` — привязка кнопок (в редакторе — `Zelda: Set Controls`)
 `controls.move` — клавиши движения PS Maker (по умолчанию стрелки и WASD): игрока ими двигает PS Maker; Toolkit использует их как подсказку направления, чтобы игрок мог «повернуться» к стене/сундуку, не сдвигаясь (`player.facingFromInput`), и для выбора кнопок на экранах меню.
 
-Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory, menu` (`menu`, по умолчанию Enter, открывает экран меню с отметкой *Menu key opens it*). `controls.hotbar` — девять клавиш слотов быстрого доступа (по умолчанию `Digit1`…`Digit9`): клавиша берёт в руку предмет своего слота, пока в HUD есть элементы *Quick slot*. Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory, menu}` — индексы кнопок стандартной раскладки (крестовина 12–15 выбирает кнопки экранов); работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
+Коды клавиш `KeyboardEvent.code` (`KeyX`, `Space`, `ArrowUp`, `ShiftLeft`…) или короткие имена (`"x"`, `"5"`, `"Space"`). Действия: `sword, useItem, shield, action, nextItem, prevItem, inventory, menu` (`menu`, по умолчанию Escape — с 0.26.0, до этого Enter, — открывает и закрывает экран с ролью *Pause menu*; пока такого экрана нет, Escape остаётся меню опций PS Maker). `controls.hotbar` — девять клавиш слотов быстрого доступа (по умолчанию `Digit1`…`Digit9`): клавиша берёт в руку предмет своего слота, пока в HUD есть элементы *Quick slot*. Геймпад: `controls.gamepad.{enabled, sword, useItem, shield, action, nextItem, prevItem, inventory, menu}` — индексы кнопок стандартной раскладки (крестовина 12–15 выбирает кнопки экранов); работает, только если в игре включён плагин Phaser Gamepad (в PS Maker не подтверждено).
 
 ```json
 {"controls":{"sword":["Space","KeyJ"],"useItem":["KeyK"],"action":["KeyZ","KeyL"]}}
@@ -49,7 +49,7 @@
 | `deathBehavior` | `respawn` | `respawn` или `none` (возрождение действием `Zelda: Respawn Player`) |
 | `respawnDelayMs` / `respawnHealth` | 1200 / 6 | |
 | `maxMagic` / `startMagic` / `magicRegenPerSecond` | 32 / 32 / 0 | магия; 0 — восполняется только банками |
-| `startItems` / `startCounts` | `["sword","shield"]` / `{}` | стартовый инвентарь новой игры |
+| `startItems` / `startCounts` | `["sword"]` / `{}` | стартовый инвентарь новой игры (до 0.26.0 — и щит) |
 
 ### `sword`
 `damage 2, range 18, width 10, windupMs 50, activeMs 130, recoveryMs 120, sweep true` (хитбокс проходит дугой от бока к фронту), `maxHitsPerTarget 1, knockback 220, lockUntilRecovered true` (иначе удар можно прервать новым в фазе восстановления).
@@ -60,7 +60,7 @@
 Листы и анимации из `Zelda: Define Sprite Sheet` / `Zelda: Define Animation`: `sprites: { sheets: { id: { image, frameWidth, frameHeight, margin?, spacing? } }, animations: { id: { sheet, frames, fps?, loop?, flipX? } } }`. Анимации атаки игрока: `player.sprites: { attack, spin, charge, hurt, weaponAttack, weaponSpin, weaponCharge, weaponBehind ["up"], hidePlayer true, offsetX 0, offsetY 0 }`. Подробно — [SPRITES.md](SPRITES.md).
 
 ### `shield`
-`enabled true, mode "passive"` (поднят, пока игрок не атакует) или `"hold"` (клавиша щита), `blocks ["projectile","arrow"]` — блокируемые типы урона, `frontalDot 0.5` — ширина сектора (косинус половины угла), `blockPushback 60`.
+`enabled true, mode "hold"` (блокирует, только пока зажата клавиша щита; с 0.26.0 по умолчанию) или `"passive"` (поднят всегда, пока игрок не атакует), `blocks ["projectile","arrow","contact"]` — блокируемые типы урона (`contact` — враг, наткнувшийся на поднятый щит спереди), `frontalDot 0.5` — ширина сектора (косинус половины угла), `blockPushback 60`. Щит работает, только если он есть у игрока (сундук, `Give Item`); без анимации «Shield up» (`Set Player Sprites`) поднятый щит рисуется встроенной иконкой перед игроком.
 
 ### `combat`
 `enemyHitCooldownMs 250, flashMs 250, bombsHurtPlayer true, pauseDuringDialogue true` (враги и снаряды замирают, пока открыт диалог PS Maker), `damageTable {}` — глобальные множители по типам урона, например `{"arrow":1.5,"fire":0.5}`.

@@ -769,6 +769,8 @@ export class PhaserHost implements HostAdapter, DepthSource {
     if (!fontId || !this.scene?.textures) return;
     const story = this.psMakerStory();
     void ensureProjectFont(story, this.scene.textures, fontId).then((family) => {
+      // Texts drawn before the font arrived were drawn in the fallback font.
+      if (family && !this.disposed) this.hud?.redraw?.();
       if (!family) this.logger.warnOnce(`font-${fontId}`, `Font "${fontId}" could not be loaded by the toolkit; PS Maker loads it when it first shows its own text with it.`);
     });
   }
@@ -791,6 +793,28 @@ export class PhaserHost implements HostAdapter, DepthSource {
     const typed = v.type === "boolean" ? (typeof value === "boolean" ? value : Number(value) !== 0 && value !== "false" && value !== "") : v.type === "number" ? (typeof value === "boolean" ? (value ? 1 : 0) : Number(value) || 0) : String(value);
     vars.set(id, typed);
     return true;
+  }
+
+  /**
+   * PS Maker opens its options menu on Escape from a window keydown listener (SystemMenusOverlay)
+   * that skips events whose default was prevented, as Phaser's keyboard does. A capture listener
+   * on the window runs before both: when the toolkit wants the Menu key, it prevents the default and
+   * hands the press to the toolkit's input itself. While PS Maker pauses the game (its menus are
+   * open) the key stays theirs.
+   */
+  claimMenuKeys(wants: () => boolean): () => void {
+    const win = globalThis as unknown as { addEventListener?: (t: string, f: (e: KeyboardEvent) => void, c: boolean) => void; removeEventListener?: (t: string, f: (e: KeyboardEvent) => void, c: boolean) => void };
+    if (typeof win.addEventListener !== "function") return () => {};
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat || this.disposed || this.game?.isPaused) return;
+      const target = e.target as { isContentEditable?: boolean; matches?: (q: string) => boolean } | null;
+      if (target?.isContentEditable || target?.matches?.("input, textarea, select")) return;
+      if (!this.input.isBound(e.code, "menu") || !wants()) return;
+      e.preventDefault();
+      this.input.inject(e);
+    };
+    win.addEventListener("keydown", onKey, true);
+    return () => win.removeEventListener?.("keydown", onKey, true);
   }
 
   /** True while a PS Maker dialogue is on screen (GameMap.playingDialogue). */

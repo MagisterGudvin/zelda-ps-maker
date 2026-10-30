@@ -1,5 +1,7 @@
 import type { Toolkit } from "../core/toolkit.ts";
-import { parseLayout } from "../ui/uiLayout.ts";
+import type { HostAdapter } from "../host/types.ts";
+import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
+import { parseLayout, type UiLayout } from "../ui/uiLayout.ts";
 
 /**
  * The UI shared by the whole project: the HUD of a "Zelda: UI Layout" without a screen name and
@@ -64,6 +66,17 @@ export function projectUi(story: { maps?: MapLike[] } | null | undefined): Proje
 }
 
 /**
+ * The project fonts a layout's texts use: their CSS family for the HUD, and loaded by the toolkit
+ * (PS Maker loads a project font only when it first shows its own text with it).
+ */
+export function useLayoutFonts(tk: Toolkit, story: unknown, host: HostAdapter | undefined, layout: UiLayout): void {
+  for (const id of new Set([layout.theme.font, ...layout.elements.map((e) => (e.type === "text" || e.type === "button" ? e.font : ""))].filter(Boolean))) {
+    tk.uiFonts[id] = fontFamilyCss(story as PsStory | null, id);
+    host?.loadProjectFont?.(id);
+  }
+}
+
+/**
  * At the start of a map: the shared HUD becomes the HUD (the map's own UI Layout, which runs after
  * Start Toolkit, may still replace it) and every screen of the project can be opened.
  */
@@ -75,10 +88,13 @@ export function applyProjectUi(tk: Toolkit, story: { maps?: MapLike[] } | null |
     if (error) tk.logger.warnOnce(`shared-hud-${ui.hud.actionId}`, `The shared UI Layout on map "${ui.hud.mapName}": ${error}; the classic HUD is shown.`);
     // Unreadable: the classic HUD (built to the player's magic and the HUD position).
     tk.hudLayout = layout;
+    if (layout) useLayoutFonts(tk, story, tk.session?.host, layout);
   }
   for (const s of ui.screens) {
     const { layout, error } = parseLayout(s.raw);
     if (error) tk.logger.warnOnce(`shared-screen-${s.actionId}`, `UI screen "${s.name}" on map "${s.mapName}": ${error}.`);
-    if (layout) tk.uiScreens.set(s.name, layout);
+    if (!layout) continue;
+    tk.uiScreens.set(s.name, layout);
+    useLayoutFonts(tk, story, tk.session?.host, layout);
   }
 }

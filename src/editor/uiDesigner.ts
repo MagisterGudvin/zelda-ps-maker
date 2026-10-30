@@ -1,7 +1,7 @@
 import { LayoutPainter, type Painted } from "../host/layoutPainter.ts";
 import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
 import { ensureProjectFont } from "../host/projectFonts.ts";
-import { anchorPoint, classicLayout, offsetFrom, type Box, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
+import { anchorPoint, classicLayout, MESSAGE_KINDS, offsetFrom, type Box, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 import { DesignerPanel, TYPE_ITEMS, type MenuItem } from "./designerPanel.ts";
 import {
   History,
@@ -276,6 +276,8 @@ export class UiDesigner {
     if (!L) return;
     const next = cloneLayout(L);
     if (path === "scale") next.scale = Math.max(0, Math.round(Number(value) || 0));
+    else if (path === "screen.typing") next.screen.typing = Math.max(0, Number(value) || 0);
+    else if (path === "screen.kinds") next.screen.kinds = MESSAGE_KINDS.filter((k) => Array.isArray(value) && value.includes(k));
     else if (path.startsWith("screen.")) (next.screen as any)[path.slice(7)] = typeof value === "boolean" ? value : String(value);
     else if (path.startsWith("theme.icons.")) {
       const item = path.slice("theme.icons.".length);
@@ -303,7 +305,7 @@ export class UiDesigner {
       this.change(next, { rebuild: path === "show.when" || path === "action.kind", select });
       return;
     }
-    this.change(next, { rebuild: path === "screen.input" });
+    this.change(next, { rebuild: path === "screen.input" || path === "screen.role" });
   }
 
   /** The game window in layout pixels. */
@@ -477,7 +479,9 @@ export class UiDesigner {
     const f = st.frame;
     const k = boardScale(st, layout);
     const values = this.layout ? sampleValues(layout, st.start) : st.values;
-    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k });
+    // Inventory grids show a few built-in item icons, the cursor on the bow (the sample {inv.name}).
+    const inventory = { cells: ["sword", "bow", "bomb", "boomerang"].map((id) => ({ icon: layout.theme.icons[id] || `icon_${id}`, count: id === "bow" ? 30 : id === "bomb" ? 10 : null })), cursor: 1 };
+    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory });
     this.painter.end();
     // The frame: the screen at the start of the game (dashed, like a camera view).
     const g = this.frameG;

@@ -202,6 +202,12 @@ export class FakeHost implements HostAdapter {
   describe(): string[] {
     return ["fake host"];
   }
+  /** Whether the toolkit wants the Menu key (Escape) now, as the session told the host; null = never asked. */
+  menuClaim: (() => boolean) | null = null;
+  claimMenuKeys(wants: () => boolean): () => void {
+    this.menuClaim = wants;
+    return () => (this.menuClaim = null);
+  }
   /** PS Maker events run by id (Run event). */
   events: string[] = [];
   runStoryEvent(id: string): boolean {

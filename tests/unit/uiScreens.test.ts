@@ -28,7 +28,9 @@ test("a button: its action and looks are read like every element; defaults for t
   assert.deepEqual([b.slice, b.size, b.color], [4, 8, "#1f1a24e6"]);
   assert.equal((readElement({ type: "button", action: { kind: "explode" } }) as any).action.kind, "none");
   const L = parseLayout('{"elements": []}').layout!;
-  assert.deepEqual(L.screen, { input: true, pause: true, dim: "#00000080", menuKey: false, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" }, "screen defaults");
+  assert.deepEqual(L.screen, { role: "none", input: true, pause: true, dim: "#00000080", kinds: ["sign", "item"], typing: 40, soundMove: "", soundPress: "", soundOpen: "", soundClose: "" }, "screen defaults");
+  assert.equal(parseLayout('{"screen": {"menuKey": true}}').layout!.screen.role, "menu", "0.23–0.25 marked the pause menu with menuKey");
+  assert.equal(parseLayout('{"screen": {"role": "boss"}}').layout!.screen.role, "none");
 });
 
 test("selection moves to the nearest button that way, and stays at the edge", () => {
@@ -183,4 +185,106 @@ test("screen sounds: opens, selection moves, button pressed, closes", () => {
   r.host.input.tap("action");
   r.step();
   assert.deepEqual(r.host.sounds.map((s) => s.src), ["s-open", "s-move", "s-move", "s-press", "s-close"]);
+});
+
+test("Escape is the toolkit's only while it has a use for it: a pause menu to open in play, an open screen (not the title)", () => {
+  const r = createRig();
+  const wants = () => r.host.menuClaim!();
+  assert.equal(wants(), false, "no pause menu: PS Maker's options menu keeps Escape");
+  r.tk.uiScreens.set("pause", parseLayout(JSON.stringify({ v: 1, screen: { role: "menu" }, elements: [button("continue", 10, 10, { kind: "close" })] })).layout!);
+  assert.equal(wants(), true);
+  r.session.setPaused("cutscene", true);
+  assert.equal(wants(), false, "the game is held (a cutscene, PS Maker's dialogue)");
+  r.session.setPaused("cutscene", false);
+  r.host.input.tap("menu");
+  r.step();
+  assert.equal(topScreen(r), "pause");
+  assert.equal(wants(), true, "open: Escape closes it");
+  r.host.input.tap("menu");
+  r.step();
+  assert.equal(topScreen(r), null);
+  r.tk.uiScreens.set("title", parseLayout(JSON.stringify({ v: 1, screen: { role: "title" }, elements: [button("start", 10, 10, { kind: "event", id: "ev-new" })] })).layout!);
+  r.session.screens!.open("title");
+  assert.equal(wants(), false, "the title screen leaves Escape to PS Maker");
+  r.session.dispose();
+  assert.equal(r.host.menuClaim, null, "released with the session");
+});
+
+test("title screen: the HUD is hidden, no key closes it, its buttons run events", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("title", parseLayout(JSON.stringify({ v: 1, screen: { role: "title" }, elements: [button("start", 10, 10, { kind: "event", id: "ev-new" })] })).layout!);
+  r.session.screens!.open("title");
+  r.step();
+  assert.equal(r.host.hud.last!.hudHidden, true);
+  for (const k of ["sword", "inventory", "menu"] as const) {
+    r.host.input.tap(k);
+    r.step();
+  }
+  assert.equal(topScreen(r), "title", "still open");
+  r.host.input.tap("action");
+  r.step();
+  assert.deepEqual(r.host.events, ["ev-new"]);
+  r.session.screens!.close();
+  r.step();
+  assert.equal(r.host.hud.last!.hudHidden, false);
+});
+
+function inventoryScreen(): UiLayout {
+  return parseLayout(
+    JSON.stringify({
+      v: 1,
+      screen: { role: "inventory" },
+      elements: [
+        { id: "grid", type: "inventory", x: 10, y: 10, w: 100, h: 50, cols: 2, cell: 20, gap: 2 },
+        { id: "name", type: "text", x: 10, y: 70, text: "{inv.name}" },
+      ],
+    }),
+  ).layout!;
+}
+
+test("inventory screen: I opens it instead of the panel; arrows move the cursor in the grid, Z takes the item in hand, I closes", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("items", inventoryScreen());
+  for (const id of ["bow", "boomerang", "bomb"]) r.tk.inventory.give(id, 1, { silent: true });
+  r.tk.inventory.equip("bow");
+  const owned = r.session.screens!.gridItems();
+  r.host.input.tap("inventory");
+  r.step();
+  assert.equal(topScreen(r), "items");
+  assert.equal(r.session.inventoryUi!.open, false, "not the built-in panel");
+  const model = () => r.host.hud.last!.screen!;
+  assert.equal(owned[model().inventory!.cursor], "bow", "the cursor starts on the item in hand");
+  assert.equal(model().inventory!.cells.length, owned.length);
+  const go = (a: "up" | "down" | "left" | "right" | "action" | "inventory") => {
+    r.host.input.tap(a);
+    r.step();
+  };
+  const start = model().inventory!.cursor;
+  go("down");
+  const below = owned[start + 2] ? start + 2 : start;
+  assert.equal(model().inventory!.cursor, below, "two columns: down is two cells on");
+  go("left");
+  go("right");
+  assert.equal(model().inventory!.cursor, below);
+  const target = owned.findIndex((id) => id === "boomerang");
+  while (model().inventory!.cursor !== target) go(model().inventory!.cursor < target ? "right" : "left");
+  assert.equal(model().values["inv.name"], r.tk.inventory.displayName("boomerang"));
+  go("action");
+  assert.equal(r.tk.state.inventory.activeItem, "boomerang");
+  go("inventory");
+  assert.equal(topScreen(r), null);
+  assert.ok(!r.session.isPaused());
+});
+
+test("inventory screen: a click on a cell takes its item", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("items", inventoryScreen());
+  for (const id of ["bow", "boomerang"]) r.tk.inventory.give(id, 1, { silent: true });
+  r.session.screens!.open("items");
+  const owned = r.session.screens!.gridItems();
+  const i = owned.indexOf("boomerang");
+  r.host.hud.pointer!("down", 10 + (i % 2) * 22 + 5, 10 + Math.floor(i / 2) * 22 + 5);
+  assert.equal(r.tk.state.inventory.activeItem, "boomerang");
+  r.host.hud.pointer!("down", 10 + 21, 15);
+  assert.equal(r.tk.state.inventory.activeItem, "boomerang", "the gap between cells takes nothing");
 });
