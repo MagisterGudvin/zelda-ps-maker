@@ -14,6 +14,8 @@ import { classicLayout, layoutBindings, offsetFrom, parseLayout, readElement, ty
 export { UI_LAYOUT_ACTION } from "./projectUi.ts";
 /** Label of the action's data field (the designer writes the layout there). */
 export const LAYOUT_FIELD_LABEL = "Layout data";
+/** The label of the action's screen name field (empty = the HUD). */
+export const SCREEN_FIELD_LABEL = "Screen name";
 /** PS Maker 1.2.1 plugin text fields keep up to 50000 characters (`maxlength`). */
 const LAYOUT_MAX_CHARS = 50000;
 
@@ -180,6 +182,9 @@ export function sampleValues(layout: UiLayout, startParams: Record<string, unkno
     else if (key === "item.icon" || key === "itemName") out[key] = "";
     else if (key === "message") out[key] = "A message of the toolkit shows here: a sign, an item received.";
     else if (key === "message.ready") out[key] = 1;
+    else if (key === "speaker") out[key] = "Villager";
+    else if (key === "portrait") out[key] = "";
+    else if (key === "note") out[key] = i18n.t("msg.got_item_count", { item: i18n.has("item.bombs.name") ? i18n.t("item.bombs.name") : "Bombs", count: 5 });
     else if (key === "inv.name") out[key] = i18n.has("item.bow.name") ? i18n.t("item.bow.name") : "Bow";
     else if (key === "inv.description") out[key] = i18n.has("item.bow.desc") ? i18n.t("item.bow.desc") : "";
     else if (key === "inv.count") out[key] = 30;

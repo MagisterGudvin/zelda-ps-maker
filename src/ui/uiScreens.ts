@@ -8,6 +8,9 @@ interface MessageState {
   startedAt: number;
   /** The page shows whole (a key pressed while it typed). */
   whole: boolean;
+  /** Zelda: Dialogue: who speaks and their portrait (a picture of the project). */
+  speaker: string;
+  portrait: string;
   done: () => void;
 }
 
@@ -87,7 +90,8 @@ export class UiScreenSystem {
       this.s.logger.warnOnce(`screen-${name}`, `UI screen "${name}" is not defined (Zelda: UI Layout with this screen name, run before).`);
       return false;
     }
-    if (!layout.screen.input && layout.screen.role === "none") {
+    // A layer: a screen without keys, and the notifications (shown by the HUD for each note).
+    if ((!layout.screen.input && layout.screen.role === "none") || layout.screen.role === "notification") {
       if (!this.layerNames.includes(name)) this.layerNames.push(name);
       this.s.hud?.markDirty();
       this.s.bus.emit("zelda:ui:screen", { name, open: true });
@@ -104,12 +108,12 @@ export class UiScreenSystem {
    * Shows a message in a message screen: one page per paragraph (a blank line), typed out at the
    * screen's speed. Resolves when the player closed the last page.
    */
-  showMessage(name: string, text: string): Promise<void> | null {
+  showMessage(name: string, text: string, who: { speaker?: string; portrait?: string } = {}): Promise<void> | null {
     const layout = this.s.toolkit.uiScreens.get(name);
     if (!layout) return null;
     const pages = text.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p);
     return new Promise<void>((resolve) => {
-      const message: MessageState = { pages: pages.length ? pages : [""], page: 0, startedAt: this.now(), whole: false, done: resolve };
+      const message: MessageState = { pages: pages.length ? pages : [""], page: 0, startedAt: this.now(), whole: false, speaker: who.speaker ?? "", portrait: who.portrait ?? "", done: resolve };
       const i = this.stack.findIndex((t) => t.name === name);
       if (i >= 0) {
         this.stack[i].message?.done();
@@ -123,16 +127,16 @@ export class UiScreenSystem {
     });
   }
 
-  /** The message screen's text as shown now (typed so far), and whether it waits for a key. */
-  messageView(): { text: string; ready: boolean; more: boolean } {
+  /** The message screen's text as shown now (typed so far), whether it waits for a key, who speaks. */
+  messageView(): { text: string; ready: boolean; more: boolean; speaker: string; portrait: string } {
     const top = [...this.stack].reverse().find((t) => t.message);
     const m = top?.message;
-    if (!m) return { text: "", ready: false, more: false };
+    if (!m) return { text: "", ready: false, more: false, speaker: "", portrait: "" };
     const page = m.pages[m.page];
     const typing = this.s.toolkit.uiScreens.get(top.name)?.screen.typing ?? 0;
     const shown = m.whole || typing <= 0 ? page.length : Math.floor(((this.now() - m.startedAt) / 1000) * typing);
     const ready = shown >= page.length;
-    return { text: ready ? page : page.slice(0, shown), ready, more: m.page < m.pages.length - 1 };
+    return { text: ready ? page : page.slice(0, shown), ready, more: m.page < m.pages.length - 1, speaker: m.speaker, portrait: m.portrait };
   }
 
   /** Closes a screen or layer by name, else the top screen (back to the one under it); `all` closes every screen and layer. */

@@ -34,7 +34,8 @@ node scripts/make-demo-project.mjs --from "Istina"
 | Таблички и полученные предметы — в окне сообщений из дизайнера: панель внизу, текст печатается, мигающая «Z», пока страница ждёт клавишу | «Map start» поля: `Zelda: UI Layout` с *Screen name* `message` (роль *Message box*) |
 | Инвентарь по I: предметы сеткой в рамках демо, курсор, название и описание предмета под курсором | «Map start» поля: `Zelda: UI Layout` с *Screen name* `inventory` (роль *Inventory*) |
 | Щит в сундуке у старта (под табличкой); V — держать щит | «Map start» поля: `Create Chest` с *Item* Shield |
-| Житель у старта (персонаж *New Female*) говорит штатным диалогом | «Map setup» поля; «Map start»: *Add event trigger* (взаимодействие) → *Dialogue* |
+| Житель у старта (персонаж *New Female*) говорит в окне диалога из дизайнера: имя на табличке, две страницы | «Map setup» поля; «Map start»: *Add event trigger* (взаимодействие) → `Zelda: Dialogue`; `Zelda: UI Layout` с *Screen name* `dialogue` (роль *Dialogue box*) |
+| Уведомления («Получено: Бомбы ×5») — плашкой под HUD из дизайнера | «Map start» поля: `Zelda: UI Layout` с *Screen name* `notification` (роль *Notifications*) |
 | Прогресс Toolkit в сохранениях PS Maker | переменная «Zelda progress»; `Start Toolkit` → *Progress variable* |
 | Карты **Field** и **Dungeon**: трава, тропинка, забор, каменные стены; пол и стены подземелья; деревья, кусты, камни, бочки, ящики | Террейн-слои «Ground» и «Details», объекты карты |
 | Коллизии стен | Слой коллизий карты |
@@ -61,7 +62,7 @@ node scripts/make-demo-project.mjs --from "Istina"
 | 9 | Инвентарь и ресурсы | HUD, экран инвентаря (I), бомбы/стрелы/рупии, лук в сундуке |
 | 10 | Сохранение прогресса | при возврате на карту открытые сундуки, стены и ворота остаются; Escape → *Settings* → *Save game*, затем в главном меню *Continue* (прогресс Toolkit — в переменной «Zelda progress») |
 | 11 | Главное меню, настройки | карта Title; Escape в игре → *Settings* — меню опций PS Maker (громкость действует и на звуки Toolkit) |
-| 12 | HUD, сообщения и инвентарь в своих картинках | `UI Layout`: HUD, окно сообщений, инвентарь; Game UI; табличка у старта, житель (диалог PS Maker) |
+| 12 | HUD, сообщения, диалоги, уведомления и инвентарь в своих картинках | `UI Layout`: HUD, окно сообщений, окно диалога, уведомления, инвентарь; Game UI; табличка у старта, житель (`Zelda: Dialogue`) |
 | 13 | Экран меню с кнопками и событиями | Escape на поле: стрелки, Z, мышь; *Settings* — меню опций PS Maker из события |
 
 ## Прохождение

@@ -1,6 +1,6 @@
 import type { Logger } from "../core/logger.ts";
 import type { HudModel, HudSink } from "./types.ts";
-import type { UiLayout } from "../ui/uiLayout.ts";
+import { layoutBoxes, type UiLayout } from "../ui/uiLayout.ts";
 import { LayoutPainter, layoutScale, type Painted } from "./layoutPainter.ts";
 
 export const HUD_SCENE_KEY = "ZeldaMakerToolkitHUD";
@@ -8,6 +8,19 @@ export const HUD_SCENE_KEY = "ZeldaMakerToolkitHUD";
 const HUDS = new WeakMap<object, PhaserHud>();
 const MSG_FILL = 0x101030;
 const MSG_BORDER = 0xf0f0f0;
+
+/**
+ * How far (layout pixels) the n-th notification is moved from the first: one height of its
+ * elements (and a gap) per place, downwards when they sit in the top half, upwards otherwise.
+ */
+export function stackOffset(layout: UiLayout, place: number, viewW: number, viewH: number): number {
+  const boxes = Object.values(layoutBoxes(layout, viewW, viewH));
+  if (!boxes.length) return 0;
+  const top = Math.min(...boxes.map((b) => b.y));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.h));
+  const step = bottom - top + 2;
+  return (top + bottom) / 2 < viewH / 2 ? place * step : -place * step;
+}
 
 /** One HUD per Phaser game, reused across maps (avoids duplicate HUD objects). */
 export function getHud(game: any, logger: Logger): PhaserHud {
@@ -139,7 +152,8 @@ export class PhaserHud implements HudSink {
     lp.begin();
     for (const l of model.layers) {
       const k = layoutScale(l.layout.scale || model.scale, model.mapZoom, W, H);
-      lp.paint(l.layout, l.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { time: model.time, minimap: model.minimap });
+      const dy = l.stack ? stackOffset(l.layout, l.stack, Math.floor(W / k), Math.floor(H / k)) * k : 0;
+      lp.paint(l.layout, l.values, model.fonts, { x: 0, y: dy, w: W, h: H, k }, { time: model.time, minimap: model.minimap });
     }
     lp.end();
     sp.begin();

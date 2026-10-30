@@ -201,3 +201,14 @@ test("designer saving: the text goes into the open action's field like typing (n
   assert.equal(details.open, true, "a folded group is opened");
   assert.equal(writeFormText(doc, "Zelda: Show Message", "Layout data", "x"), false, "another action's form");
 });
+
+test("notifications stack one height (and a gap) apart, away from the screen edge they are near; a {portrait} picture is a value, not a project picture", async () => {
+  const { stackOffset } = await import("../../src/host/phaserHud.ts");
+  const top = parseLayout(JSON.stringify({ elements: [{ id: "a", type: "text", y: 10, h: 12 }] })).layout!;
+  const bottom = parseLayout(JSON.stringify({ elements: [{ id: "a", type: "text", anchor: "bl", y: -20, h: 12 }] })).layout!;
+  assert.equal(stackOffset(top, 2, 320, 180), 28);
+  assert.equal(stackOffset(bottom, 1, 320, 180), -14);
+  const face = parseLayout(JSON.stringify({ elements: [{ id: "f", type: "image", image: "{portrait}" }] })).layout!;
+  assert.deepEqual(pictureKeys(face.elements[0]), []);
+  assert.ok(layoutBindings(face).has("portrait"));
+});

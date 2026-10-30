@@ -187,8 +187,12 @@ export interface HudModel {
   hudHidden: boolean;
   /** The open UI screen over the game (its selected button; an inventory screen's grid), or null. */
   screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null } | null;
-  /** Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the screen. */
-  layers: { name: string; layout: UiLayout; values: LayoutValues }[];
+  /**
+   * Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the
+   * screen; then one notification layer per note, `stack` = its place (0 = the oldest), each drawn
+   * one layout height further from the screen edge it is near.
+   */
+  layers: { name: string; layout: UiLayout; values: LayoutValues; stack?: number }[];
   /** Milliseconds of play, for element effects. */
   time: number;
   /** The world around the player, when a layout has a minimap. */

@@ -167,7 +167,11 @@ test("every action ends itself (ctx.endAction) exactly once, also on errors", as
     a.execute({}, { ...base, endAction: () => counts.set(a.name, (counts.get(a.name) ?? 0) + 1) });
     if (a.name === "Zelda: Start Toolkit") getToolkit().configure({ debug: { logLevel: "silent" } });
   }
+  // Zelda: Dialogue ends once its box was shown and closed (here: no box, a note — on the next tick, or when the toolkit stopped).
+  const waiting = counts.get("Zelda: Dialogue") ?? 0;
+  for (let i = 0; i < 3; i++) getToolkit().session?.step(17);
   for (const a of actions) assert.equal(counts.get(a.name), 1, `${a.name} called endAction ${counts.get(a.name) ?? 0} times`);
+  assert.ok(waiting <= 1);
   // Also when the action body throws.
   getToolkit().configure({ debug: { rethrowErrors: true } });
   let ended = 0;

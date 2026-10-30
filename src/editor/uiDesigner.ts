@@ -3,9 +3,11 @@ import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
 import { ensureProjectFont } from "../host/projectFonts.ts";
 import { anchorPoint, classicLayout, MESSAGE_KINDS, offsetFrom, type Box, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 import { DesignerPanel, TYPE_ITEMS, type MenuItem } from "./designerPanel.ts";
+import { projectUi } from "./projectUi.ts";
 import {
   History,
   LAYOUT_FIELD_LABEL,
+  SCREEN_FIELD_LABEL,
   UI_LAYOUT_ACTION,
   alignElements,
   boardScale,
@@ -45,7 +47,17 @@ import {
 
 const DEPTH = 1_000_100;
 /** How the frame label names a screen's role. */
-const ROLE_NAMES: Record<string, string> = { none: "", menu: " (pause menu, over the HUD)", message: " (message box, over the HUD)", inventory: " (inventory, over the HUD)", title: " (title screen, no HUD)" };
+const ROLE_NAMES: Record<string, string> = {
+  none: "",
+  menu: " (pause menu, over the HUD)",
+  message: " (message box, over the HUD)",
+  dialogue: " (dialogue box, over the HUD)",
+  notification: " (a notification, over the HUD)",
+  inventory: " (inventory, over the HUD)",
+  title: " (title screen, no HUD)",
+};
+/** The screen name a HUD gets when it is given a role in the designer. */
+const ROLE_SCREEN_NAMES: Record<string, string> = { none: "screen", menu: "pause", message: "message", dialogue: "dialogue", notification: "notification", inventory: "inventory", title: "title" };
 const SAVE_DELAY_MS = 250;
 /** A map update that does not match what the designer wrote this long after its write is someone else's. */
 const ECHO_MS = 2000;
@@ -135,7 +147,7 @@ export class UiDesigner {
   update(setup: DesignerSetup | null, editing: boolean): void {
     if (this.drag) return;
     // "This map only" ticked or another shared HUD added: the panel's note changes.
-    const resharing = setup?.sharing !== this.setup?.sharing;
+    const resharing = setup?.sharing !== this.setup?.sharing || setup?.screen !== this.setup?.screen;
     this.setup = setup;
     if (resharing && this.layout) this.panel.render();
     if (setup && editing && setup.action) {
@@ -311,6 +323,32 @@ export class UiDesigner {
       return;
     }
     this.change(next, { rebuild: path === "screen.input" || path === "screen.role" });
+  }
+
+  /**
+   * The Role list: the HUD is a layout without a screen name, a screen has one. Turning one into the
+   * other writes the action's Screen name field (as typing in it would); a screen's role is in its layout.
+   */
+  setRole(role: string): void {
+    const L = this.layout;
+    if (!L) return;
+    if (role === "hud") {
+      if (!this.isScreen) return;
+      this.change({ ...cloneLayout(L), screen: { ...L.screen, role: "none" } });
+      this.flush();
+      if (!writeFormText(this.win.document, UI_LAYOUT_ACTION, SCREEN_FIELD_LABEL, "")) this.panel.status(`Not changed: the "${SCREEN_FIELD_LABEL}" field of ${UI_LAYOUT_ACTION} was not found.`);
+      return;
+    }
+    const roleOf = role as UiLayout["screen"]["role"];
+    if (this.isScreen) return this.setField("screen.role", roleOf);
+    // A HUD becomes a screen: the name of its role, numbered when the project has a screen of that name.
+    const taken = new Set(projectUi(this.host.story() as Parameters<typeof projectUi>[0]).screens.map((x) => x.name));
+    const base = ROLE_SCREEN_NAMES[role] ?? "screen";
+    let name = base;
+    for (let n = 2; taken.has(name); n++) name = `${base}${n}`;
+    this.change({ ...cloneLayout(L), screen: { ...L.screen, role: roleOf, dim: role === "notification" || role === "title" ? "" : L.screen.dim } });
+    this.flush();
+    if (!writeFormText(this.win.document, UI_LAYOUT_ACTION, SCREEN_FIELD_LABEL, name)) this.panel.status(`Not changed: the "${SCREEN_FIELD_LABEL}" field of ${UI_LAYOUT_ACTION} was not found.`);
   }
 
   /** The game window in layout pixels. */

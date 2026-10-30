@@ -305,22 +305,34 @@ await check("message screen (UI Designer, role Message): reading the sign types 
   expect(!still && !again, `still open ${still}, opened again ${again}`);
   return `typed ("${typing.text}"), 2 pages, closed`;
 });
-await check("the villager talks with PS Maker's own Dialogue (styled panel); the toolkit waits meanwhile", async () => {
+await check("the villager talks in the dialogue box made in the UI Designer (Zelda: Dialogue: his name on a plate, two pages); the game waits; Z closes it and he does not start again", async () => {
   await tp(80, 140);
   await hold("ArrowUp", 150);
   await page.keyboard.press("z");
-  await page.waitForFunction(() => document.body.innerText.includes("dangerous"), null, { timeout: 5000 }).catch(() => {});
-  const during = await ev(() => ({ dialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true, paused: window.ZeldaMakerToolkit.session.isPaused("dialogue"), text: document.body.innerText.includes("dangerous"), name: document.body.innerText.includes("Villager") }));
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.endsWith("by the gate.")), null, { timeout: 6000 }).catch(() => {});
+  const during = await ev(() => ({
+    screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null,
+    psDialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
+    paused: window.ZeldaMakerToolkit.session.isPaused("message"),
+  }));
+  const texts = (await hudTexts()).map((t) => t.text);
   await page.screenshot({ path: path.join(OUT, "villager-dialogue.png") });
-  // Z finishes a page, then turns it; stop once it closes (one more Z would talk to him again).
-  let after = true;
-  for (let i = 0; i < 10 && after; i++) {
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("Read the sign")), null, { timeout: 6000 }).catch(() => {});
+  const page2 = (await hudTexts()).some((t) => t.text.startsWith("Read the sign"));
+  let open = true;
+  for (let i = 0; i < 6 && open; i++) {
     await page.keyboard.press("z");
     await wait(500);
-    after = await ev(() => window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true);
+    open = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null);
   }
-  expect(during.text && during.name && during.dialogue && during.paused, JSON.stringify(during));
-  expect(!after, "dialogue still open");
+  await wait(800);
+  const again = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null || window.ZeldaMakerToolkit.session.isPaused("message"));
+  expect(during.screen === "dialogue" && !during.psDialogue && during.paused, JSON.stringify(during));
+  expect(texts.includes("Villager"), `texts ${texts.join(" | ")}`);
+  expect(page2, "the second page did not show");
+  expect(!open && !again, `still open ${open}, started again ${again}`);
+  return "name plate, 2 pages, closed, not started again";
 });
 /** The leaf element of the page that shows a text, with its font. */
 const textOnPage = (part) =>
@@ -328,20 +340,26 @@ const textOnPage = (part) =>
     const el = [...document.querySelectorAll("body *")].find((e) => e.children.length === 0 && e.textContent.includes(part));
     return el ? { text: el.textContent.trim(), font: getComputedStyle(el).fontFamily } : null;
   }, part);
-await check("a chest opens with Z; the small note \"Получено: Бомбы ×5\" is drawn by the toolkit in the demo font", async () => {
+await check("a chest opens with Z; the note \"Получено: Бомбы ×5\" is drawn by the notification screen of the UI Designer (its plate) in the demo font", async () => {
   await tp(140, 218);
   await hold("ArrowUp", 250);
   await page.keyboard.press("z");
   await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.includes("Получено")), null, { timeout: 6000 }).catch(() => {});
   const note = await ev(() => {
-    const t = window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.find((o) => o.type === "Text" && o.visible && o.text.includes("Получено"));
-    return t ? { text: t.text, font: t.style.fontFamily } : null;
+    const hud = window.game.scene.getScene("ZeldaMakerToolkitHUD");
+    const t = hud.children.list.find((o) => o.type === "Text" && o.visible && o.text.includes("Получено"));
+    // The plate: a HUD bar picture under the note (the HUD's own bars are at the top edge).
+    const cx = t ? t.x + t.width / 2 : 0;
+    const cy = t ? t.y + t.height / 2 : 0;
+    const plates = hud.children.list.filter((o) => o.visible && o.texture?.key === "zelda-ui-hud-bar" && o.x <= cx && cx <= o.x + o.displayWidth && o.y <= cy && cy <= o.y + o.displayHeight).length;
+    return t ? { text: t.text, font: t.style.fontFamily, plates } : null;
   });
   await page.screenshot({ path: path.join(OUT, "chest-note.png") });
   await dismiss();
   const s = await state();
   expect(s.chest === "opened", JSON.stringify(s));
   expect(note && /zelda-font-pixelify-sans/.test(note.font), `note: ${JSON.stringify(note)}`);
+  expect(note.plates > 0, `no notification plate under the note: ${JSON.stringify(note)}`);
   return `"${note.text}" in ${note.font.split(",")[0]}`;
 });
 await check("the boomerang chest: \"Получено: Бумеранг!\" shows in the message screen in the demo font, which draws its Cyrillic", async () => {

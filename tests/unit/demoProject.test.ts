@@ -179,9 +179,11 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   const talk = field.initialActions.find((a: Any) => a.triggerType === "interact");
   assert.deepEqual(talk.staticArea, { x: villager.position.x, y: villager.position.y, width: 48, height: 48 }, "the trigger is around him (saved by its centre)");
   const ev = story.ownedStoryEvents.find((e: Any) => e.id === talk.storyEventId);
-  assert.equal(ev.actions[0].type, "dialogueAction");
-  assert.match(ev.actions[0].dialogueSource, /^@name "Villager"\n/);
-  assert.ok(!/^[^@\n]*: /m.test(ev.actions[0].dialogueSource), "no text line reads as \"Name: text\"");
+  // He talks in the toolkit's dialogue box (Zelda: Dialogue), made in the designer.
+  assert.equal(ev.actions[0].actionName, "Zelda: Dialogue");
+  assert.equal(ev.actions[0].pluginParams.name, "Villager");
+  assert.match(ev.actions[0].pluginParams.text, /\\n\\n/, "two pages");
+  assert.equal(ev.actions[0].pluginParams.wait, true);
 });
 
 test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI HUD; one font with Cyrillic everywhere", async () => {
@@ -189,7 +191,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
   // The HUD and the pause screen are on the first map only; the dungeon uses them from the project.
   const shared = projectUi(story);
   assert.equal(shared.hud?.mapId, story.maps[0].id);
-  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "message", "inventory", "title"]);
+  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "message", "inventory", "dialogue", "notification", "title"]);
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
     assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
@@ -212,6 +214,13 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     assert.equal(inventory.screen.role, "inventory");
     assert.ok(inventory.elements.some((e) => e.type === "inventory"));
     assert.ok(inventory.elements.some((e) => e.type === "text" && e.text === "{inv.name}"));
+    // The dialogue box: the speaker on a plate, the words wrapped; notifications: {note}, the game plays on.
+    const talk = screenOf("dialogue");
+    assert.equal(talk.screen.role, "dialogue");
+    assert.ok(talk.elements.some((e) => e.type === "text" && e.text === "{speaker}") && talk.elements.some((e) => e.type === "text" && e.text === "{message}" && e.wrap));
+    const note = screenOf("notification");
+    assert.equal(note.screen.role, "notification");
+    assert.ok(note.elements.some((e) => e.type === "text" && e.text === "{note}"));
     // The pause screen (Escape): its buttons run project events that exist.
     const screen = screenOf("pause");
     assert.ok(screen.screen.role === "menu" && screen.screen.pause);

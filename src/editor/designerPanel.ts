@@ -38,13 +38,19 @@ interface FieldDef {
 }
 
 const ROLE_OPTIONS: readonly Opt[] = [
-  ["none", "Plain (Open UI Screen, buttons)"],
+  ["hud", "HUD (always on screen)"],
+  ["none", "Plain screen (Open UI Screen, buttons)"],
   ["menu", "Pause menu (Escape opens and closes it)"],
   ["message", "Message box (signs, items received)"],
+  ["dialogue", "Dialogue box (Zelda: Dialogue, NPCs)"],
+  ["notification", "Notifications (short notes over the game)"],
   ["inventory", "Inventory (I opens it)"],
   ["title", "Title screen (hides the HUD)"],
 ];
 const ROLE_HINTS: Record<string, string> = {
+  hud: "The HUD: no screen name. Choosing another role gives this action a screen name; the map then shows the project's shared HUD (or the classic one).",
+  dialogue: "Zelda: Dialogue shows what an NPC says here: {speaker}, {message} (tick \"Wrap lines\"), a Picture whose picture is {portrait}. Z, X or Escape: next page; the event waits until it closes.",
+  notification: "Each short note (\"You got 5 bombs\", \"Saved\", hints the message box does not show) is drawn with this layout while it lasts: texts show {note}. Several notes stack one height apart. The game plays on.",
   menu: "Escape (the Menu key) opens and closes it; PS Maker's options menu opens from a button that runs an event with \"Open options menu\".",
   message: "Texts show {message} (tick \"Wrap lines\"); {message.ready} is 1 when the page waits for a key, {message.more} while more pages follow. Z, X or Escape: next page.",
   inventory: "Add an Inventory grid: arrows move its cursor, Z takes the item in hand. Texts show {inv.name}, {inv.description}, {inv.count}. I, X or Escape close it.",
@@ -406,24 +412,25 @@ export class DesignerPanel {
 
     this.body.append(this.el("div", CSS.head, this.d.isScreen ? "Screen" : "Layout"));
     const cur = () => this.d.current!;
+    this.roleField();
+    if (!this.d.isScreen && ROLE_HINTS.hud) this.body.append(this.el("div", "color:#999;margin:2px 0", ROLE_HINTS.hud));
     if (this.d.isScreen) {
-      this.field({ path: "screen.role", label: "Role", kind: "choice", options: ROLE_OPTIONS }, () => cur().screen.role);
       const role = L.screen.role;
-      const takesKeys = role !== "none" || L.screen.input;
+      const takesKeys = role !== "notification" && (role !== "none" || L.screen.input);
       if (role === "none") this.field({ path: "screen.input", label: "Takes the keys (a menu)", kind: "check" }, () => cur().screen.input);
       if (takesKeys) this.field({ path: "screen.pause", label: "Pause the game", kind: "check" }, () => cur().screen.pause);
-      if (role === "message") {
-        this.kinds();
+      if (role === "message" || role === "dialogue") {
+        if (role === "message") this.kinds();
         this.field({ path: "screen.typing", label: "Typing (letters a second, 0 = at once)", kind: "num" }, () => cur().screen.typing);
       }
       if (ROLE_HINTS[role]) this.body.append(this.el("div", "color:#999;margin:2px 0", ROLE_HINTS[role]));
-      this.field({ path: "screen.dim", label: "Dim colour", kind: "color" }, () => cur().screen.dim);
+      if (role !== "notification") this.field({ path: "screen.dim", label: "Dim colour", kind: "color" }, () => cur().screen.dim);
       if (takesKeys) {
         this.field({ path: "screen.soundOpen", label: "Sound: opens", kind: "sound" }, () => cur().screen.soundOpen);
         this.field({ path: "screen.soundClose", label: "Sound: closes", kind: "sound" }, () => cur().screen.soundClose);
         this.field({ path: "screen.soundMove", label: "Sound: selection moves", kind: "sound" }, () => cur().screen.soundMove);
         this.field({ path: "screen.soundPress", label: "Sound: button pressed", kind: "sound" }, () => cur().screen.soundPress);
-      } else this.body.append(this.el("div", "color:#999", "A layer: the game plays under it; open it with Open UI Screen and close it with Close UI Screen by its name."));
+      } else if (role !== "notification") this.body.append(this.el("div", "color:#999", "A layer: the game plays under it; open it with Open UI Screen and close it with Close UI Screen by its name."));
     }
     this.field({ path: "scale", label: "Scale (0 = like the map)", kind: "num" }, () => cur().scale);
     this.field({ path: "theme.font", label: "Font", kind: "font" }, () => cur().theme.font);
@@ -551,7 +558,12 @@ export class DesignerPanel {
     const story = this.d.story;
     switch (f.kind) {
       case "pic":
-        return [["", "None / built-in"], ...BUILT_IN_PICTURES.map((p) => [p, `Built-in: ${p.replace(/^hud_/, "")}`] as const), ...(story?.images ?? []).map((i) => [i.id, i.name || i.id] as const)];
+        return [
+          ["", "None / built-in"],
+          ...(f.path === "image" ? ([["{portrait}", "Portrait of the speaker (Zelda: Dialogue)"]] as const) : []),
+          ...BUILT_IN_PICTURES.map((p) => [p, `Built-in: ${p.replace(/^hud_/, "")}`] as const),
+          ...(story?.images ?? []).map((i) => [i.id, i.name || i.id] as const),
+        ];
       case "font":
         return [["", "Default"], ...(story?.gameUI?.fonts ?? []).map((x) => [x.id, x.name || x.id] as const)];
       case "bind":
@@ -572,6 +584,25 @@ export class DesignerPanel {
   }
 
   /** One labelled field bound to a path of the selection or the layout. */
+  /** What the layout is: the HUD or a screen with a role (the HUD has no screen name). */
+  private roleField(): void {
+    const row = this.el("label", CSS.row);
+    row.append(this.el("span", CSS.label, "Role"));
+    const input = this.el("select", CSS.input);
+    for (const [v, t] of ROLE_OPTIONS) input.append(this.option(v, t));
+    const now = () => (this.d.isScreen ? (this.d.current?.screen.role ?? "none") : "hud");
+    input.value = now();
+    input.addEventListener("change", () => {
+      this.d.remember();
+      this.d.setRole(input.value);
+    });
+    this.syncers.push(() => {
+      if (this.doc.activeElement !== input) input.value = now();
+    });
+    row.append(input);
+    this.body.append(row);
+  }
+
   /** The message box's kinds: a checkbox for each kind of toolkit message. */
   private kinds(): void {
     this.body.append(this.el("div", "color:#ccc;margin:4px 0 0", "Shows these messages (the others stay short notes)"));

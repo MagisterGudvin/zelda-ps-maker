@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.26.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.27.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **37**. Все имена начинаются с `Zelda: `.
+Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -33,6 +33,7 @@
 - [Zelda: Change Player Stats](#zelda-change-player-stats)
 - [Zelda: Set Ability](#zelda-set-ability)
 - [Zelda: Show Message](#zelda-show-message)
+- [Zelda: Dialogue](#zelda-dialogue)
 - [Zelda: UI Layout](#zelda-ui-layout)
 - [Zelda: Open UI Screen](#zelda-open-ui-screen)
 - [Zelda: Close UI Screen](#zelda-close-ui-screen)
@@ -392,6 +393,17 @@ Shows a toolkit message: a short HUD note, or a box that waits for a key (the me
 | `text` (Text) | string | `""` | Message to show. / Текст сообщения. |
 | `durationMs` (Duration (ms)) | number | `2200` | How long a short note stays: 1000 = one second. / Сколько показывать. |
 | `box` (In a message box) | boolean | `false` | Show it in the message screen (UI Designer, role Message; else a PS Maker dialogue), closed with the action key, instead of a note. / В окне сообщения. |
+
+## Zelda: Dialogue
+
+An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture); else in the message box, else in PS Maker's dialogue. The event waits until the player closes it. Type \n for a new line, \n\n for a new page. / Реплика NPC в окне диалога из дизайнера.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `name` (Speaker) | string | `""` | Who speaks, shown by {speaker}; empty = nobody. / Кто говорит. |
+| `text` (Text) | string | `""` | What they say. \n = new line, \n\n = new page. / Текст; \n — новая строка, \n\n — новая страница. |
+| `portrait` (Portrait) | image | — | Optional picture shown by a Picture element whose picture is {portrait}. / Портрет (необязательно). |
+| `wait` (Wait until closed) | boolean | `true` | The event's next action runs after the player closed the dialogue. / Ждать, пока игрок закроет. |
 
 ## Zelda: UI Layout
 

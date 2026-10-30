@@ -213,9 +213,12 @@ export class LayoutPainter {
 
   private element(e: UiElement, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout, focused: boolean, opts: PaintOptions): Box {
     switch (e.type) {
-      case "image":
-        if (!this.picture(e.image, b, e.mode, e.slice, e.rotation) && e.color) this.rect(b, color(e.color, "#000000"));
+      case "image": {
+        // "{portrait}": the picture a value names (the speaker's portrait); none shown when it is empty.
+        const key = e.image.includes("{") ? textWithValues(e.image, values) : e.image;
+        if (!this.picture(key, b, e.mode, e.slice, e.rotation) && e.color) this.rect(b, color(e.color, "#000000"));
         return b;
+      }
       case "text": {
         const family = fonts[e.font || layout.theme.font] ?? "monospace";
         const t = this.text(textWithValues(e.text, values), family, e.size, e.color || layout.theme.textColor, e.wrap ? e.w * this.k : 0, e.stroke ? { color: e.stroke, width: e.strokeWidth } : null);

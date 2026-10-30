@@ -161,3 +161,74 @@ test("dialogue source: PS Maker syntax in the text is escaped", () => {
   assert.equal(dialogueSourceOf("a *b* _c_ {d} \\e"), "a \\*b\\* \\_c\\_ \\{d\\} \\\\e", "no markup");
   assert.equal(dialogueSourceOf("one\n\ntwo"), "one\n\ntwo", "a blank line is a new page");
 });
+
+/** Runs a plugin action on a fresh toolkit (fake Phaser scene); returns how often it ended. */
+async function pluginRig() {
+  const { default: plugin } = await import("../../src/index.ts");
+  const { getToolkit, resetToolkitForTests } = await import("../../src/editor/runtime.ts");
+  const { createFakeScene } = await import("../helpers/fakePhaser.ts");
+  resetToolkitForTests();
+  const f = createFakeScene();
+  const ends: Record<string, number> = {};
+  const run = (name: string, params: Record<string, unknown>) => (plugin.events as any[]).find((e) => e.name === name)!.execute(params, { game: f.game, scene: f.scene, player: f.player, endAction: () => (ends[name] = (ends[name] ?? 0) + 1) });
+  run("Zelda: Start Toolkit", { language: "en" });
+  const tk = getToolkit();
+  tk.configure({ debug: { logLevel: "silent" } });
+  const screen = (name: string, role: string) => tk.uiScreens.set(name, parseLayout(JSON.stringify({ v: 1, screen: { role, typing: 0 }, elements: [{ id: "who", type: "text", text: "{speaker}" }, { id: "t", type: "text", text: "{message}" }, { id: "face", type: "image", image: "{portrait}" }] })).layout!);
+  return { tk, run, ends, screen, done: resetToolkitForTests, step: (n = 2) => { for (let i = 0; i < n; i++) tk.session!.step(17); } };
+}
+
+test("Zelda: Dialogue: the NPC's words in the dialogue box with {speaker} and {portrait}; the PS Maker event waits until it is closed", async () => {
+  const r = await pluginRig();
+  r.screen("talk", "dialogue");
+  r.screen("message", "message");
+  r.run("Zelda: Dialogue", { name: "Villager", text: "Hello!\\n\\nTake care.", portrait: "face-villager", wait: true });
+  r.step();
+  const sc = r.tk.session!.screens!;
+  assert.equal(sc.current?.name, "talk", "the dialogue box, not the message box");
+  const values = r.tk.session!.hud!.values(sc.current!.layout);
+  assert.deepEqual([values.speaker, values.message, values.portrait], ["Villager", "Hello!", "face-villager"]);
+  assert.equal(r.ends["Zelda: Dialogue"], undefined, "the event waits");
+  assert.ok(r.tk.session!.isPaused("message"));
+  const input = r.tk.session!.host.input as any;
+  const press = async () => {
+    input.onDown({ code: "KeyZ" });
+    r.step(1);
+    input.onUp({ code: "KeyZ" });
+    r.step(1);
+    await new Promise((ok) => setTimeout(ok, 0));
+    r.step(1);
+  };
+  await press();
+  assert.equal(r.tk.session!.hud!.values(sc.current!.layout).message, "Take care.", "the second page");
+  await press();
+  assert.equal(sc.current, null);
+  assert.equal(r.ends["Zelda: Dialogue"], 1, "ended once it was closed");
+  r.run("Zelda: Dialogue", { name: "", text: "Bye", wait: false });
+  assert.equal(r.ends["Zelda: Dialogue"], 2, "Wait until closed off: the event goes on at once");
+  r.done();
+});
+
+test("Zelda: Dialogue without a dialogue box: the message box; without either, PS Maker's dialogue with the speaker's @name", async () => {
+  const r = await pluginRig();
+  r.screen("message", "message");
+  r.run("Zelda: Dialogue", { name: "Guard", text: "Halt." });
+  r.step();
+  assert.equal(r.tk.session!.screens!.current?.name, "message");
+  r.done();
+  assert.equal(dialogueSourceOf("Halt.", "Guard"), '@name "Guard"\nHalt.');
+});
+
+test("notification screen: every short note is drawn with it ({note}), stacked; the HUD's own note box stays empty", () => {
+  const r = createRig();
+  r.tk.uiScreens.set("toast", parseLayout(JSON.stringify({ v: 1, screen: { role: "notification" }, elements: [{ id: "t", type: "text", y: 30, h: 10, text: "{note}" }] })).layout!);
+  r.tk.bus.emit("zelda:message", { text: "Saved", durationMs: 1000, kind: "info" });
+  r.tk.bus.emit("zelda:message", { text: "You got 5 bombs!", durationMs: 1000, kind: "info" });
+  r.step(2);
+  const m = r.host.hud.last!;
+  assert.deepEqual(m.messages, []);
+  assert.deepEqual(m.layers.map((l) => [l.name, l.values.note, l.stack]), [["toast", "Saved", 0], ["toast", "You got 5 bombs!", 1]]);
+  assert.ok(!r.session.isPaused(), "the game plays on");
+  r.run(1200);
+  assert.deepEqual(r.host.hud.last!.layers, [], "gone when the notes end");
+});

@@ -1038,6 +1038,32 @@ const showMessage = defineEvent({
   },
 });
 
+const dialogue = defineEvent({
+  name: "Zelda: Dialogue",
+  description: "An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture); else in the message box, else in PS Maker's dialogue. The event waits until the player closes it. Type \\n for a new line, \\n\\n for a new page. / Реплика NPC в окне диалога из дизайнера.",
+  parameterDefs: {
+    name: str("Speaker", "Who speaks, shown by {speaker}; empty = nobody. / Кто говорит.", ""),
+    text: str("Text", "What they say. \\n = new line, \\n\\n = new page. / Текст; \\n — новая строка, \\n\\n — новая страница.", ""),
+    portrait: img("Portrait", "Optional picture shown by a Picture element whose picture is {portrait}. / Портрет (необязательно)."),
+    wait: bool("Wait until closed", "The event's next action runs after the player closed the dialogue. / Ждать, пока игрок закроет.", true),
+  },
+  execute(params, ctx) {
+    const end = endOnce(ctx);
+    let waits = false;
+    run("Zelda: Dialogue", ctx, params, (s) => {
+      const p = params as Record<string, unknown>;
+      const text = s.i18n.text(textOf(p.text)).replace(/\\n/g, "\n");
+      if (!s.messageBox) {
+        s.logger.warnOnce("dialogue-no-hud", "Zelda: Dialogue needs the toolkit HUD (Start Toolkit → Show HUD).");
+        return;
+      }
+      waits = p.wait !== false;
+      s.messageBox.say(text, s.i18n.text(textOf(p.name)), assetId(p.portrait), waits ? end : undefined);
+    });
+    if (!waits) end();
+  },
+});
+
 const STAT_OPTIONS = [
   ["rupees", "Rupees"],
   ["bombs", "Bombs"],
@@ -1186,17 +1212,34 @@ function endsAction(e: PluginEvent<any>): PluginEvent<any> {
     ...e,
     execute(params: any, ctx: any) {
       const before = getToolkit().session;
+      let finished = false;
       try {
         execute.call(e, params, ctx);
+        finished = true;
       } finally {
         try {
           recordMapAction(e.name, (p, c) => execute.call(e, p as any, c as any), params, ctx, before);
         } catch (err) {
           getToolkit().logger.error(`Could not remember "${e.name}" for this map:`, err);
         }
-        (ctx as { endAction?: (result?: object) => void } | undefined)?.endAction?.({});
+        // An action that waits (Zelda: Dialogue) ends itself, unless it failed.
+        if (!SELF_ENDING.has(e.name) || !finished) endOnce(ctx)();
       }
     },
+  };
+}
+
+/** Actions that end themselves later (PS Maker's event waits for them). */
+const SELF_ENDING = new Set(["Zelda: Dialogue"]);
+
+const ended = new WeakSet<object>();
+/** Calls PS Maker's ctx.endAction once, however often it is asked. */
+function endOnce(ctx: unknown): () => void {
+  return () => {
+    const c = ctx as { endAction?: (result?: object) => void } | undefined;
+    if (!c || typeof c !== "object" || ended.has(c)) return;
+    ended.add(c);
+    c.endAction?.({});
   };
 }
 
@@ -1229,6 +1272,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   changePlayerStats,
   setAbility,
   showMessage,
+  dialogue,
   uiLayout,
   openUiScreen,
   closeUiScreen,

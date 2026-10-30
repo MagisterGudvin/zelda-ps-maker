@@ -332,6 +332,10 @@ export const ACTION_UI: Record<string, ActionUi> = {
     keywords: ["menu", "screen", "ui", "close", "back"],
     preview: (p) => (p.all === true ? "all" : set(p.name) ? String(p.name) : "top screen"),
   },
+  "Zelda: Dialogue": {
+    keywords: ["dialogue", "dialog", "npc", "talk", "say", "speak", "conversation"],
+    preview: (p) => join([set(p.name) ? `${String(p.name)}:` : undefined, set(p.text) ? `"${String(p.text).slice(0, 40)}"` : undefined], " "),
+  },
   "Zelda: Show Message": {
     keywords: ["message", "text", "toast", "notification", "say"],
     fields: { durationMs: { min: 0, step: 100 } },

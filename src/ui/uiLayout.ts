@@ -225,11 +225,12 @@ export interface LayoutTheme {
 
 /**
  * What a screen is for: a plain screen (opened by actions and buttons), the pause menu (the Menu
- * key, Escape), the box for toolkit messages, the inventory (the inventory key, I), or the title
- * screen (the HUD hidden, no key closes it).
+ * key, Escape), the box for toolkit messages, the box for NPC dialogue (Zelda: Dialogue), the
+ * short notifications over the game, the inventory (the inventory key, I), or the title screen
+ * (the HUD hidden, no key closes it). The HUD is a layout without a screen name.
  */
-export type ScreenRole = "none" | "menu" | "message" | "inventory" | "title";
-export const SCREEN_ROLES: readonly ScreenRole[] = ["none", "menu", "message", "inventory", "title"];
+export type ScreenRole = "none" | "menu" | "message" | "dialogue" | "notification" | "inventory" | "title";
+export const SCREEN_ROLES: readonly ScreenRole[] = ["none", "menu", "message", "dialogue", "notification", "inventory", "title"];
 export const MESSAGE_KINDS = ["sign", "item", "hint", "info"] as const;
 export type MessageKindName = (typeof MESSAGE_KINDS)[number];
 
@@ -445,6 +446,7 @@ export function layoutBindings(layout: UiLayout): Set<string> {
     if (e.type === "slot") (out.add(`slot.${e.index}.icon`), out.add(`slot.${e.index}.sel`));
     if (e.type === "inventory") (out.add("inv.name"), out.add("inv.description"), out.add("inv.count"));
     if (e.type === "text" || e.type === "button" || e.type === "bar") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
+    if (e.type === "image") for (const m of e.image.matchAll(BRACES)) out.add(m[1]);
     if (e.show.when === "variable" && e.show.id) out.add(`var:${e.show.id}`);
     if (e.show.when === "item" && e.show.id) out.add(`owned:${e.show.id}`);
     if (e.show.when === "compare" && e.show.id) out.add(e.show.id);
@@ -504,7 +506,8 @@ export function pictureKeys(e: UiElement): string[] {
                 : e.type === "button"
                   ? [e.image, e.hover]
                   : [];
-  return keys.filter((k) => k && !k.startsWith("hud_") && !k.startsWith("icon_"));
+  // "{portrait}": a picture chosen by the value (the speaker's portrait), not a picture of the project.
+  return keys.filter((k) => k && !k.startsWith("hud_") && !k.startsWith("icon_") && !k.includes("{"));
 }
 
 /** Offset (layout pixels) and opacity factor of an effect at a time (ms). */

@@ -130,11 +130,11 @@ export class HudSystem {
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
       else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
       else if (key === "item.count") out[key] = s.statValue("itemCount");
-      else if (key === "message" || key === "message.ready" || key === "message.more") {
-        // The message screen: its text as typed so far, whether it waits for a key, more pages.
-        const m = s.screens?.messageView() ?? { text: "", ready: false, more: false };
-        out[key] = key === "message" ? m.text : key === "message.ready" ? (m.ready ? 1 : 0) : m.more ? 1 : 0;
-      } else if (key.startsWith("inv.")) {
+      else if (key === "message" || key === "message.ready" || key === "message.more" || key === "speaker" || key === "portrait") {
+        // The message or dialogue screen: its text as typed so far, whether it waits for a key, more pages, who speaks.
+        const m = s.screens?.messageView() ?? { text: "", ready: false, more: false, speaker: "", portrait: "" };
+        out[key] = key === "message" ? m.text : key === "message.ready" ? (m.ready ? 1 : 0) : key === "message.more" ? (m.more ? 1 : 0) : key === "speaker" ? m.speaker : m.portrait;
+      } else if (key === "note") out[key] = ""; else if (key.startsWith("inv.")) {
         // The item under an inventory screen's cursor.
         const id = s.screens?.cursorItem() ?? null;
         out[key] = !id ? "" : key === "inv.name" ? s.toolkit.inventory.displayName(id) : key === "inv.description" ? s.toolkit.inventory.displayDescription(id) : (this.countOf(id) ?? "");
@@ -147,6 +147,12 @@ export class HudSystem {
       else out[key] = s.statValue(key);
     }
     return out;
+  }
+
+  /** The project's notification screen (role Notification), or null: it shows each note. */
+  private notification(): { name: string; layout: UiLayout } | null {
+    for (const [name, layout] of this.s.toolkit.uiScreens) if (layout.screen.role === "notification") return { name, layout };
+    return null;
   }
 
   /** The ammunition count an item shows (bombs, arrows), or null. */
@@ -168,6 +174,7 @@ export class HudSystem {
     const open = s.inventoryUi?.open ?? false;
     const activeId = st.inventory.activeItem;
     const layout = this.layout();
+    const note = this.notification();
     const slot = (id: string): HudItemSlot => ({
       itemId: id,
       name: inv.displayName(id),
@@ -183,7 +190,8 @@ export class HudSystem {
       fonts: s.toolkit.uiFonts,
       scale: s.config.ui.scale,
       mapZoom: s.host.mapZoom?.() ?? 0,
-      messages: this.messages.map((m) => ({ text: m.text, remainingMs: m.remainingMs })),
+      // With a notification screen (UI Designer) the notes are drawn by it, else by the HUD's own box.
+      messages: note ? [] : this.messages.map((m) => ({ text: m.text, remainingMs: m.remainingMs })),
       inventoryOpen: open,
       inventoryTitle: s.i18n.t("hud.inventory"),
       inventory: open ? [...st.inventory.owned.filter((id) => s.toolkit.items.has(id)).map(slot)] : [],
@@ -197,7 +205,10 @@ export class HudSystem {
         const inventory = grid ? { cells: s.screens!.gridItems().map((id) => ({ icon: this.iconOf(id, cur.layout), count: this.countOf(id) })), cursor: cur.cursor } : null;
         return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus, inventory };
       })(),
-      layers: (s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
+      layers: [
+        ...(s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
+        ...(note ? this.messages.map((m, i) => ({ name: note.name, layout: note.layout, values: { ...this.values(note.layout), note: m.text }, stack: i })) : []),
+      ],
       time: s.tick * (1000 / s.config.world.fixedStepHz),
       minimap: this.minimapData(),
     };

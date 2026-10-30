@@ -1,36 +1,53 @@
 import type { Session } from "../core/session.ts";
 import type { MessageKind } from "../core/events.ts";
 
+/** A message waiting for its box: a toolkit message, or what an NPC says (Zelda: Dialogue). */
+interface Queued {
+  text: string;
+  kind: MessageKind | "dialogue";
+  speaker: string;
+  portrait: string;
+  /** Called once it was shown and closed (or could not be shown). */
+  done?: () => void;
+}
+
 /**
- * Toolkit messages (signs, "You got...") in the project's message screen: a UI Layout screen with
- * the role Message, made in the UI Designer, whose texts show {message}. Its kinds say which
- * messages it shows; the others stay short HUD notes. Queued one at a time; the game waits while
- * one is open. "Show Message" as a box always waits for a key: in the message screen, else in
- * PS Maker's own dialogue, else (no dialogue in the engine) as a HUD note.
+ * Boxes that wait for a key, made in the UI Designer:
+ * - toolkit messages (signs, "You got...") in the message screen (role Message), whose kinds say
+ *   which messages it shows; the others stay short notifications;
+ * - what NPCs say (Zelda: Dialogue) in the dialogue screen (role Dialogue), else in the message
+ *   screen, with {speaker} and the {portrait} picture.
+ * Queued one at a time; the game waits while one is open. Without a screen for it, a box message
+ * is PS Maker's own dialogue, else (no dialogue in the engine) a HUD note.
  */
 export class MessageBoxSystem {
   private readonly s: Session;
-  private readonly queue: { text: string; kind: MessageKind }[] = [];
-  private current: { done: boolean } | null = null;
+  private readonly queue: Queued[] = [];
+  private current: { done: boolean; entry: Queued } | null = null;
   private readonly off: () => void;
 
   constructor(session: Session) {
     this.s = session;
     this.off = session.bus.on("zelda:message", (m) => {
-      if (this.accepts(m.kind)) this.queue.push({ text: m.text, kind: m.kind ?? "info" });
+      if (this.accepts(m.kind)) this.queue.push({ text: m.text, kind: m.kind ?? "info", speaker: "", portrait: "" });
     });
   }
 
-  /** The message screen of the project (role Message), or null. */
-  private screen(): { name: string; kinds: readonly string[] } | null {
-    for (const [name, layout] of this.s.toolkit.uiScreens) if (layout.screen.role === "message") return { name, kinds: layout.screen.kinds };
+  /** The project's screen with this role, or null. */
+  private screen(role: "message" | "dialogue"): { name: string; kinds: readonly string[] } | null {
+    for (const [name, layout] of this.s.toolkit.uiScreens) if (layout.screen.role === role) return { name, kinds: layout.screen.kinds };
     return null;
   }
 
   /** True when a message of this kind waits for a key in a box (the HUD then does not show it). */
   accepts(kind: MessageKind | undefined): boolean {
     if (kind === "box") return true;
-    return !!this.screen()?.kinds.includes(kind ?? "info");
+    return !!this.screen("message")?.kinds.includes(kind ?? "info");
+  }
+
+  /** What an NPC says (Zelda: Dialogue): queued like a message; `done` runs when it was closed. */
+  say(text: string, speaker: string, portrait: string, done?: () => void): void {
+    this.queue.push({ text, kind: "dialogue", speaker, portrait, done });
   }
 
   get isOpen(): boolean {
@@ -45,23 +62,31 @@ export class MessageBoxSystem {
     }
     const next = this.queue.shift();
     if (next === undefined) return;
-    const screen = this.screen();
-    const shown = screen && this.s.screens ? this.s.screens.showMessage(screen.name, next.text) : this.s.host.playDialogue?.(dialogueSourceOf(next.text));
+    const shown = this.show(next);
     if (!shown) {
-      this.s.hud?.note(next.text);
+      this.s.hud?.note(next.speaker ? `${next.speaker}: ${next.text}` : next.text);
+      next.done?.();
       return;
     }
-    const state = { done: false };
+    const state = { done: false, entry: next };
     this.current = state;
     shown.then(() => (state.done = true));
     this.setHold(true);
   }
 
+  private show(m: Queued): Promise<void> | null {
+    const screen = m.kind === "dialogue" ? (this.screen("dialogue") ?? this.screen("message")) : this.screen("message");
+    if (screen && this.s.screens) return this.s.screens.showMessage(screen.name, m.text, { speaker: m.speaker, portrait: m.portrait });
+    return this.s.host.playDialogue?.(dialogueSourceOf(m.text, m.speaker)) ?? null;
+  }
+
   private close(): void {
+    const entry = this.current?.entry;
     this.current = null;
     // The press that closed the message must not read the sign again in this same tick.
     this.s.host.input.reset();
     if (this.queue.length === 0) this.setHold(false);
+    entry?.done?.();
   }
 
   private setHold(on: boolean): void {
@@ -73,24 +98,25 @@ export class MessageBoxSystem {
   dispose(): void {
     this.off();
     if (this.current) this.setHold(false);
+    // A PS Maker event waiting for a Zelda: Dialogue goes on.
+    const waiting = [this.current?.entry, ...this.queue];
     this.current = null;
     this.queue.length = 0;
+    for (const e of waiting) e?.done?.();
   }
 }
 
 /**
- * A toolkit message as PS Maker dialogue source (dialogueSourceParser.ts): the text with PS Maker's
- * syntax escaped — "Name: text" lines and "@" commands get a leading backslash, markup characters
- * (* _ { } and the backslash itself) one each — so the text shows as written. A blank line still
- * starts a new page.
+ * A toolkit message as PS Maker dialogue source (dialogueSourceParser.ts): the speaker as an
+ * `@name` command, then the text with PS Maker's syntax escaped — "Name: text" lines and "@"
+ * commands get a leading backslash, markup characters (* _ { } and the backslash itself) one each —
+ * so the text shows as written. A blank line still starts a new page.
  */
-export function dialogueSourceOf(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => {
-      const escaped = line.replace(/[\\*_{}]/g, (c) => `\\${c}`);
-      const t = escaped.trimStart();
-      return t.startsWith("@") || t.indexOf(": ") > 0 ? `\\${escaped}` : escaped;
-    })
-    .join("\n");
+export function dialogueSourceOf(text: string, speaker = ""): string {
+  const lines = text.split("\n").map((line) => {
+    const escaped = line.replace(/[\\*_{}]/g, (c) => `\\${c}`);
+    const t = escaped.trimStart();
+    return t.startsWith("@") || t.indexOf(": ") > 0 ? `\\${escaped}` : escaped;
+  });
+  return [...(speaker ? [`@name "${speaker.replace(/["\\]/g, "")}"`] : []), ...lines].join("\n");
 }

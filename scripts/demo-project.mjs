@@ -188,6 +188,31 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "next", type: "text", x: 120, y: -18, w: 8, h: 8, anchor: "b", show: { when: "compare", id: "message.ready", op: "==", value: 1 }, effect: "blink", text: "Z", font: "", size: 7, color: "#ffd23a", align: "center" },
     ],
   };
+  // The dialogue box (Zelda: Dialogue): a name plate over the panel at the bottom.
+  const dialogueLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("dialogue", { dim: "" }),
+    elements: [
+      { id: "panel", type: "image", x: -140, y: -58, w: 280, h: 52, anchor: "b", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "plate", type: "image", x: -136, y: -72, w: 76, h: 18, anchor: "b", show: always, image: "zelda-ui-button", mode: "nine", slice: 6, color: "" },
+      { id: "speaker", type: "text", x: -136, y: -67, w: 76, h: 10, anchor: "b", show: always, text: "{speaker}", font: "", size: 8, color: "#ffd23a", align: "center" },
+      { id: "text", type: "text", x: -128, y: -48, w: 256, h: 34, anchor: "b", show: always, text: "{message}", font: "", size: 8, color: "", align: "left", wrap: true },
+      { id: "next", type: "text", x: 120, y: -18, w: 8, h: 8, anchor: "b", show: { when: "compare", id: "message.ready", op: "==", value: 1 }, effect: "blink", text: "Z", font: "", size: 7, color: "#ffd23a", align: "center" },
+    ],
+  };
+  // Short notes ("You got 5 bombs!", "Saved"): a small plate under the HUD, one per note.
+  const notificationLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("notification", { dim: "", pause: false, input: false }),
+    elements: [
+      { id: "plate", type: "image", x: -70, y: 40, w: 140, h: 16, anchor: "t", show: always, image: "zelda-ui-hud-bar", mode: "nine", slice: 4, color: "" },
+      { id: "note", type: "text", x: -66, y: 44, w: 132, h: 8, anchor: "t", show: always, text: "{note}", font: "", size: 7, color: "", align: "center" },
+    ],
+  };
   // The inventory (I): the items in a grid, the name and description of the one under the cursor.
   const inventoryLayout = {
     v: 1,
@@ -309,9 +334,9 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       setupActions.push({ id: makeId(), name: "Move player", type: "movePlayerAction", moveType: "absolute-position", position: { ...m.spawn }, instant: true, waitForCompletion: true, speedMultiplier: 1, faceDirection: "down" });
     const extra = [];
     if (key === Object.keys(maps)[0]) {
-      // A villager who talks with PS Maker's own Dialogue (an "interact" trigger around him).
+      // A villager who talks in the toolkit's dialogue box (an "interact" trigger around him runs Zelda: Dialogue).
       setupActions.push({ id: makeId(), name: "Spawn NPC", type: "spawnNPCAction", characterId: character.guard, inGameCharacterId: `in-game-character-${makeId()}`, position: { ...VILLAGER }, faceDirection: "down", fadeInEnabled: false, fadeInDurationMs: 750, waitForCompletion: true, instanceName: "Villager" });
-      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [{ id: makeId(), name: "Dialogue", type: "dialogueAction", dialogueSource: VILLAGER_TEXT }]));
+      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_TEXT })]));
     }
     for (const n of m.npcs ?? []) {
       npcIds[n.name] = `in-game-character-${makeId()}`;
@@ -339,6 +364,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
           zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "message", layout: JSON.stringify(messageLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "inventory", layout: JSON.stringify(inventoryLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "dialogue", layout: JSON.stringify(dialogueLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "notification", layout: JSON.stringify(notificationLayout) }));
         }
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
@@ -496,10 +523,8 @@ export function demoGameUi(source) {
  * page, and a line "Name: text" sets the speaker, so the text itself has no ": ".
  */
 const VILLAGER = { x: 80, y: 118 };
-const VILLAGER_TEXT = `@name "Villager"
-It's dangerous out there. Slimes in the grass, and a knight by the gate.
-
-Read the sign for the controls. The chests hold what you need.`;
+/** What the villager says (Zelda: Dialogue: "\\n" typed in the field is a new line, two of them a new page). */
+const VILLAGER_TEXT = "It's dangerous out there. Slimes in the grass, and a knight by the gate.\\n\\nRead the sign for the controls. The chests hold what you need.";
 
 /** File names the story refers to (asset keys are plain file names in <project>/assets). */
 export function assetKeysOf(story) {
