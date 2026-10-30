@@ -292,14 +292,15 @@ const startToolkit = defineEvent({
   },
 });
 
-const CONTROL_ACTIONS = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu"] as const;
+const CONTROL_ACTIONS = ["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu"] as const;
 
 const setControls = defineEvent({
   name: "Zelda: Set Controls",
-  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, item C, shield V, action Z, items Q/E, inventory I, menu Escape. / Клавиши Toolkit (пусто — не менять).",
+  description: "Changes the toolkit keys with PS Maker's key picker (empty = keep). Defaults: sword X, items C and B, shield V, action Z, switch item Q/E, inventory I, menu Escape. / Клавиши Toolkit (пусто — не менять).",
   parameterDefs: {
     sword: keys("Sword", "Default: X."),
-    useItem: keys("Use item", "Default: C."),
+    useItem: keys("Use item", "The first item button (Q/E switch its item). Default: C."),
+    useItem2: keys("Use item 2", "The second item button; its item is chosen in the inventory screen. Default: B."),
     shield: keys("Shield", "Hold it to raise the shield (Start Toolkit: Shield). Default: V."),
     action: keys("Action", "Open, lift, read. Default: Z."),
     nextItem: keys("Next item", "Default: E."),
@@ -952,11 +953,15 @@ const removeItem = defineEvent({
 
 const equipItem = defineEvent({
   name: "Zelda: Equip Item",
-  description: "Puts an owned item into the quick-use slot. / Ставит предмет в быстрый слот.",
-  parameterDefs: { item: choice("Item", "Which item. / Предмет.", ABILITY_OPTIONS, "boomerang") },
+  description: "Puts an owned item on an item button: the first (C) or the second (B). / Ставит предмет на кнопку предмета.",
+  parameterDefs: {
+    item: choice("Item", "Which item. / Предмет.", ABILITY_OPTIONS, "boomerang"),
+    button: choice("Item button", "The first item button (C, Q/E switch it) or the second (B). / Кнопка предмета.", [["1", "First (C)"], ["2", "Second (B)"]], "1"),
+  },
   execute(params, ctx) {
     run("Zelda: Equip Item", ctx, params, (s, tk) => {
-      if (!tk.inventory.equip(params.item || null)) s.logger.warn(`Equip Item: "${params.item}" is not an owned quick-use item.`);
+      const slot = String((params as Record<string, unknown>).button) === "2" ? 2 : 1;
+      if (!tk.inventory.assign(slot, params.item || null)) s.logger.warn(`Equip Item: "${params.item}" is not an owned quick-use item.`);
     });
   },
 });

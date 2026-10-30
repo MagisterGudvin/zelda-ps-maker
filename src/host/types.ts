@@ -62,6 +62,10 @@ export interface HostAdapter {
   /** Moves the player sprite by a delta; collision was already checked by the toolkit. */
   movePlayerBy(dx: number, dy: number): void;
   setPlayerPosition(x: number, y: number): void;
+  /** Optional: draws the player this many pixels above the ground (a jump), with a shadow below; 0 = on the ground. */
+  setPlayerHop?(height: number): void;
+  /** Optional: the engine's walking speed times this factor (1 = the player's own speed). */
+  setPlayerSpeedFactor?(factor: number): void;
   /** While locked, the host cancels the engine's own player movement. */
   setPlayerLocked(locked: boolean): void;
   /** Visual feedback: invulnerability blink / hit flash. */
@@ -81,9 +85,9 @@ export type HotbarAction = "slot1" | "slot2" | "slot3" | "slot4" | "slot5" | "sl
 export const HOTBAR_ACTIONS: readonly HotbarAction[] = ["slot1", "slot2", "slot3", "slot4", "slot5", "slot6", "slot7", "slot8", "slot9"];
 
 /** Toolkit keys; "up"…"right" are the movement keys, read only by UI screens (PS Maker moves the player). */
-export type InputAction = "sword" | "useItem" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | HotbarAction | "debug" | "diagnostics";
+export type InputAction = "sword" | "useItem" | "useItem2" | "shield" | "action" | "nextItem" | "prevItem" | "inventory" | "menu" | "up" | "down" | "left" | "right" | HotbarAction | "debug" | "diagnostics";
 
-export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", ...HOTBAR_ACTIONS, "debug", "diagnostics"];
+export const INPUT_ACTIONS: readonly InputAction[] = ["sword", "useItem", "useItem2", "shield", "action", "nextItem", "prevItem", "inventory", "menu", "up", "down", "left", "right", ...HOTBAR_ACTIONS, "debug", "diagnostics"];
 
 /**
  * Edge-aware input. `latch()` is called once per fixed tick; presses that

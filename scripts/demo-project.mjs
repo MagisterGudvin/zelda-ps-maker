@@ -135,6 +135,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "leftPanel", type: "image", x: 2, y: 2, w: 122, h: 32, anchor: "tl", show: always, image: "zelda-ui-hud-bar", mode: "nine", slice: 4, color: "" },
       { id: "magic", type: "bar", x: 6, y: 3, w: 8, h: 30, anchor: "tl", show: always, value: "magic", max: "maxMagic", fill: "zelda-ui-magic-fill", back: "zelda-ui-magic-frame", dir: "up", fillColor: "#3ad16b", backColor: "#000000d9" },
       { id: "item", type: "item", x: 18, y: 7, w: 22, h: 22, anchor: "tl", show: always, frame: "zelda-ui-item-box" },
+      // The second item button (B), under the panel.
+      { id: "item2", type: "item", x: 18, y: 36, w: 22, h: 22, anchor: "tl", show: always, frame: "zelda-ui-item-box", slot: 2 },
       ...[
         ["rupees", "zelda-ui-rupee", 3, 46],
         ["bombs", "zelda-ui-bomb", 2, 70],

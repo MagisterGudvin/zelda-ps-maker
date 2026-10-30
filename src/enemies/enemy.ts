@@ -141,19 +141,21 @@ export class Enemy extends Entity implements Damageable {
     );
     // Touching the player is a bump, as in ALttP: the enemy breaks off its lunge and
     // recoils; while the player blinks it is pushed out. It never walks through.
-    if (result === "damaged" || result === "blocked" || result === "killed") this.recoilFrom(s, player.box.x, player.box.y);
+    // Running into the raised shield throws the enemy back harder (shield.bashKnockback).
+    if (result === "blocked") this.recoilFrom(s, player.box.x, player.box.y, Math.max(s.config.enemies.contactRecoil, s.config.shield.bashKnockback));
+    else if (result === "damaged" || result === "killed") this.recoilFrom(s, player.box.x, player.box.y);
     else this.separateFrom(s, player.hurtbox);
   }
 
   /** Bounces away from a point (contact with the player) and pauses before attacking again. */
-  recoilFrom(s: Session, x: number, y: number): void {
+  recoilFrom(s: Session, x: number, y: number, recoil = s.config.enemies.contactRecoil): void {
     normalize(this.tmp, this.x - x, this.y - y);
     if (this.tmp.x === 0 && this.tmp.y === 0) {
       const fv = FACING_VECTORS[this.facing];
       this.tmp.x = -fv.x;
       this.tmp.y = -fv.y;
     }
-    const speed = s.config.enemies.contactRecoil * (1 - this.cfg.knockbackResist);
+    const speed = recoil * (1 - this.cfg.knockbackResist);
     this.vx = this.tmp.x * speed;
     this.vy = this.tmp.y * speed;
     this.attackCooldownMs = Math.max(this.attackCooldownMs, this.cfg.attackCooldownMs);

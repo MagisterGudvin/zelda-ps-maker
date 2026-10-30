@@ -15,6 +15,8 @@ export function registerBuiltinItems(reg: ItemRegistry): void {
   // Passive equipment (not quick-usable; checked by other systems).
   reg.register({ id: "sword", icon: "icon_sword", quickUse: false });
   reg.register({ id: "shield", icon: "icon_shield", quickUse: false });
+  // A better shield: sends shots back (shield.reflects). Held up with the shield key like the shield.
+  reg.register({ id: "mirror_shield", icon: "icon_mirror_shield", quickUse: false });
   reg.register({ id: "glove", icon: "icon_glove", quickUse: false });
 
   reg.register({
@@ -77,6 +79,23 @@ export function registerBuiltinItems(reg: ItemRegistry): void {
         ),
       );
     },
+  });
+
+  // Pegasus Boots: hold the item button to run up, then dash (MoveAbilities).
+  reg.register({
+    id: "boots",
+    icon: "icon_boots",
+    quickUse: true,
+    use: (ctx) => ctx.session.moves?.startDash(ctx.button) ?? false,
+  });
+
+  // Roc's Feather: a jump over pits, spikes and enemies on the ground.
+  reg.register({
+    id: "feather",
+    icon: "icon_feather",
+    quickUse: true,
+    cooldownMs: (s) => s.config.items.feather.jumpMs + s.config.items.feather.cooldownMs,
+    use: (ctx) => ctx.session.moves?.jump() ?? false,
   });
 
   reg.register({

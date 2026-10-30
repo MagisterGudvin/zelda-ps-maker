@@ -24,7 +24,7 @@ export class ItemSystem implements SessionSystem {
 
   constructor(session: Session) {
     this.s = session;
-    this.ctx = { session, facing: "down", x: 0, y: 0, frontX: 0, frontY: 0, dirX: 0, dirY: 1 };
+    this.ctx = { session, facing: "down", x: 0, y: 0, frontX: 0, frontY: 0, dirX: 0, dirY: 1, button: "useItem" };
   }
 
   isBusy(): boolean {
@@ -41,9 +41,11 @@ export class ItemSystem implements SessionSystem {
       this.busyMs -= dtMs;
       if (this.busyMs <= 0) this.s.player.unlock("item");
     }
-    if (this.s.host.input.pressed("useItem")) {
-      const id = this.s.state.inventory.activeItem;
-      if (id) this.use(id);
+    // Two item buttons, each with its own item (chosen with Q/E or in the inventory screen).
+    for (const [button, slot] of [["useItem", 1], ["useItem2", 2]] as const) {
+      if (!this.s.host.input.pressed(button)) continue;
+      const id = this.s.toolkit.inventory.slotItem(slot);
+      if (id) this.use(id, { button });
     }
   }
 
@@ -59,7 +61,7 @@ export class ItemSystem implements SessionSystem {
    * Uses an item. `free` skips ownership/resource checks (scripts).
    * Resources are spent only after the item reports a successful use.
    */
-  use(itemId: string, options: { free?: boolean } = {}): UseItemResult {
+  use(itemId: string, options: { free?: boolean; button?: "useItem" | "useItem2" } = {}): UseItemResult {
     const s = this.s;
     const def = s.toolkit.items.get(itemId);
     const inv = s.toolkit.inventory;
@@ -67,7 +69,7 @@ export class ItemSystem implements SessionSystem {
     if (!options.free && !inv.owns(itemId)) return this.fail(itemId, "notOwned");
     if (!inv.isAbilityEnabled(itemId)) return this.fail(itemId, "disabled");
     const p = s.player;
-    if (!p.present || p.isDead || p.isKnockedBack || this.busyMs > 0 || s.sword?.isBusy() || s.interactions?.isCarrying()) return this.fail(itemId, "busy");
+    if (!p.present || p.isDead || p.isKnockedBack || this.busyMs > 0 || s.sword?.isBusy() || s.interactions?.isCarrying() || s.moves?.isDashing) return this.fail(itemId, "busy");
     if (this.cooldowns.has(itemId)) return this.fail(itemId, "cooldown");
     const cost = resolveNumber(def.cost, s, 0);
     if (!options.free && def.resource && cost > 0 && !inv.has(def.resource, cost)) {
@@ -86,6 +88,7 @@ export class ItemSystem implements SessionSystem {
     c.dirY = v.y;
     c.frontX = p.box.x + v.x * (p.box.hw + 6);
     c.frontY = p.box.y + v.y * (p.box.hh + 6);
+    c.button = options.button ?? "useItem";
 
     const result = def.use(c);
     if (result === false) return { ok: false };

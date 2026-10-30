@@ -97,6 +97,7 @@ export function sanitizeState(raw: Record<string, unknown>, defaults: GameState)
   s.inventory.counts = numRecord(inv.counts);
   s.inventory.capacities = numRecord(inv.capacities);
   s.inventory.activeItem = typeof inv.activeItem === "string" && s.inventory.owned.includes(inv.activeItem) ? inv.activeItem : null;
+  s.inventory.secondItem = typeof inv.secondItem === "string" && s.inventory.owned.includes(inv.secondItem) && inv.secondItem !== s.inventory.activeItem ? inv.secondItem : null;
 
   if (isObj(raw.abilities)) for (const [k, v] of Object.entries(raw.abilities)) if (v === false) s.abilities[k] = false;
   if (isObj(raw.flags)) {

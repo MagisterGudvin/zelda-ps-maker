@@ -288,8 +288,8 @@ await check("message screen (UI Designer, role Message): reading the sign types 
   const page1 = (await hudTexts()).find((t) => t.text.startsWith("Arrows: move"));
   await page.screenshot({ path: path.join(OUT, "sign-message.png") });
   await page.keyboard.press("z");
-  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("C: use")), null, { timeout: 6000 }).catch(() => {});
-  const page2 = (await hudTexts()).some((t) => t.text.startsWith("C: use"));
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("C and B")), null, { timeout: 6000 }).catch(() => {});
+  const page2 = (await hudTexts()).some((t) => t.text.startsWith("C and B"));
   let still = true;
   for (let i = 0; i < 6 && still; i++) {
     await page.keyboard.press("z");
@@ -404,6 +404,82 @@ await check("the shield: not owned at the start; the chest by the start gives it
   expect(!before && after, `owned before ${before}, after the chest ${after}`);
   expect(up && !down, `held ${up}, released ${down}`);
   return "picked up from the chest, drawn while V is held";
+});
+await check("items as in Link's Awakening: Pegasus Boots and Roc's Feather from chests; in the inventory B puts the feather on the second item button; B jumps (drawn above the ground, then back); the shield up halves the walking speed; the boots on C dash", async () => {
+  for (const x of [136, 168]) {
+    await tp(x, 62);
+    await hold("ArrowUp", 200);
+    await page.keyboard.press("z");
+    await wait(800);
+    await dismiss();
+  }
+  const owned = await ev(() => ["boots", "feather"].map((id) => window.ZeldaMakerToolkit.toolkit.inventory.owns(id)));
+  /** Opens I, moves the cursor to an item, presses a key there (c or b), closes I. */
+  const putOn = async (item, key) => {
+    await page.keyboard.press("i");
+    await wait(400);
+    const target = await ev((item) => window.ZeldaMakerToolkit.session.screens.gridItems().indexOf(item), item);
+    for (let n = 0; n < 16; n++) {
+      const cur = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.cursor ?? -1);
+      if (cur === target || cur < 0) break;
+      await page.keyboard.press(cur < target ? "ArrowRight" : "ArrowLeft");
+      await wait(120);
+    }
+    await page.keyboard.press(key);
+    await wait(200);
+    await page.keyboard.press("i");
+    await wait(400);
+  };
+  await putOn("feather", "b");
+  const slots = await ev(() => [1, 2].map((n) => window.ZeldaMakerToolkit.toolkit.inventory.slotItem(n)));
+  // B: the jump. What is drawn: the sprite's y against its body, at render time.
+  // The row under the top chests: no enemies, the wall at x 288 far ahead.
+  await tp(130, 64);
+  await ev(() => {
+    const scene = window.game.scene.getScenes(true).find((m) => m.map);
+    window.__lift = [];
+    window.__liftSampler = () => {
+      const p = scene.player;
+      window.__lift.push(p.body.center.y - p.y);
+    };
+    scene.events.on("render", window.__liftSampler);
+  });
+  await page.keyboard.press("b");
+  await wait(250);
+  await page.screenshot({ path: path.join(OUT, "feather-jump.png") });
+  await wait(600);
+  const lift = await ev(() => {
+    window.game.scene.getScenes(true).find((m) => m.map).events.off("render", window.__liftSampler);
+    const l = window.__lift;
+    return { base: l[0], top: Math.max(...l), last: l[l.length - 1] };
+  });
+  // The shield up: PS Maker's walking speed (Player.getSpeed) halves, and comes back.
+  const speed = () => ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.getSpeed());
+  const base = await speed();
+  await page.keyboard.down("v");
+  await wait(250);
+  const shielded = await speed();
+  await page.keyboard.up("v");
+  await wait(250);
+  const back = await speed();
+  // The boots on C: hold it, run up, dash to the right.
+  await putOn("boots", "c");
+  await tp(130, 64);
+  await hold("ArrowRight", 60);
+  await wait(200);
+  const x0 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
+  await page.keyboard.down("c");
+  await wait(600);
+  await page.screenshot({ path: path.join(OUT, "boots-dash.png") });
+  await page.keyboard.up("c");
+  await wait(200);
+  const x1 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
+  expect(owned.every(Boolean), `owned ${owned}`);
+  expect(slots[1] === "feather", `item buttons ${JSON.stringify(slots)}`);
+  expect(lift.top - lift.base > 6 && Math.abs(lift.last - lift.base) < 0.5, `lift ${JSON.stringify(lift)}`);
+  expect(Math.abs(shielded - base * 0.5) < 0.01 && back === base, `speed ${base} → ${shielded} → ${back}`);
+  expect(x1 - x0 > 25, `dash ${x1 - x0}`);
+  return `buttons C=${slots[0]}, B=${slots[1]}; jump ${(lift.top - lift.base).toFixed(1)} px; speed ${base} → ${shielded} → ${back}; dash ${Math.round(x1 - x0)} px`;
 });
 await check("I opens the inventory screen (UI Designer, role Inventory): the items in a grid of the demo's item boxes, the cursor, the selected item's name; arrows move it; I closes", async () => {
   const look = () =>

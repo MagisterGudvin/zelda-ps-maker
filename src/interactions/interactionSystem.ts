@@ -234,6 +234,11 @@ export class InteractionSystem implements SessionSystem {
     const s = this.s;
     const p = s.player;
     p.onHazard = false;
+    // In the air (Roc's Feather) spikes and pits do nothing; where the player lands counts.
+    if (s.moves?.isAirborne) {
+      p.onHazard = true;
+      return;
+    }
     for (const e of s.world.list("object")) {
       if (e.removed || !(e instanceof Interactable) || !e.visible) continue;
       const type = e.cfg.type;

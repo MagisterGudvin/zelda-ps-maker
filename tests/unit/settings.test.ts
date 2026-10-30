@@ -43,10 +43,10 @@ test("UI Layout: the designer's layout is the HUD, with its fonts; empty or unre
   assert.equal(model.fonts["font-pixel-operator"], '"ps-maker-font-font-pixel-operator", "PixelOperator", monospace');
   assert.ok("itemName" in model.values && "rupees" in model.values, "the values the layout shows");
   run("Zelda: UI Layout", { layout: "" });
-  assert.equal(tk.session!.hud!.buildModel().layout.elements.length, 8, "empty = classic");
+  assert.equal(tk.session!.hud!.buildModel().layout.elements.length, 9, "empty = classic");
   run("Zelda: UI Layout", { layout: "{broken" });
   model = tk.session!.hud!.buildModel();
-  assert.equal(model.layout.elements.length, 8, "unreadable = classic");
+  assert.equal(model.layout.elements.length, 9, "unreadable = classic");
   assert.ok(warnings.some((w) => w.includes("UI Layout: not valid layout data")), "and the author is told why");
   resetToolkitForTests();
 });

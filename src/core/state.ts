@@ -35,7 +35,10 @@ export interface GameState {
     counts: Record<string, number>;
     /** Capacity overrides gained in game (bigger quiver...). */
     capacities: Record<string, number>;
+    /** The item on the first item button (useItem, C). */
     activeItem: string | null;
+    /** The item on the second item button (useItem2, B). */
+    secondItem: string | null;
   };
   /** Abilities explicitly switched off by events (`false`). Missing = enabled. */
   abilities: Record<string, boolean>;
@@ -70,6 +73,7 @@ export function createDefaultState(config: ToolkitConfig): GameState {
       counts: {},
       capacities: {},
       activeItem: null,
+      secondItem: null,
     },
     abilities: {},
     flags: {},

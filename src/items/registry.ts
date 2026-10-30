@@ -14,6 +14,8 @@ export interface ItemUseContext {
   frontY: number;
   dirX: number;
   dirY: number;
+  /** The item button that used it (items that act while it is held: the Pegasus Boots). */
+  button: "useItem" | "useItem2";
 }
 
 /**

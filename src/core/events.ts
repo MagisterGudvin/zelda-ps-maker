@@ -20,6 +20,13 @@ export interface ZeldaEventMap {
   "zelda:player:charged": { facing: Facing };
   "zelda:player:takeDamage": { amount: number; type: DamageType; sourceId: string };
   "zelda:player:blocked": { type: DamageType; sourceId: string };
+  /** The Mirror Shield sent a shot back. */
+  "zelda:player:reflected": { type: DamageType; sourceId: string };
+  /** Roc's Feather: the player jumped. */
+  "zelda:player:jumped": Record<string, never>;
+  /** Pegasus Boots: the run-up ended and the dash began; a wall stopped it. */
+  "zelda:player:dashed": Record<string, never>;
+  "zelda:player:bumped": Record<string, never>;
   "zelda:player:healthChanged": { hp: number; maxHp: number; delta: number };
   "zelda:player:magicChanged": { magic: number; maxMagic: number; delta: number };
   "zelda:player:died": { mapId: string };
@@ -27,7 +34,8 @@ export interface ZeldaEventMap {
   "zelda:item:used": { itemId: string };
   "zelda:item:failed": { itemId: string; reason: "noResource" | "cooldown" | "disabled" | "busy" | "maxActive" | "notOwned" };
   "zelda:item:collected": { itemId: string; count: number; total: number };
-  "zelda:item:equipped": { itemId: string | null };
+  /** An item was put on an item button (slot 1 = useItem, 2 = useItem2). */
+  "zelda:item:equipped": { itemId: string | null; slot?: 1 | 2 };
   "zelda:resource:changed": { resource: string; value: number; max: number };
   "zelda:ability:changed": { ability: string; enabled: boolean };
   "zelda:enemy:spawned": { enemyId: string; template: string; group: string };

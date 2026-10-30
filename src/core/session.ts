@@ -12,6 +12,7 @@ import { RulesEngine } from "../puzzles/rules.ts";
 import { DungeonSystem } from "../dungeons/dungeonSystem.ts";
 import { HudSystem } from "../ui/hud.ts";
 import { MessageBoxSystem } from "../ui/messageBox.ts";
+import { MoveAbilities } from "../player/moves.ts";
 import { UiScreenSystem } from "../ui/uiScreens.ts";
 import { DebugSystem } from "../debug/debug.ts";
 import { SoundSystem } from "../ui/sound.ts";
@@ -53,6 +54,8 @@ export class Session {
 
   readonly player: PlayerSystem;
   readonly sword: SwordSystem | null;
+  /** Item moves: the Pegasus Boots dash, the Roc's Feather jump. */
+  readonly moves: MoveAbilities | null;
   readonly items: ItemSystem | null;
   readonly inventoryUi: InventorySystem | null;
   readonly interactions: InteractionSystem | null;
@@ -81,6 +84,7 @@ export class Session {
     const f = toolkit.config.features;
     this.player = new PlayerSystem(this);
     this.sword = f.combat && toolkit.config.sword.enabled ? new SwordSystem(this) : null;
+    this.moves = f.items ? new MoveAbilities(this) : null;
     this.items = f.items ? new ItemSystem(this) : null;
     this.inventoryUi = f.inventory ? new InventorySystem(this) : null;
     this.interactions = f.interactions ? new InteractionSystem(this) : null;
@@ -94,6 +98,7 @@ export class Session {
 
     // Order matters: input-driven systems first, entities next, evaluation last.
     this.systems.push(this.player);
+    if (this.moves) this.systems.push(this.moves);
     if (this.sword) this.systems.push(this.sword);
     if (this.items) this.systems.push(this.items);
     if (this.interactions) this.systems.push(this.interactions);

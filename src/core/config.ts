@@ -57,7 +57,10 @@ export interface ToolkitConfig {
   };
   controls: {
     sword: string[];
+    /** The first item button (its item: Q/E, the inventory). */
     useItem: string[];
+    /** The second item button (its item is chosen in the inventory screen). */
+    useItem2: string[];
     shield: string[];
     action: string[];
     nextItem: string[];
@@ -73,6 +76,7 @@ export interface ToolkitConfig {
       enabled: boolean;
       sword: number;
       useItem: number;
+      useItem2: number;
       shield: number;
       action: number;
       nextItem: number;
@@ -176,6 +180,14 @@ export interface ToolkitConfig {
     frontalDot: number;
     /** Knockback (px/s) applied to the player when a block happens. */
     blockPushback: number;
+    /** Walking speed while the shield is held up (1 = normal). */
+    walkSpeed: number;
+    /** The player keeps facing the same way while the shield is up (steps sideways and back). */
+    lockFacing: boolean;
+    /** Speed (px/s) an enemy that runs into the raised shield is pushed back with. */
+    bashKnockback: number;
+    /** Damage types the Mirror Shield sends back at the shooter (a projectile then flies for the player). */
+    reflects: DamageType[];
   };
   combat: {
     enemyHitCooldownMs: number;
@@ -192,6 +204,10 @@ export interface ToolkitConfig {
     bow: { speed: number; range: number; damage: number; maxActive: number };
     fireRod: { speed: number; range: number; damage: number; magicCost: number };
     healingSpell: { magicCost: number; heal: number };
+    /** Pegasus Boots: hold the item button to run up, then dash until it is let go or a wall is hit. */
+    boots: { chargeMs: number; speed: number; bounce: number };
+    /** Roc's Feather: a jump over pits, spikes and enemies on the ground. */
+    feather: { jumpMs: number; height: number; cooldownMs: number };
     thrown: { speed: number; range: number; damage: number };
   };
   inventory: {
@@ -199,6 +215,8 @@ export interface ToolkitConfig {
     /** Quick-use order; items not listed are appended in acquisition order. */
     order: string[];
     autoEquipFirst: boolean;
+    /** A new item goes on the second item button when the first is taken. */
+    autoEquipSecond: boolean;
   };
   enemies: {
     /** AI decisions run every N ticks, staggered by enemy index. */
@@ -292,6 +310,7 @@ export function createDefaultConfig(): ToolkitConfig {
     controls: {
       sword: ["KeyX"],
       useItem: ["KeyC"],
+      useItem2: ["KeyB"],
       shield: ["KeyV"],
       action: ["KeyZ"],
       nextItem: ["KeyE"],
@@ -300,7 +319,7 @@ export function createDefaultConfig(): ToolkitConfig {
       menu: ["Escape"],
       hotbar: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"],
       move: { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"], left: ["ArrowLeft", "KeyA"], right: ["ArrowRight", "KeyD"] },
-      gamepad: { enabled: true, sword: 0, useItem: 2, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
+      gamepad: { enabled: true, sword: 0, useItem: 2, useItem2: 3, shield: 5, action: 1, nextItem: 7, prevItem: 6, inventory: 9, menu: 8 },
     },
     player: {
       heartValue: 2,
@@ -350,7 +369,7 @@ export function createDefaultConfig(): ToolkitConfig {
         pokeDamage: 1,
       },
     },
-    shield: { enabled: true, mode: "hold", blocks: ["projectile", "arrow", "contact"], frontalDot: 0.5, blockPushback: 60 },
+    shield: { enabled: true, mode: "hold", blocks: ["projectile", "arrow", "contact"], frontalDot: 0.5, blockPushback: 60, walkSpeed: 0.5, lockFacing: true, bashKnockback: 220, reflects: ["projectile", "magic", "fire"] },
     combat: {
       enemyHitCooldownMs: 250,
       flashMs: 250,
@@ -364,12 +383,15 @@ export function createDefaultConfig(): ToolkitConfig {
       bow: { speed: 300, range: 220, damage: 2, maxActive: 3 },
       fireRod: { speed: 200, range: 160, damage: 4, magicCost: 4 },
       healingSpell: { magicCost: 8, heal: 2 },
+      boots: { chargeMs: 300, speed: 190, bounce: 90 },
+      feather: { jumpMs: 480, height: 10, cooldownMs: 120 },
       thrown: { speed: 200, range: 64, damage: 2 },
     },
     inventory: {
       capacities: { bombs: 10, arrows: 30, rupees: 999 },
-      order: ["bow", "boomerang", "bomb", "fire_rod", "healing_spell"],
+      order: ["bow", "boomerang", "bomb", "boots", "feather", "fire_rod", "healing_spell"],
       autoEquipFirst: true,
+      autoEquipSecond: true,
     },
     enemies: {
       thinkEveryTicks: 4,

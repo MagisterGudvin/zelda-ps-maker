@@ -43,11 +43,21 @@ test("inventory: capacities, quick-item cycling, keys, heart containers", () => 
   inv.give("bow", 1, { silent: true });
   inv.give("boomerang", 1, { silent: true });
   assert.deepEqual(inv.quickItems(), ["bow", "boomerang", "bomb"]);
+  inv.assign(2, null);
   inv.equip("bow");
   assert.equal(inv.cycle(1), "boomerang");
   assert.equal(inv.cycle(1), "bomb");
   assert.equal(inv.cycle(1), "bow");
   assert.equal(inv.cycle(-1), "bomb");
+  // The second item button: an item put on it leaves Q/E; one already on the other button swaps.
+  assert.ok(inv.assign(2, "bow"));
+  assert.deepEqual([inv.slotItem(1), inv.slotItem(2)], ["bomb", "bow"]);
+  assert.equal(inv.cycle(1), "boomerang", "the bow on the second button is skipped");
+  assert.equal(inv.cycle(1), "bomb");
+  inv.equip("bow");
+  assert.deepEqual([inv.slotItem(1), inv.slotItem(2)], ["bow", "bomb"], "swapped");
+  inv.remove("bomb");
+  assert.equal(inv.slotItem(2), null);
   assert.equal(inv.spend("arrows", 1), false);
   const max = rig.tk.state.player.maxHp;
   inv.give("heart_container", 1, { silent: true });
@@ -66,7 +76,7 @@ test("HUD model: the classic layout and its values (hearts, counters, the active
   rig.tk.bus.emit("zelda:custom:refresh", {});
   rig.step();
   const m = rig.host.hud.last!;
-  assert.deepEqual(m.layout.elements.map((e) => e.id), ["magic", "item", "rupees", "bombs", "arrows", "key", "life", "hearts"]);
+  assert.deepEqual(m.layout.elements.map((e) => e.id), ["magic", "item", "item2", "rupees", "bombs", "arrows", "key", "life", "hearts"]);
   assert.equal(m.values.health, 3);
   assert.equal(m.values.maxHealth, 6);
   assert.equal(m.values["item.icon"], "icon_bomb");

@@ -152,6 +152,7 @@ export class KeyboardInput implements InputSource {
     };
     add("sword", c.sword);
     add("useItem", c.useItem);
+    add("useItem2", c.useItem2);
     add("shield", c.shield);
     add("action", c.action);
     add("nextItem", c.nextItem);
@@ -204,6 +205,7 @@ export class KeyboardInput implements InputSource {
     const map: [InputAction, number][] = [
       ["sword", g.sword],
       ["useItem", g.useItem],
+      ["useItem2", g.useItem2],
       ["shield", g.shield],
       ["action", g.action],
       ["nextItem", g.nextItem],

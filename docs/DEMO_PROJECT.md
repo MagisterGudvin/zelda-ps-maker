@@ -34,6 +34,7 @@ node scripts/make-demo-project.mjs --from "Istina"
 | Таблички и полученные предметы — в окне сообщений из дизайнера: панель внизу, текст печатается, мигающая «Z», пока страница ждёт клавишу | «Map start» поля: `Zelda: UI Layout` с *Screen name* `message` (роль *Message box*) |
 | Инвентарь по I: предметы сеткой в рамках демо, курсор, название и описание предмета под курсором | «Map start» поля: `Zelda: UI Layout` с *Screen name* `inventory` (роль *Inventory*) |
 | Щит в сундуке у старта (под табличкой); V — держать щит | «Map start» поля: `Create Chest` с *Item* Shield |
+| Сапоги-скороходы и Перо Рока в сундуках в верхнем ряду поля; две кнопки предметов C и B (в инвентаре: C или B ставит предмет на эту кнопку) | «Map start» поля: `Create Chest` с *Item* Pegasus Boots, Roc's Feather; `Zelda: UI Layout` (HUD) — второй *Item box* |
 | Житель у старта (персонаж *New Female*) говорит в окне диалога из дизайнера: имя на табличке, две страницы, затем ответы «Any advice?» (событие «Villager: advice» с советом) и «Bye!» | «Map setup» поля; «Map start»: *Add event trigger* (взаимодействие) → `Zelda: Dialogue`; `Zelda: UI Layout` с *Screen name* `dialogue` (роль *Dialogue box*) |
 | Уведомления («Получено: Бомбы ×5») — плашкой под HUD из дизайнера | «Map start» поля: `Zelda: UI Layout` с *Screen name* `notification` (роль *Notifications*) |
 | Прогресс Toolkit в сохранениях PS Maker | переменная «Zelda progress»; `Start Toolkit` → *Progress variable* |

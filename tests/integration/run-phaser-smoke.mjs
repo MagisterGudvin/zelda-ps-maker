@@ -751,6 +751,50 @@ await check("shield: none at the start of the demo; given, V held up shows the b
   return "start items without the shield; shown while V is held";
 });
 
+await check("Roc's Feather: B jumps — the sprite is drawn above its body with a shadow, the body stays on the ground, and all is back after; Pegasus Boots on C: a dash", async () => {
+  await ev(() => {
+    const inv = window.ZeldaMakerToolkit.toolkit.inventory;
+    inv.give("feather", 1, { silent: true });
+    inv.give("boots", 1, { silent: true });
+    inv.assign(2, "feather");
+    inv.assign(1, "boots");
+    window.__hop = [];
+    const scene = window.__harness.scene();
+    // Sample what is drawn: the sprite's y against its body at render time.
+    window.__hopSampler = () => {
+      const p = window.__harness.player();
+      window.__hop.push(p.body.center.y - p.y);
+    };
+    scene.events.on("render", window.__hopSampler);
+  });
+  await tapKey("b");
+  await sleep(220);
+  const mid = await ev(() => ({ lift: Math.max(...window.__hop), airborne: window.ZeldaMakerToolkit.session.moves.isAirborne, shadow: window.__harness.scene().children.list.some((o) => o.type === "Graphics" && o.visible && o.commandBuffer?.length > 0 && o.depth < window.__harness.player().depth) }));
+  await page.screenshot({ path: `${ARTIFACTS}feather-jump.png` });
+  await sleep(500);
+  const after = await ev(() => {
+    window.__harness.scene().events.off("render", window.__hopSampler);
+    const p = window.__harness.player();
+    return { airborne: window.ZeldaMakerToolkit.session.moves.isAirborne, offset: p.body.center.y - p.y, base: window.__hop[0] };
+  });
+  // Pegasus Boots: in the open, facing right, hold C: run up, dash.
+  await teleport(60, 160);
+  await tapKey("ArrowRight", 80);
+  await sleep(200);
+  const x0 = await ev(() => window.__harness.player().body.center.x);
+  await page.keyboard.down("c");
+  await sleep(550);
+  const dashing = await ev(() => window.ZeldaMakerToolkit.session.moves.isDashing);
+  await page.keyboard.up("c");
+  await sleep(150);
+  const x1 = await ev(() => window.__harness.player().body.center.x);
+  assert(mid.airborne && mid.lift - after.base > 6, `lift ${mid.lift} vs ${after.base}`);
+  assert(mid.shadow, "no shadow under the jump");
+  assert(!after.airborne && Math.abs(after.offset - after.base) < 0.5, JSON.stringify(after));
+  assert(dashing && Math.abs(x1 - x0) > 20, `dash ${dashing}, moved ${x1 - x0}`);
+  return `drawn ${(mid.lift - after.base).toFixed(1)} px up, shadow, back on the ground; dash ${Math.round(Math.abs(x1 - x0))} px`;
+});
+
 await check("no page errors or console errors", async () => {
   assert(pageErrors.length === 0, pageErrors.join("\n"));
   assert(consoleErrors.length === 0, consoleErrors.join("\n"));

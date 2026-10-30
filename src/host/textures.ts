@@ -373,6 +373,12 @@ const DEFS: Record<string, SpriteDef> = {
   obj_sign: { w: 16, h: 16, paint: (c) => (rect(c, 7, 9, 2, 7, "#5b4632"), rect(c, 1, 1, 14, 9, "#a4612a"), rect(c, 3, 4, 10, 1, "#4a2a10"), rect(c, 3, 6, 7, 1, "#4a2a10")) },
   icon_sword: { w: 16, h: 16, paint: (c) => (poly(c, [3, 13, 11, 5, 13, 3, 11, 5, 4, 14], "#e8eef5"), poly(c, [11, 2, 14, 2, 14, 5, 5, 14, 2, 11], "#c8d0da"), rect(c, 2, 11, 3, 3, "#d8b84a")) },
   icon_shield: { w: 16, h: 16, paint: (c) => (poly(c, [2, 2, 14, 2, 14, 8, 8, 15, 2, 8], "#1e3f8f"), poly(c, [4, 4, 12, 4, 12, 8, 8, 12.5, 4, 8], "#d63a3a")) },
+  // Mirror Shield: a silver shield with a blue mirror face.
+  icon_mirror_shield: { w: 16, h: 16, paint: (c) => (poly(c, [2, 2, 14, 2, 14, 8, 8, 15, 2, 8], "#c8d0da"), poly(c, [4, 4, 12, 4, 12, 8, 8, 12.5, 4, 8], "#5ab0e8"), rect(c, 5, 5, 2, 3, "#e8f6ff")) },
+  // Pegasus Boots: a brown boot with a white wing.
+  icon_boots: { w: 16, h: 16, paint: (c) => (rect(c, 5, 3, 5, 9, "#8a4b22"), rect(c, 5, 10, 9, 4, "#8a4b22"), rect(c, 5, 13, 9, 1, "#4a2a10"), poly(c, [10, 4, 15, 2, 14, 5, 11, 7], "#f0f0f0")) },
+  // Roc's Feather: a long feather, its quill across.
+  icon_feather: { w: 16, h: 16, paint: (c) => (poly(c, [3, 14, 6, 9, 11, 3, 14, 2, 13, 6, 8, 11], "#e8e0c8"), poly(c, [3, 14, 13, 3, 13.6, 3.6, 3.6, 14.6], "#9a7a4a")) },
   icon_glove: { w: 16, h: 16, paint: (c) => (rect(c, 3, 6, 10, 8, "#c9a227"), rect(c, 3, 2, 2, 5, "#c9a227"), rect(c, 6, 1, 2, 5, "#c9a227"), rect(c, 9, 1, 2, 5, "#c9a227")) },
   icon_bomb: { w: 16, h: 16, paint: (c) => (circle(c, 8, 9, 6, "#1b1f3a"), circle(c, 6, 7, 2, "#5a6390"), rect(c, 8, 1, 1, 3, "#c9a24a"), rect(c, 9, 1, 1, 1, "#ff9a2e")) },
   icon_boomerang: { w: 16, h: 16, paint: (c) => poly(c, [2, 2, 14, 2, 14, 6, 6, 6, 6, 14, 2, 14], "#b5622b") },

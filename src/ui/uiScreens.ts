@@ -273,7 +273,9 @@ export class UiScreenSystem {
       const next = nextButton(this.boxes(cur.layout), ids, top.focus, dir);
       if (next !== top.focus) this.moved(cur.layout, () => (top.focus = next));
     }
-    if (input.pressed("action") && grid) this.takeItem(top.cursor);
+    // On the item grid: Z or the first item button puts the item on the first button, the second button on the second.
+    if (grid && (input.pressed("action") || input.pressed("useItem"))) this.takeItem(top.cursor, 1);
+    else if (grid && input.pressed("useItem2")) this.takeItem(top.cursor, 2);
     else if (input.pressed("action") && top.focus) this.press(top.focus);
     else if (role !== "title" && (input.pressed("sword") || input.pressed("inventory") || input.pressed("menu"))) this.close();
   }
@@ -308,12 +310,12 @@ export class UiScreenSystem {
     this.s.hud?.markDirty();
   }
 
-  /** Takes the item of an inventory cell in hand (items used from the item button only). */
-  private takeItem(index: number): void {
+  /** Puts the item of an inventory cell on an item button (items used from an item button only). */
+  private takeItem(index: number, slot: 1 | 2 = 1): void {
     const cur = this.current!;
     const id = this.gridItems()[index];
     if (!id) return;
-    if (this.s.toolkit.inventory.equip(id)) this.sound(cur.layout.screen.soundPress);
+    if (this.s.toolkit.inventory.assign(slot, id)) this.sound(cur.layout.screen.soundPress);
     this.s.hud?.markDirty();
   }
 

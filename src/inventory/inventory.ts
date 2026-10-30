@@ -158,16 +158,42 @@ export class Inventory {
     const idx = this.inv.owned.indexOf(id);
     if (idx < 0) return false;
     this.inv.owned.splice(idx, 1);
-    if (this.inv.activeItem === id) this.equip(this.quickItems()[0] ?? null);
+    this.unassign(id);
     return true;
   }
 
+  /** Puts an item on the first item button (useItem, C). */
   equip(id: string | null): boolean {
+    return this.assign(1, id);
+  }
+
+  /**
+   * Puts an item on an item button: 1 = the first (useItem, C), 2 = the second (useItem2, B). An
+   * item already on the other button swaps places with what this button had.
+   */
+  assign(slot: 1 | 2, id: string | null): boolean {
     if (id !== null && !this.quickItems().includes(id)) return false;
-    if (this.inv.activeItem === id) return true;
-    this.inv.activeItem = id;
-    this.tk.bus.emit("zelda:item:equipped", { itemId: id });
+    const mine = slot === 1 ? "activeItem" : "secondItem";
+    const other = slot === 1 ? "secondItem" : "activeItem";
+    if (this.inv[mine] === id) return true;
+    if (id !== null && this.inv[other] === id) {
+      this.inv[other] = this.inv[mine];
+      this.tk.bus.emit("zelda:item:equipped", { itemId: this.inv[other], slot: slot === 1 ? 2 : 1 });
+    }
+    this.inv[mine] = id;
+    this.tk.bus.emit("zelda:item:equipped", { itemId: id, slot });
     return true;
+  }
+
+  /** The item on an item button. */
+  slotItem(slot: 1 | 2): string | null {
+    return slot === 1 ? this.inv.activeItem : this.inv.secondItem;
+  }
+
+  /** Takes an item off both buttons (removed, switched off); the first button gets the next item. */
+  private unassign(id: string): void {
+    if (this.inv.secondItem === id) this.assign(2, null);
+    if (this.inv.activeItem === id) this.equip(this.quickItems().find((x) => x !== this.inv.secondItem) ?? null);
   }
 
   /** Owned items usable from the quick slot, in configured order. */
@@ -186,7 +212,8 @@ export class Inventory {
   }
 
   cycle(direction: 1 | -1): string | null {
-    const list = this.quickItems();
+    // The item on the second button stays there.
+    const list = this.quickItems().filter((id) => id !== this.inv.secondItem);
     if (list.length === 0) {
       this.equip(null);
       return null;
@@ -205,7 +232,7 @@ export class Inventory {
     if (enabled) delete this.tk.state.abilities[id];
     else this.tk.state.abilities[id] = false;
     this.tk.bus.emit("zelda:ability:changed", { ability: id, enabled });
-    if (!enabled && this.inv.activeItem === id) this.equip(this.quickItems()[0] ?? null);
+    if (!enabled) this.unassign(id);
   }
 
   displayName(id: string): string {
@@ -232,7 +259,11 @@ export class Inventory {
   private addOwned(id: string): boolean {
     if (this.inv.owned.includes(id)) return false;
     this.inv.owned.push(id);
-    if (this.tk.config.inventory.autoEquipFirst && this.inv.activeItem === null && this.isQuickUsable(id)) this.equip(id);
+    // A new usable item goes on a free item button (the first, else the second).
+    if (this.tk.config.inventory.autoEquipFirst && this.isQuickUsable(id)) {
+      if (this.inv.activeItem === null) this.equip(id);
+      else if (this.inv.secondItem === null && this.tk.config.inventory.autoEquipSecond) this.assign(2, id);
+    }
     return true;
   }
 }

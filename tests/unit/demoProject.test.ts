@@ -205,7 +205,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     }
     const { layout, error } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout" && !a.pluginParams.name).pluginParams.layout);
     assert.equal(error, null);
-    assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text", "text"]);
+    assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "item", "text", "text"]);
     assert.equal(layout!.scale, 0);
     assert.equal(layout!.theme.font, DEMO_FONT.id);
     const screenOf = (name: string) => parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout" && a.pluginParams.name === name).pluginParams.layout).layout!;

@@ -259,6 +259,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
     this.stillMs = stepped ? 0 : this.stillMs + dtMs;
     if (this.isMoving) this.walkMs += dtMs;
     this.tickPose(dtMs);
+    this.updateShieldWalk();
     this.updateFacing();
     this.applyKnockback(dtMs);
     this.syncSolidBodies();
@@ -275,6 +276,8 @@ export class PlayerSystem implements SessionSystem, Damageable {
 
   private updateFacing(): void {
     if (this.facingLocked) return;
+    // With the shield up the player keeps facing the threat and steps sideways or back (shield.lockFacing).
+    if (this.s.config.shield.lockFacing && this.shieldRaised()) return;
     const hint = this.s.host.readPlayerFacingHint(this.facing);
     if (hint) {
       this.facing = hint;
@@ -421,28 +424,48 @@ export class PlayerSystem implements SessionSystem, Damageable {
       return;
     }
     this.shieldView ??= this.s.host.renderer.createView({ sprite: "icon_shield", layer: 1, scale: 0.75 });
+    this.shieldView.setSprite(this.s.toolkit.inventory.owns("mirror_shield") ? "icon_mirror_shield" : "icon_shield");
     const v = FACING_VECTORS[this.facing];
     const x = this.box.x + v.x * (this.box.hw + 2);
     const y = this.box.y + (v.y > 0 ? this.box.hh - 3 : v.y < 0 ? -this.box.hh : 0);
     this.shieldView.setVisible(true);
-    this.shieldView.setPosition(x, y);
+    this.shieldView.setPosition(x, y - (this.s.moves?.hopHeight ?? 0));
     this.shieldView.setFlipX(this.facing === "left");
     this.shieldView.setDepthY?.(v.y < 0 ? this.box.y - this.box.hh - 1 : this.box.y + this.box.hh + 1);
   }
 
-  /** The shield is held up with its button (shield on a button). */
-  private shieldRaised(): boolean {
-    const cfg = this.s.config.shield;
+  /** Walking with the shield up is slower (shield.walkSpeed); the engine's speed is set back when it is lowered. */
+  private updateShieldWalk(): void {
+    const factor = this.shieldRaised() ? this.s.config.shield.walkSpeed : 1;
+    if (factor === this.walkFactor) return;
+    this.walkFactor = factor;
+    this.s.host.setPlayerSpeedFactor?.(factor);
+  }
+
+  private walkFactor = 1;
+
+  /** The player has a shield (the Shield or the Mirror Shield) and may use it. */
+  hasShield(): boolean {
     const inv = this.s.toolkit.inventory;
-    return cfg.enabled && cfg.mode === "hold" && this.s.host.input.isDown("shield") && inv.owns("shield") && inv.isAbilityEnabled("shield") && !this.s.sword?.isAttacking();
+    return (inv.owns("shield") || inv.owns("mirror_shield")) && inv.isAbilityEnabled("shield");
+  }
+
+  /** The Mirror Shield sends shots of this damage type back. */
+  reflects(type: DamageInfo["type"]): boolean {
+    return this.s.toolkit.inventory.owns("mirror_shield") && this.s.config.shield.reflects.includes(type);
+  }
+
+  /** The shield is held up with its button (shield on a button). */
+  shieldRaised(): boolean {
+    const cfg = this.s.config.shield;
+    return cfg.enabled && cfg.mode === "hold" && this.s.host.input.isDown("shield") && this.hasShield() && !this.s.sword?.isAttacking() && !this.s.moves?.isDashing;
   }
 
   /** True when the shield would block a hit coming from (srcX, srcY). */
   canBlock(info: DamageInfo): boolean {
     const cfg = this.s.config.shield;
     if (!cfg.enabled || !info.blockable || !cfg.blocks.includes(info.type)) return false;
-    const inv = this.s.toolkit.inventory;
-    if (!inv.owns("shield") || !inv.isAbilityEnabled("shield")) return false;
+    if (!this.hasShield()) return false;
     if (cfg.mode === "hold" && !this.s.host.input.isDown("shield")) return false;
     if (cfg.mode === "passive" && this.s.sword?.isAttacking()) return false;
     return isInFront(this.facing, this.box.x, this.box.y, info.originX, info.originY, cfg.frontalDot);
@@ -450,6 +473,8 @@ export class PlayerSystem implements SessionSystem, Damageable {
 
   receiveHit(info: DamageInfo): HitResult {
     if (!this.isHittable()) return "ignored";
+    // In the air (Roc's Feather) enemies on the ground do not touch the player.
+    if (info.type === "contact" && this.s.moves?.isAirborne) return "ignored";
     if (this.canBlock(info)) {
       this.s.bus.emit("zelda:player:blocked", { type: info.type, sourceId: info.sourceId });
       this.startKnockback(info.originX, info.originY, this.s.config.shield.blockPushback, this.s.config.player.knockbackMs * 0.5);
@@ -479,6 +504,12 @@ export class PlayerSystem implements SessionSystem, Damageable {
       return "killed";
     }
     return "damaged";
+  }
+
+  /** Thrown back from the way the player faces (a dash into a wall). */
+  bump(speed: number): void {
+    const v = FACING_VECTORS[this.facing];
+    this.startKnockback(this.box.x + v.x, this.box.y + v.y, speed, this.s.config.player.knockbackMs * 0.6);
   }
 
   private startKnockback(originX: number, originY: number, speed: number, ms: number): void {
@@ -581,6 +612,7 @@ export class PlayerSystem implements SessionSystem, Damageable {
     if (this.overlayShown) this.s.host.setPlayerOverlay(null);
     this.shieldView?.destroy();
     this.shieldView = null;
+    if (this.walkFactor !== 1) this.s.host.setPlayerSpeedFactor?.(1);
     this.s.host.setPlayerLocked(false);
     this.s.host.setPlayerBlink(true);
     this.s.host.setPlayerTint(null);

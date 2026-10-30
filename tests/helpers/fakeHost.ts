@@ -202,6 +202,17 @@ export class FakeHost implements HostAdapter {
   describe(): string[] {
     return ["fake host"];
   }
+  /** How high the player is drawn (Roc's Feather) and the walking speed factor (shield up), as last set. */
+  hop = 0;
+  hops: number[] = [];
+  speedFactor = 1;
+  setPlayerHop(height: number): void {
+    this.hop = height;
+    this.hops.push(height);
+  }
+  setPlayerSpeedFactor(factor: number): void {
+    this.speedFactor = factor;
+  }
   /** Whether the toolkit wants the Menu key (Escape) now, as the session told the host; null = never asked. */
   menuClaim: (() => boolean) | null = null;
   claimMenuKeys(wants: () => boolean): () => void {

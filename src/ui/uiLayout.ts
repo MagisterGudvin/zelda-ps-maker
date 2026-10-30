@@ -128,6 +128,8 @@ export interface CounterElement extends Base {
 export interface ItemElement extends Base {
   type: "item";
   frame: string;
+  /** Which item button it shows: 1 = the first (useItem, C), 2 = the second (useItem2, B). */
+  slot: 1 | 2;
 }
 
 /** One icon of an icon sheet (cells of `cellW` × `cellH` pixels, numbered row by row from 0). */
@@ -377,7 +379,7 @@ export function readElement(v: unknown, index = 0): UiElement | null {
     case "counter":
       return { ...base, type, value: str(v.value, "rupees"), icon: str(v.icon), digits: str(v.digits), places: int(v.places, 2, 1, 6) };
     case "item":
-      return { ...base, type, frame: str(v.frame) };
+      return { ...base, type, frame: str(v.frame), slot: Number(v.slot) === 2 ? 2 : 1 };
     case "icon":
       return { ...base, type, image: str(v.image), cellW: int(v.cellW, 16, 0), cellH: int(v.cellH, 16, 0), index: int(v.index, 0, 0) };
     case "slot":
@@ -467,7 +469,7 @@ export function layoutBindings(layout: UiLayout): Set<string> {
   for (const e of layout.elements) {
     if (e.type === "bar") (out.add(e.value), out.add(e.max));
     if (e.type === "counter") out.add(e.value);
-    if (e.type === "item") (out.add("item.icon"), out.add("item.count"));
+    if (e.type === "item") e.slot === 2 ? (out.add("item2.icon"), out.add("item2.count")) : (out.add("item.icon"), out.add("item.count"));
     if (e.type === "slot") (out.add(`slot.${e.index}.icon`), out.add(`slot.${e.index}.sel`));
     if (e.type === "inventory") (out.add("inv.name"), out.add("inv.description"), out.add("inv.count"));
     if (e.type === "text" || e.type === "button" || e.type === "bar") for (const m of e.text.matchAll(BRACES)) out.add(m[1]);
@@ -739,7 +741,9 @@ export function classicLayout(options: { magic?: boolean; bottom?: boolean } = {
     raw.push({ id: "magic", type: "bar", x, y: top(4, 30), w: 8, h: 30, anchor: a("l"), value: "magic", max: "maxMagic", dir: "up" });
     x += 12;
   }
+  // The two item buttons: C, and B under it (side by side they would run into the hearts on 256 pixels).
   raw.push({ id: "item", type: "item", x, y: top(6, 22), w: 22, h: 22, anchor: a("l") });
+  raw.push({ id: "item2", type: "item", x, y: top(31, 22), w: 22, h: 22, anchor: a("l"), slot: 2 });
   x += 30;
   for (const [id, places] of [["rupees", 3], ["bombs", 2], ["arrows", 2], ["key", 1]] as const) {
     const w = Math.max(8, places * 6);

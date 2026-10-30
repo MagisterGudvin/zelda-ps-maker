@@ -348,6 +348,14 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private readonly npcBoxes: AABB[] = [];
   private npcCount = 0;
   private frameListener: ((time: number, delta: number) => void) | null = null;
+  private preUpdateListener: (() => void) | null = null;
+  /** Roc's Feather: how high the player is drawn, the lift applied this frame, the shadow, the camera's own follow offset. */
+  private hop = 0;
+  private hopApplied = 0;
+  private hopShadow: any = null;
+  private followBase: number | null = null;
+  /** The engine's walking speed before the toolkit slowed it (shield up), or null. */
+  private baseSpeed: number | null = null;
   private shutdownListener: (() => void) | null = null;
   private disposed = false;
   private readonly probe = makeBox();
@@ -399,7 +407,11 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.frameListener = (_time: number, delta: number) => {
       this.enforceLock();
       onFrame(delta);
+      this.applyHop();
     };
+    // The jump lifts only the drawing: the real position is back before physics runs.
+    this.preUpdateListener = () => this.restoreHop();
+    events.on("preupdate", this.preUpdateListener);
     this.shutdownListener = () => onShutdown();
     // POST_UPDATE runs after Arcade Physics has synced bodies to sprites, so our
     // position corrections (knockback, solids, locks) are what gets rendered.
@@ -483,6 +495,64 @@ export class PhaserHost implements HostAdapter, DepthSource {
   private syncBody(): void {
     const body = this.player?.body;
     if (body && typeof body.updateFromGameObject === "function") body.updateFromGameObject();
+  }
+
+  setPlayerHop(height: number): void {
+    this.hop = Math.max(0, height);
+  }
+
+  /**
+   * Draws the player `hop` pixels higher until the next frame's physics: the sprite (and its
+   * animation overlay) moves up and back, the camera's follow offset moves with it so the view stays
+   * still, and a shadow stays on the ground at the body's feet.
+   */
+  private applyHop(): void {
+    const p = this.player;
+    const cam = this.scene?.cameras?.main;
+    const follows = !!cam && cam._follow === p && cam.followOffset && typeof cam.followOffset.y === "number";
+    if (this.hop <= 0 || !p) {
+      this.hopShadow?.clear?.();
+      if (follows && this.followBase !== null) cam.followOffset.y = this.followBase;
+      this.followBase = null;
+      return;
+    }
+    p.y -= this.hop;
+    this.hopApplied = this.hop;
+    for (const img of this.overlayImgs) if (img.visible) img.y -= this.hop;
+    if (follows) {
+      this.followBase ??= cam.followOffset.y;
+      cam.followOffset.y = this.followBase! - this.hop;
+    }
+    this.hopShadow ??= this.scene.add?.graphics?.() ?? null;
+    const g = this.hopShadow;
+    if (!g) return;
+    const feet = typeof p.body?.bottom === "number" ? p.body.bottom : p.y + this.hop;
+    const w = Math.max(6, (p.body?.width ?? 10) * 0.9);
+    g.clear();
+    g.fillStyle(0x000000, 0.3);
+    g.fillEllipse(p.x, feet - 1, w * (1 - this.hop / 40), 4);
+    g.setDepth?.((p.depth ?? 0) - 0.02);
+  }
+
+  private restoreHop(): void {
+    if (!this.hopApplied) return;
+    const p = this.player;
+    if (p) p.y += this.hopApplied;
+    for (const img of this.overlayImgs) if (img.visible) img.y += this.hopApplied;
+    this.hopApplied = 0;
+  }
+
+  /** Walking speed of PS Maker's player (Player.getSpeed / setSpeed) times `factor`; 1 sets the player's own speed back. */
+  setPlayerSpeedFactor(factor: number): void {
+    const p = this.player;
+    if (typeof p?.getSpeed !== "function" || typeof p.setSpeed !== "function") return;
+    if (factor === 1) {
+      if (this.baseSpeed !== null) p.setSpeed(this.baseSpeed);
+      this.baseSpeed = null;
+      return;
+    }
+    this.baseSpeed ??= p.getSpeed();
+    p.setSpeed(this.baseSpeed! * factor);
   }
 
   setPlayerLocked(locked: boolean): void {
@@ -941,6 +1011,13 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.disposed = true;
     const events = this.scene?.events;
     if (events && this.frameListener) events.off("postupdate", this.frameListener);
+    if (events && this.preUpdateListener) events.off("preupdate", this.preUpdateListener);
+    this.restoreHop();
+    this.hop = 0;
+    this.applyHop();
+    this.hopShadow?.destroy?.();
+    this.hopShadow = null;
+    this.setPlayerSpeedFactor(1);
     if (events && this.shutdownListener) {
       events.off("shutdown", this.shutdownListener);
       events.off("destroy", this.shutdownListener);

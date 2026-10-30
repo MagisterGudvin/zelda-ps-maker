@@ -54,7 +54,7 @@ const ROLE_HINTS: Record<string, string> = {
   notification: "Each short note (\"You got 5 bombs\", \"Saved\", hints the message box does not show) is drawn with this layout while it lasts: texts show {note}. Several notes stack one height apart. The game plays on.",
   menu: "Escape (the Menu key) opens and closes it; PS Maker's options menu opens from a button that runs an event with \"Open options menu\".",
   message: "Texts show {message} (tick \"Wrap lines\"); {message.ready} is 1 when the page waits for a key, {message.more} while more pages follow. Z, X or Escape: next page.",
-  inventory: "Add an Inventory grid: arrows move its cursor, Z takes the item in hand. Texts show {inv.name}, {inv.description}, {inv.count}. I, X or Escape close it.",
+  inventory: "Add an Inventory grid: arrows move its cursor, Z or C puts the item on the first item button, B on the second. Texts show {inv.name}, {inv.description}, {inv.count}. I, X or Escape close it.",
   title: "Open it with Open UI Screen on the title map. Buttons run PS Maker events: change map (new game), open the load menu, the options menu, exit the game. No key closes it.",
 };
 const KIND_LABELS: readonly [MessageKindName, string][] = [
@@ -131,7 +131,10 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "digits", label: "Digit strip (0-9 in a row)", kind: "pic" },
     { path: "places", label: "Digits", kind: "num" },
   ],
-  item: [{ path: "frame", label: "Frame picture", kind: "pic" }],
+  item: [
+    { path: "slot", label: "Item button", kind: "choice", options: [["1", "First (C)"], ["2", "Second (B)"]] },
+    { path: "frame", label: "Frame picture", kind: "pic" },
+  ],
   icon: [
     { path: "image", label: "Icon sheet", kind: "pic" },
     { path: "cellW", label: "Cell width (0 = whole)", kind: "num" },

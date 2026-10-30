@@ -239,7 +239,7 @@ export class LayoutPainter {
       case "counter":
         return this.counter(e, b, values);
       case "item":
-        this.item(e.frame, b, String(values["item.icon"] ?? ""));
+        this.item(e.frame, b, String(values[e.slot === 2 ? "item2.icon" : "item.icon"] ?? ""));
         return b;
       case "icon":
         this.iconCell(e, b);

@@ -34,7 +34,7 @@ export interface ProjectileOptions {
  * `onWall` and `onTargetHit`.
  */
 export class Projectile extends Entity {
-  readonly ownerId: string;
+  ownerId: string;
   readonly damageType: DamageType;
   vx: number;
   vy: number;
@@ -42,7 +42,7 @@ export class Projectile extends Entity {
   readonly range: number;
   traveled = 0;
   protected readonly opts: ProjectileOptions;
-  protected readonly attack = new AttackInstance(1);
+  protected attack = new AttackInstance(1);
   protected readonly found: Entity[] = [];
   protected readonly probe = makeBox();
   private readonly dir: Vec2 = { x: 0, y: 0 };
@@ -134,6 +134,20 @@ export class Projectile extends Entity {
   }
 
   protected onTargetHit(session: Session, _target: Entity | { id: string }, result: HitResult): void {
+    // The Mirror Shield sends the shot back: it now flies for the player, at whoever is in its way.
+    if (result === "blocked" && this.team === "enemy" && _target === session.player && session.player.reflects(this.damageType)) {
+      spawnEffect(session, "sparkle", this.x, this.y, 200);
+      session.bus.emit("zelda:player:reflected", { type: this.damageType, sourceId: this.id });
+      this.team = "player";
+      this.ownerId = "player";
+      this.vx = -this.vx;
+      this.vy = -this.vy;
+      this.traveled = 0;
+      // Its hits start over: the shooter can be hit by its own shot.
+      this.attack = new AttackInstance(1);
+      if (this.opts.rotate !== false) this.view?.setRotation(Math.atan2(this.vy, this.vx));
+      return;
+    }
     if (result === "blocked") {
       spawnEffect(session, "spark", this.x, this.y, 150);
       session.world.remove(this);

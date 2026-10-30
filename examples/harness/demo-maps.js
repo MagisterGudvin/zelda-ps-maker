@@ -36,7 +36,7 @@ export const MAPS = {
       ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldMode: "hold", hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
-      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC: use the item. Q/E: switch items. I: all items. V: hold up the shield (in the chest below). Esc: pause." }],
+      ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC and B: the two item buttons. Q/E: switch the C item. I: all items (C or B puts one on that button). V: hold up the shield (in the chest below). Esc: pause." }],
       // 3. Sword targets and enemies (several types); group 1 = the field.
       ["Zelda: Create Enemy", { template: "slime", position: { x: 230, y: 120 }, group: "1" }],
       ["Zelda: Create Enemy", { template: "slime", position: { x: 260, y: 160 }, group: "1" }],
@@ -58,6 +58,9 @@ export const MAPS = {
       ["Zelda: Create Object", { type: "rock", position: { x: 120, y: 128 } }],
       // 9. Items in chests; the shield first, near the start (held up with V).
       ["Zelda: Create Chest", { position: { x: 88, y: 176 }, item: "shield", count: 1, requiresBigKey: false, hidden: false }],
+      // Pegasus Boots and Roc's Feather (they go on the item buttons C and B; I switches them).
+      ["Zelda: Create Chest", { position: { x: 136, y: 40 }, item: "boots", count: 1, requiresBigKey: false, hidden: false }],
+      ["Zelda: Create Chest", { position: { x: 168, y: 40 }, item: "feather", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 200, y: 40 }, item: "boomerang", count: 1, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 140, y: 200 }, item: "bombs", count: 5, requiresBigKey: false, hidden: false }],
       ["Zelda: Create Chest", { position: { x: 248, y: 40 }, item: "bow", count: 1, requiresBigKey: false, hidden: false }],

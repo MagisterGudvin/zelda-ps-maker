@@ -130,6 +130,10 @@ export class HudSystem {
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
       else if (key === "item.icon") out[key] = st.inventory.activeItem && s.feature("inventory") ? this.iconOf(st.inventory.activeItem, layout) : "";
       else if (key === "item.count") out[key] = s.statValue("itemCount");
+      else if (key === "item2.icon" || key === "item2.count") {
+        const id = st.inventory.secondItem;
+        out[key] = !id || !s.feature("inventory") ? "" : key === "item2.icon" ? this.iconOf(id, layout) : (this.countOf(id) ?? "");
+      }
       else if (key === "message" || key === "message.ready" || key === "message.more" || key === "speaker" || key === "portrait") {
         // The message or dialogue screen: its text as typed so far, whether it waits for a key, more pages, who speaks.
         const m = s.screens?.messageView() ?? { text: "", ready: false, more: false, speaker: "", portrait: "" };

@@ -95,7 +95,7 @@ test("designer setup: the game window around the player's start; no UI Layout = 
   const st = designerSetup({ initialActions: [start, spawn] }, story as any, 0)!;
   assert.deepEqual(st.frame, { x: 40, y: 10, w: 320, h: 180 });
   assert.equal(st.action, null);
-  assert.equal(st.layout.elements.length, 8);
+  assert.equal(st.layout.elements.length, 9);
   assert.equal(boardScale(st, st.layout), 1, "one layout pixel per map pixel");
   assert.equal(st.values.maxHealth, 10);
   assert.equal(st.values["t:hud.life"], "- LIFE -");
@@ -108,7 +108,7 @@ test("designer setup: the map's UI Layout action and its scale; a broken one is 
   assert.deepEqual(st.layout.elements.map((e) => e.id), ["t"]);
   assert.equal(boardScale(st, st.layout), 0.5, "2 screen pixels per layout pixel at map zoom 4");
   const broken = designerSetup({ initialActions: [start, { ...own, pluginParams: { layout: "{" } }] }, story as any, 0)!;
-  assert.equal(broken.layout.elements.length, 8);
+  assert.equal(broken.layout.elements.length, 9);
   assert.match(broken.error!, /not valid/);
 });
 
@@ -135,7 +135,7 @@ test("designer values: every element shown (variables and items count as on), th
 
 test("designer edits: new elements get free names; fields are checked like saved ones", () => {
   const L = classicLayout();
-  assert.equal(freeId(L, "item"), "item2");
+  assert.equal(freeId(L, "item"), "item3");
   assert.equal(freeId(L, "picture"), "picture");
   const e = newElement(L, "counter", 10.6, 20.2);
   assert.deepEqual([e.id, e.x, e.y, (e as any).icon], ["counter", 11, 20, "hud_rupee"]);

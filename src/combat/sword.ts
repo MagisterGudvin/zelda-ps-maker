@@ -61,6 +61,8 @@ export class SwordSystem implements SessionSystem {
     if (!inv.owns("sword") || !inv.isAbilityEnabled("sword")) return false;
     if (this.s.interactions?.isCarrying()) return false;
     if (this.s.items?.isBusy()) return false;
+    // The dash holds the sword out itself (MoveAbilities).
+    if (this.s.moves?.isDashing) return false;
     return true;
   }
 
