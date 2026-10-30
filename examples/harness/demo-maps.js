@@ -33,7 +33,7 @@ export const MAPS = {
     ],
     npcs: [{ name: "npc_guard", x: 120, y: 184, color: "#d9822b" }],
     onLoad: [
-      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldMode: "hold", hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, shieldMode: "hold", language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 48, y: 140 } }],
       ["Zelda: Create Object", { type: "sign", position: { x: 32, y: 120 }, text: "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC and B: the two item buttons. Q/E: switch the C item. I: all items (C or B puts one on that button). V: hold up the shield (in the chest below). Esc: pause." }],
@@ -108,7 +108,7 @@ export const MAPS = {
     ],
     npcs: [],
     onLoad: [
-      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, magicBar: true, shieldMode: "hold", hudBottom: false, language: "auto", debugHitboxes: false, diagnostics: false }],
+      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, shieldMode: "hold", language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "dungeon_1", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 40, y: 200 } }],
       // 8. Block + pressure plate opens the puzzle shutter.

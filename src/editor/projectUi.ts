@@ -100,7 +100,7 @@ export function applyProjectUi(tk: Toolkit, story: { maps?: MapLike[] } | null |
   if (ui.hud) {
     const { layout, error } = parseLayout(ui.hud.raw);
     if (error) tk.logger.warnOnce(`shared-hud-${ui.hud.actionId}`, `The shared UI Layout on map "${ui.hud.mapName}": ${error}; the classic HUD is shown.`);
-    // Unreadable: the classic HUD (built to the player's magic and the HUD position).
+    // Unreadable: the classic HUD (its magic meter once the player has magic).
     tk.hudLayout = layout;
     if (layout) useLayoutFonts(tk, story, tk.session?.host, layout);
   }

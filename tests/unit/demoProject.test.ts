@@ -54,7 +54,7 @@ test("demo story: plugin actions in the PS Maker format, with editor defaults", 
   assert.equal(start.pluginName, "Zelda Maker Toolkit");
   assert.equal(start.actionName, "Zelda: Start Toolkit");
   assert.equal(start.pluginParams.hearts, 3);
-  assert.equal(start.pluginParams.hud, true, "fields left untouched get their default, as the editor saves them");
+  assert.equal(start.pluginParams.tileUnits, false, "fields left untouched get their default, as the editor saves them");
   const enemy = field.initialActions.find((a: Any) => a.actionName === "Zelda: Create Enemy" && a.pluginParams.template === "slime");
   assert.equal(enemy.pluginParams.character, story.characters.find((c: Any) => c.name === "Slime").id, "slimes look like the pack's Slime");
   // Every action and parameter exists in the plugin.

@@ -90,8 +90,6 @@ test("editor frame of a screen: the HUD the game shows under it (none under a ti
   assert.deepEqual(st.under?.elements.map((e) => e.id), ["fieldHud"], "the shared HUD under the screen");
   const cave = designerSetup({ ...story.maps[2], initialActions: [...story.maps[2].initialActions, ui("shop", { name: "shop", layout: layoutText("buy") })] }, story, 0, "shop")!;
   assert.deepEqual(cave.under?.elements.map((e) => e.id), ["caveHud"], "a map's own HUD");
-  const noHud = designerSetup({ id: "t", initialActions: [{ ...start, pluginParams: { hud: false } }, ui("title", { name: "title", layout: layoutText("go") })] }, story, 0, "title")!;
-  assert.equal(noHud.under, null);
   assert.equal(designerSetup(story.maps[0], story, 0)!.under, null, "the HUD itself has nothing under it");
 });
 

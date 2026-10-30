@@ -61,9 +61,9 @@ test("pictures of an element: project images only (built-in sprites are not chec
 });
 
 for (const [W, H] of [[256, 224], [320, 180], [400, 240], [640, 360], [1280, 720], [1920, 1080]]) {
-  for (const bottom of [false, true]) {
-    test(`classic HUD: elements on screen and apart, ${W}x${H}, ${bottom ? "bottom" : "top"}`, () => {
-      const L = classicLayout({ bottom });
+  for (const magic of [true, false]) {
+    test(`classic HUD: elements on screen and apart, ${W}x${H}, ${magic ? "with" : "without"} the magic meter`, () => {
+      const L = classicLayout({ magic });
       const k = layoutScale(0, 0, W, H);
       const viewW = Math.floor(W / k);
       const viewH = Math.floor(H / k);
@@ -91,7 +91,7 @@ const spawn = { type: "movePlayerAction", moveType: "absolute-position", positio
 
 test("designer setup: the game window around the player's start; no UI Layout = the classic HUD to look at", () => {
   assert.equal(designerSetup({ initialActions: [] }, story as any, 0), null, "no Start Toolkit, no HUD");
-  assert.equal(designerSetup({ initialActions: [{ ...start, pluginParams: { hud: false } }] }, story as any, 0), null);
+  assert.equal(designerSetup({ initialActions: [{ ...start, pluginParams: { hud: false } }] }, story as any, 0)?.layout.elements.length, 9, "an old unticked Show HUD (removed) hides nothing");
   const st = designerSetup({ initialActions: [start, spawn] }, story as any, 0)!;
   assert.deepEqual(st.frame, { x: 40, y: 10, w: 320, h: 180 });
   assert.equal(st.action, null);

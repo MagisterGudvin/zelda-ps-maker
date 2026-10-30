@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.32.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.32.1) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
@@ -54,12 +54,9 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `difficulty` (Difficulty) | string-enum | `"alttp"` | Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность. Варианты: Easy, Normal, Hard. |
 | `hearts` (Hearts) | number | `3` | Starting and maximum hearts. / Сердца в начале игры. |
 | `swordDamage` (Sword damage) | number | `2` | Damage of one sword hit (a slime has 2 HP). / Урон меча. |
-| `hud` (Show HUD) | boolean | `true` | Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit. |
-| `magicBar` (Magic bar) | boolean | `true` | Show the magic meter (needed for magic items). / Шкала магии. |
 | `shieldMode` (Shield) | string-enum | `"hold"` | The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят. Варианты: Hold its key to block, Always up (blocks shots from the front). |
-| `hudBottom` (HUD at the bottom) | boolean | `false` | Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана. |
-| `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
+| `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
 | `diagnostics` (Show diagnostics) | boolean | `false` | On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики. |

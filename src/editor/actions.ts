@@ -233,12 +233,9 @@ const startToolkit = defineEvent({
     difficulty: choice("Difficulty", "Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность.", [["casual", "Easy"], ["alttp", "Normal"], ["hardcore", "Hard"]], "alttp"),
     hearts: num("Hearts", "Starting and maximum hearts. / Сердца в начале игры.", 3),
     swordDamage: num("Sword damage", "Damage of one sword hit (a slime has 2 HP). / Урон меча.", 2),
-    hud: bool("Show HUD", "Hearts, item and counters on screen. Turn off if you build your own UI with PS Maker UI components. / Показывать интерфейс Toolkit.", true),
-    magicBar: bool("Magic bar", "Show the magic meter (needed for magic items). / Шкала магии.", true),
     shieldMode: choice("Shield", "The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят.", [["hold", "Hold its key to block"], ["passive", "Always up (blocks shots from the front)"]], "hold"),
-    hudBottom: bool("HUD at the bottom", "Draw hearts and counters at the bottom of the screen. / Интерфейс внизу экрана.", false),
-    progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
+    progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
     debugHitboxes: bool("Show hitboxes", "Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы.", false),
     diagnostics: bool("Show diagnostics", "On-screen panel with positions and recent messages (toggle with F10). / Панель диагностики.", false),
@@ -264,11 +261,6 @@ const startToolkit = defineEvent({
           sword: numOr(params.swordDamage, 0) > 0 ? { damage: numOr(params.swordDamage, 0) } : {},
           // 0.25 and older saved "Shield on a button" (off = always up); only a ticked one carries over.
           shield: has("shieldMode") ? { mode: textOf(old.shieldMode) === "passive" ? "passive" : "hold" } : old.shieldButton === true ? { mode: "hold" } : {},
-          ui: {
-            ...(has("hud") ? { enabled: boolOr(params.hud, true) } : {}),
-            ...(has("magicBar") ? { showMagic: boolOr(params.magicBar, true) } : {}),
-            ...(has("hudBottom") ? { position: boolOr(params.hudBottom, false) ? "bottom" : "top" } : {}),
-          },
           world: has("tileUnits") ? { positionUnits: boolOr(params.tileUnits, false) ? "tiles" : "pixels" } : {},
           debug: { hitboxes: boolOr(params.debugHitboxes, false), diagnostics: boolOr(params.diagnostics, false) },
         },
@@ -1112,7 +1104,7 @@ const dialogue = defineEvent({
       const p = params as Record<string, unknown>;
       const text = s.i18n.text(textOf(p.text)).replace(/\\n/g, "\n");
       if (!s.messageBox) {
-        s.logger.warnOnce("dialogue-no-hud", "Zelda: Dialogue needs the toolkit HUD (Start Toolkit → Show HUD).");
+        s.logger.warnOnce("dialogue-no-hud", "Zelda: Dialogue needs the toolkit HUD (it is off: ui.enabled false).");
         return;
       }
       // Answers keep their slot: answer 2 runs event 2 even when answer 1 is empty.

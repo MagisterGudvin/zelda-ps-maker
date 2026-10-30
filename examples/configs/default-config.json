@@ -322,8 +322,6 @@
   },
   "ui": {
     "enabled": true,
-    "showMagic": true,
-    "position": "top",
     "scale": 0,
     "messageMs": 2200,
     "inventoryPanel": true,

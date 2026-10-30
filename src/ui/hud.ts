@@ -113,15 +113,15 @@ export class HudSystem {
 
   /** The layout the HUD shows: the designer's (Zelda: UI Layout) or the classic one. */
   layout(): UiLayout {
-    const ui = this.s.config.ui;
     const own = this.s.toolkit.hudLayout;
     if (own) return own;
-    const key = `${ui.showMagic && this.s.state.player.maxMagic > 0}|${ui.position}`;
-    if (this.classic?.key !== key) this.classic = { key, layout: classicLayout({ magic: ui.showMagic && this.s.state.player.maxMagic > 0, bottom: ui.position.startsWith("bottom") }) };
+    // The magic meter only once the player has magic.
+    const magic = this.s.state.player.maxMagic > 0;
+    if (this.classic?.magic !== magic) this.classic = { magic, layout: classicLayout({ magic }) };
     return this.classic.layout;
   }
 
-  private classic: { key: string; layout: UiLayout } | null = null;
+  private classic: { magic: boolean; layout: UiLayout } | null = null;
 
   /** The values a layout shows, from the toolkit state and the project variables. */
   values(layout: UiLayout): LayoutValues {

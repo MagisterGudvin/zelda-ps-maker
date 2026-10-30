@@ -96,5 +96,5 @@ test("fields that do not apply are hidden", async () => {
   assert.ok(!visibleFields(item, { heal: 4 }).includes("damageType"));
   assert.ok(!visibleFields(item, { resource: "" }).includes("cost"));
   const start = byName(list, "Start Toolkit");
-  assert.ok(!visibleFields(start, { hud: false }).includes("magicBar"));
+  for (const gone of ["hud", "magicBar", "hudBottom"]) assert.ok(!visibleFields(start, {}).includes(gone), `${gone}: the HUD is made in the UI Designer`);
 });

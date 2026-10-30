@@ -6,7 +6,7 @@
 
 | Где | Поля |
 |---|---|
-| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Show HUD, Magic bar, Shield (hold its key / always up), HUD at the bottom, Progress variable, Language, Positions in tiles, Show hitboxes, Show diagnostics |
+| `Zelda: Start Toolkit` | Difficulty (Easy / Normal / Hard), Hearts, Sword damage, Shield (hold its key / always up), Language, Progress variable; раздел Debug: Positions in tiles, Show hitboxes, Show diagnostics. Как выглядит HUD — только в дизайнере `Zelda: UI Layout` (галочки Show HUD, Magic bar и HUD at the bottom убраны в 0.32.1) |
 | `Zelda: Set Controls` | клавиши меча, предмета, щита, действия, смены предмета, инвентаря — штатным выбором клавиш PS Maker (можно выбрать и управление проекта, например Interact) |
 | `Zelda: Set Player Sprites` | анимации атаки из PS Maker, слой оружия, центр взмаха |
 | `Zelda: Set Sound` | звуки моментов |
@@ -95,7 +95,7 @@
 
 ### `ui`
 Классический HUD (пока на карте нет `Zelda: UI Layout`): шкала магии, рамка предмета, счётчики (пиксельные цифры), «— LIFE —» и сердца справа (10 в ряд), левее шестерёнки настроек PS Maker. Свой HUD и экраны меню — дизайнер `Zelda: UI Layout` ([UI.md](UI.md)).
-`enabled, showMagic, position "top" | "bottom"` (старые `top-left` и т.п. читаются как top/bottom; для классического HUD), `scale 0` (размер пикселя макета на экране, если в макете 0: 0 = как у карты), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true`. Сообщения выводятся рамками внизу свободной области и не перекрывают HUD.
+`enabled true` (`false` — Toolkit не рисует ничего: ни HUD, ни экраны, ни свои диалоги; чтобы убрать только HUD, оставьте его макет без элементов), `scale 0` (размер пикселя макета на экране, если в макете 0: 0 = как у карты), `messageMs 2200, inventoryPanel true, pauseWhileInventoryOpen true`. Сообщения выводятся рамками внизу свободной области и не перекрывают HUD.
 
 ### `audio`
 `enabled true, volume 1, sounds {}` — звуки моментов (`Zelda: Set Sound`): `{"audio":{"sounds":{"swordSwing":{"src":"sfx/swing.ogg","volume":0.8}}}}`. Список моментов — в [PS_MAKER_INTEGRATION.md](PS_MAKER_INTEGRATION.md#звук).
@@ -115,7 +115,4 @@
 {"player":{"maxMagic":64,"startMagic":64,"magicRegenPerSecond":2},"items":{"fireRod":{"magicCost":6,"damage":5}}}
 ```
 
-Классический HUD внизу, без шкалы магии:
-```json
-{"ui":{"position":"bottom","showMagic":false}}
-```
+HUD внизу экрана, без шкалы магии — в дизайнере `Zelda: UI Layout` (`ui.position` и `ui.showMagic` убраны в 0.32.1; классический HUD показывает шкалу магии, только когда у игрока есть магия).

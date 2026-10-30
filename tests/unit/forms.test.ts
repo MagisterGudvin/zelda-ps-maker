@@ -64,14 +64,14 @@ test("action names stay stable (PS Maker saves actions under a key derived from 
 });
 
 test("Start Toolkit: game settings from numbers and checkboxes", async () => {
-  const { tk, done } = await setup({ difficulty: 3, hearts: 5, swordDamage: 3, magicBar: false, shieldButton: true, hudBottom: true });
+  // Show HUD, Magic bar and HUD at the bottom were removed in 0.32.1 (the HUD is made in the UI Designer): saved values are ignored.
+  const { tk, done } = await setup({ difficulty: 3, hearts: 5, swordDamage: 3, hud: false, magicBar: false, shieldButton: true, hudBottom: true });
   assert.equal(tk.config.player.invulnerableMs, 600, "difficulty 3 = hard");
   assert.equal(tk.config.player.maxHealth, 10);
   assert.equal(tk.state.player.maxHp, 10, "new game starts with 5 hearts");
   assert.equal(tk.config.sword.damage, 3);
-  assert.equal(tk.config.ui.showMagic, false);
   assert.equal(tk.config.shield.mode, "hold");
-  assert.equal(tk.config.ui.position, "bottom");
+  assert.equal(tk.config.ui.enabled, true, "an old unticked Show HUD no longer hides the HUD");
   done();
 });
 

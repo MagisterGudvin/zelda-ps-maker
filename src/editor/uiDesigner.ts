@@ -487,8 +487,7 @@ export class UiDesigner {
   /** Starts again from the classic Zelda HUD, or an empty screen (undo brings the old layout back). */
   template(): void {
     if (!this.layout || !this.setup) return;
-    const sp = this.setup.start;
-    const classic = classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true });
+    const classic = classicLayout();
     this.change(this.isScreen ? { ...classic, screen: this.layout.screen, elements: [] } : classic, { record: true, select: [] });
   }
 

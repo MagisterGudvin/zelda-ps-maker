@@ -2,6 +2,16 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
+## [0.32.1] — 2026-10-30
+
+### Удалено
+- Галочки **Show HUD**, **Magic bar** и **HUD at the bottom** у `Zelda: Start Toolkit` и настройки `ui.showMagic`, `ui.position`: остались с тех пор, как HUD не собирался в дизайнере. Теперь HUD целиком делается в `Zelda: UI Layout` (роль *HUD*): шкалу магии и место HUD задаёт макет. Классический HUD (пока макета нет) показывает шкалу магии, только когда у игрока есть магия.
+  - Сохранённые в проектах значения этих галочек больше ничего не делают. Если HUD был скрыт снятой *Show HUD* (интерфейс на UI-компонентах PS Maker), удалите в дизайнере все элементы HUD — пустой HUD ничего не рисует, а экраны, уведомления и диалоги Toolkit работают (раньше *Show HUD* выключала и их).
+  - `ui.enabled false` в конфигурации JSON по-прежнему выключает весь интерфейс Toolkit.
+
+### Изменено
+- Форма `Start Toolkit` без разделов из одного-двух полей: Difficulty, Hearts, Sword damage, Shield, Language, Progress variable и свёрнутый раздел Debug.
+
 ## [0.32.0] — 2026-10-30
 
 Просил пользователь: возможности, как у Keyboard Gamepad Solution (Sang Hendrix) для RPG Maker MZ — по скриншоту его страницы; код и данные плагина не использовались.

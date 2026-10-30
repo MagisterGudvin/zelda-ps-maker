@@ -253,10 +253,6 @@ export interface ToolkitConfig {
   };
   ui: {
     enabled: boolean;
-    /** Classic HUD (no UI Layout on the map): the magic meter is shown. */
-    showMagic: boolean;
-    /** Classic HUD: at the top or bottom of the screen ("top-left" etc. are read as top/bottom). */
-    position: "top" | "bottom" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
     /** Layout pixel scale for layouts without their own; 0 = like the map (its camera zoom). */
     scale: number;
     messageMs: number;
@@ -447,8 +443,6 @@ export function createDefaultConfig(): ToolkitConfig {
     },
     ui: {
       enabled: true,
-      showMagic: true,
-      position: "top",
       scale: 0,
       messageMs: 2200,
       inventoryPanel: true,

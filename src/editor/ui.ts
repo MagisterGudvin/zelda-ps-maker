@@ -123,22 +123,16 @@ const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "de
 
 export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Start Toolkit": {
-    keywords: ["start", "setup", "settings", "init", "difficulty", "hud", "language"],
+    keywords: ["start", "setup", "settings", "init", "difficulty", "language"],
     fields: {
       difficulty: { ui: "radio" },
       hearts: { min: 1, max: 20, step: 1 },
       swordDamage: { min: 1, max: 20, step: 1 },
-      hud: { group: "Interface" },
-      magicBar: { group: "Interface" },
-      hudBottom: { group: "Interface" },
-      language: { group: "Interface", ui: "radio" },
-      shieldMode: { group: "Game" },
-      progressVariable: { group: "Game" },
+      language: { ui: "radio" },
       tileUnits: { group: "Debug" },
       debugHitboxes: { group: "Debug" },
       diagnostics: { group: "Debug" },
     },
-    visible: { magicBar: (p) => p.hud !== false, hudBottom: (p) => p.hud !== false },
     collapsed: ["Debug"],
     preview: (p, show) => join([show("difficulty"), `${p.hearts ?? 3} hearts`, `sword ${p.swordDamage ?? 2}`]),
   },

@@ -749,28 +749,25 @@ export function barFillPolygon(shape: BarShape, b: Box, dir: "up" | "right" | "d
  * rupee, bomb, arrow and key counters, "- LIFE -" and the hearts on the right (clear of PS Maker's
  * settings gear). It is the HUD while a map has no UI Layout, and the designer's starting template.
  */
-export function classicLayout(options: { magic?: boolean; bottom?: boolean } = {}): UiLayout {
+export function classicLayout(options: { magic?: boolean } = {}): UiLayout {
   const magic = options.magic !== false;
-  const bottom = options.bottom === true;
-  const top = (y: number, h: number) => (bottom ? -(y + h) : y);
-  const a = (side: "l" | "r"): Anchor => ((bottom ? "b" : "t") + side) as Anchor;
   const raw: Raw[] = [];
   let x = 6;
   if (magic) {
-    raw.push({ id: "magic", type: "bar", x, y: top(4, 30), w: 8, h: 30, anchor: a("l"), value: "magic", max: "maxMagic", dir: "up" });
+    raw.push({ id: "magic", type: "bar", x, y: 4, w: 8, h: 30, anchor: "tl", value: "magic", max: "maxMagic", dir: "up" });
     x += 12;
   }
   // The two item buttons: C, and B under it (side by side they would run into the hearts on 256 pixels).
-  raw.push({ id: "item", type: "item", x, y: top(6, 22), w: 22, h: 22, anchor: a("l") });
-  raw.push({ id: "item2", type: "item", x, y: top(31, 22), w: 22, h: 22, anchor: a("l"), slot: 2 });
+  raw.push({ id: "item", type: "item", x, y: 6, w: 22, h: 22, anchor: "tl" });
+  raw.push({ id: "item2", type: "item", x, y: 31, w: 22, h: 22, anchor: "tl", slot: 2 });
   x += 30;
   for (const [id, places] of [["rupees", 3], ["bombs", 2], ["arrows", 2], ["key", 1]] as const) {
     const w = Math.max(8, places * 6);
-    raw.push({ id, type: "counter", x, y: top(6, 17), w, h: 17, anchor: a("l"), value: id, icon: `hud_${id === "key" ? "key" : id.replace(/s$/, "")}`, places });
+    raw.push({ id, type: "counter", x, y: 6, w, h: 17, anchor: "tl", value: id, icon: `hud_${id === "key" ? "key" : id.replace(/s$/, "")}`, places });
     x += w + 8;
   }
   // Ten hearts a row, 8 pixels apart, right-aligned 30 pixels in (the gear sits in the corner).
-  raw.push({ id: "life", type: "text", x: -110, y: top(3, 8), w: 80, h: 8, anchor: a("r"), text: "{t:hud.life}", size: 7, align: "center" });
-  raw.push({ id: "hearts", type: "hearts", x: -110, y: top(13, 16), w: 80, h: 16, anchor: a("r"), perRow: 10, gap: 1 });
+  raw.push({ id: "life", type: "text", x: -110, y: 3, w: 80, h: 8, anchor: "tr", text: "{t:hud.life}", size: 7, align: "center" });
+  raw.push({ id: "hearts", type: "hearts", x: -110, y: 13, w: 80, h: 16, anchor: "tr", perRow: 10, gap: 1 });
   return { v: LAYOUT_VERSION, scale: 0, theme: defaultTheme(), screen: defaultScreen(), elements: raw.map((r) => readElement(r)!) };
 }

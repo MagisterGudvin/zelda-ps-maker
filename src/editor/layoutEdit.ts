@@ -102,7 +102,7 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
     }
   }
   const sp = start?.pluginParams ?? {};
-  if (!opened && (!start || sp.hud === false)) return null;
+  if (!opened && !start) return null;
   const shared = projectUi(story as Parameters<typeof projectUi>[0]).hud;
   let own = opened ?? hud;
   const mine = own ? layoutAction(own.action) : null;
@@ -124,12 +124,12 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
   if (sharing === "project") own = null;
   const parsed = parseLayout(raw);
   const empty = { ...classicLayout(), elements: [] };
-  const layout = parsed.layout ?? (screen ? empty : classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true }));
+  const layout = parsed.layout ?? (screen ? empty : classicLayout());
   // Under a screen the game shows this map's HUD: its own ("This map only"), else the project's, else the classic one.
   let under: UiLayout | null = null;
-  if (screen && start && sp.hud !== false) {
+  if (screen && start) {
     const own = hud && layoutAction(hud.action).thisMapOnly ? layoutAction(hud.action).raw : null;
-    under = parseLayout(own ?? shared?.raw ?? (hud ? layoutAction(hud.action).raw : "")).layout ?? classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true });
+    under = parseLayout(own ?? shared?.raw ?? (hud ? layoutAction(hud.action).raw : "")).layout ?? classicLayout();
   }
   const zoom = cameraZoom > 0 ? cameraZoom : Number(story?.gameConfig?.zoom) || 1;
   const gw = Number(story?.gameConfig?.width) || 1280;
