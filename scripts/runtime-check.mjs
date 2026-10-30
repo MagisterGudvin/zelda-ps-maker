@@ -565,6 +565,31 @@ await check("back on the field (the map wakes up): enemies again, opened chest a
   expect(s.enemies === 6 && s.chest === "opened" && s.gate === "opened", JSON.stringify(s));
   await page.screenshot({ path: path.join(OUT, "field-again.png") });
 });
+await check("pause menu → Main menu: the title map wakes up with its title screen again (HUD hidden); New game goes back to the field", async () => {
+  await page.keyboard.press("Escape");
+  await wait(400);
+  await page.keyboard.press("ArrowDown");
+  await wait(200);
+  await page.keyboard.press("ArrowDown");
+  await wait(200);
+  const focus = (await screenNow()).focus;
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-title", null, { timeout: 15000 });
+  await wait(1500);
+  const title = await ev(() => {
+    const shown = window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.filter((o) => o.visible);
+    return { screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null, hearts: shown.filter((o) => o.texture?.key === "zelda-ui-heart-full").length, hudBar: shown.filter((o) => o.texture?.key === "zelda-ui-hud-bar").length };
+  });
+  await page.screenshot({ path: path.join(OUT, "title-again.png") });
+  await page.keyboard.press("z");
+  await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-field", null, { timeout: 15000 });
+  await wait(1500);
+  const s = await state();
+  expect(focus === "mainMenu", `selected ${focus}`);
+  expect(title.screen === "title" && title.hearts === 0 && title.hudBar === 0, JSON.stringify(title));
+  expect(s.map === "zelda-demo-field" && s.chest === "opened", JSON.stringify(s));
+  return "title screen again, no HUD; back on the field with its progress";
+});
 await check("reload, Continue, load the save: the Toolkit starts on the restored map with its progress", async () => {
   await page.reload();
   await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.screens?.current?.name === "title", null, { timeout: 30000 });

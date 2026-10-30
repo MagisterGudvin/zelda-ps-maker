@@ -172,7 +172,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "title", type: "text", x: -60, y: -43, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
       button("continue", "Continue", -26, { kind: "close", id: "" }),
       button("settings", "Settings", -4, { kind: "event", id: "zelda-pause-settings" }),
-      button("title", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
+      button("mainMenu", "Main menu", 18, { kind: "event", id: "zelda-pause-title" }),
     ],
   };
   // The message box: signs and items received, typed out on the panel at the bottom; a blinking

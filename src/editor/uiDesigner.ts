@@ -44,6 +44,8 @@ import {
  */
 
 const DEPTH = 1_000_100;
+/** How the frame label names a screen's role. */
+const ROLE_NAMES: Record<string, string> = { none: "", menu: " (pause menu, over the HUD)", message: " (message box, over the HUD)", inventory: " (inventory, over the HUD)", title: " (title screen, no HUD)" };
 const SAVE_DELAY_MS = 250;
 /** A map update that does not match what the designer wrote this long after its write is someone else's. */
 const ECHO_MS = 2000;
@@ -75,6 +77,7 @@ export class UiDesigner {
   private readonly win: any;
   private readonly host: DesignerHost;
   private readonly painter: LayoutPainter;
+  private readonly underPainter: LayoutPainter;
   private readonly frameG: any;
   private readonly label: any;
   private setup: DesignerSetup | null = null;
@@ -108,6 +111,8 @@ export class UiDesigner {
     this.win = win;
     this.host = host;
     this.painter = new LayoutPainter(scene, DEPTH, 4);
+    // The HUD the game shows under a screen (not the title screen), below the screen's dim colour.
+    this.underPainter = new LayoutPainter(scene, DEPTH - 3, 4);
     this.frameG = scene.add.graphics().setDepth(DEPTH - 1);
     this.label = scene.add.text(0, 0, "", { fontFamily: "sans-serif", fontSize: "8px", color: "#ffffff", backgroundColor: "#1f1a24cc" }).setOrigin(0, 1).setDepth(DEPTH + 1);
     this.label.setResolution?.(4);
@@ -465,13 +470,15 @@ export class UiDesigner {
   private paint(): void {
     const st = this.setup;
     const layout = this.layout ?? st?.layout ?? null;
-    const sig = st && layout ? JSON.stringify([layout, st.frame, st.zoom, st.values, !!this.layout, !!st.action]) : "";
+    const sig = st && layout ? JSON.stringify([layout, st.frame, st.zoom, st.values, !!this.layout, !!st.action, st.under]) : "";
     if (sig === this.sig) return;
     this.sig = sig;
     this.painter.begin();
+    this.underPainter.begin();
     this.frameG.clear();
     if (!st || !layout) {
       this.painter.end();
+      this.underPainter.end();
       this.painted = null;
       this.label.setVisible(false);
       return;
@@ -483,6 +490,9 @@ export class UiDesigner {
     const inventory = { cells: ["sword", "bow", "bomb", "boomerang"].map((id) => ({ icon: layout.theme.icons[id] || `icon_${id}`, count: id === "bow" ? 30 : id === "bomb" ? 10 : null })), cursor: 1 };
     this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory });
     this.painter.end();
+    const under = st.screen && layout.screen.role !== "title" ? st.under : null;
+    if (under) this.underPainter.paint(under, sampleValues(under, st.start), this.fonts(under), { x: f.x, y: f.y, w: f.w, h: f.h, k: boardScale(st, under) });
+    this.underPainter.end();
     // The frame: the screen at the start of the game (dashed, like a camera view).
     const g = this.frameG;
     // A screen is drawn over the game, dimmed by its colour.
@@ -501,7 +511,7 @@ export class UiDesigner {
     dash(f.x + f.w, f.y, f.x + f.w, f.y + f.h);
     dash(f.x + f.w, f.y + f.h, f.x, f.y + f.h);
     dash(f.x, f.y + f.h, f.x, f.y);
-    const what = st.screen ? `screen "${st.screen}"` : st.sharing === "thisMap" ? "HUD of this map" : st.sharing === "conflict" ? "second shared HUD (not shown in the game)" : "HUD of all maps";
+    const what = st.screen ? `screen "${st.screen}"${ROLE_NAMES[layout.screen.role]}` : st.sharing === "thisMap" ? "HUD of this map" : st.sharing === "conflict" ? "second shared HUD (not shown in the game)" : "HUD of all maps";
     const text = this.layout
       ? `Game window · ${what}: drag to move, right-click for more; the wheel and the middle button still move the map`
       : st.sharing === "project"
@@ -877,6 +887,7 @@ export class UiDesigner {
     this.overlay?.remove?.();
     this.overlay = null;
     this.painter.destroy();
+    this.underPainter.destroy();
     this.frameG.destroy?.();
     this.label.destroy?.();
   }

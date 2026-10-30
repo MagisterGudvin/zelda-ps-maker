@@ -35,6 +35,18 @@ export const MAP_BUILDING_ACTIONS = new Set([
   "Zelda: UI Layout",
 ]);
 
+/**
+ * Whether an action builds the map. Opening a title screen does (the title map shows it whenever
+ * it is entered); opening any other screen is something that happened, not part of the map.
+ */
+function buildsMap(name: string, params: unknown): boolean {
+  if (name === "Zelda: Open UI Screen") {
+    const screen = (params as { name?: unknown } | null)?.name;
+    return typeof screen === "string" && getToolkit().uiScreens.get(screen.trim())?.screen.role === "title";
+  }
+  return MAP_BUILDING_ACTIONS.has(name);
+}
+
 type Execute = (params: unknown, ctx: PluginContextLike) => void;
 interface Entry {
   name: string;
@@ -64,7 +76,7 @@ export function isReplayedSession(session: Session | null): boolean {
  * Called after every Zelda action with the session from before it ran.
  */
 export function recordMapAction(name: string, execute: Execute, params: unknown, ctx: PluginContextLike, sessionBefore: Session | null): void {
-  if (replaying || !MAP_BUILDING_ACTIONS.has(name)) return;
+  if (replaying || !buildsMap(name, params)) return;
   const scene = mapSceneOf(ctx) as object | null;
   const session = getToolkit().session;
   if (!scene || typeof scene !== "object" || sceneOf(session) !== scene) return;

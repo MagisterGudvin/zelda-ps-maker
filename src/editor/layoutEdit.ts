@@ -69,6 +69,8 @@ export interface DesignerSetup {
   sharing: "classic" | "thisMap" | "shared" | "project" | "conflict";
   /** The map that holds the project's shared HUD. */
   sharedMap: string;
+  /** For a screen: the HUD the game shows under it on this map (null: no HUD). */
+  under: UiLayout | null;
 }
 
 const screenOf = (a: ActionLike) => (typeof a.pluginParams?.name === "string" ? a.pluginParams.name.trim() : "");
@@ -119,6 +121,12 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
   const parsed = parseLayout(raw);
   const empty = { ...classicLayout(), elements: [] };
   const layout = parsed.layout ?? (screen ? empty : classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true }));
+  // Under a screen the game shows this map's HUD: its own ("This map only"), else the project's, else the classic one.
+  let under: UiLayout | null = null;
+  if (screen && start && sp.hud !== false) {
+    const own = hud && layoutAction(hud.action).thisMapOnly ? layoutAction(hud.action).raw : null;
+    under = parseLayout(own ?? shared?.raw ?? (hud ? layoutAction(hud.action).raw : "")).layout ?? classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true });
+  }
   const zoom = cameraZoom > 0 ? cameraZoom : Number(story?.gameConfig?.zoom) || 1;
   const gw = Number(story?.gameConfig?.width) || 1280;
   const gh = Number(story?.gameConfig?.height) || 720;
@@ -141,6 +149,7 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
     mapEvents: (map.storyEvents ?? []).filter((e) => e?.id && !e.hidden).map((e) => ({ id: e.id!, name: e.name || e.id! })),
     sharing,
     sharedMap: shared?.mapName ?? "",
+    under,
   };
 }
 
