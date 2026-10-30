@@ -141,3 +141,86 @@ test("Roc's Feather: enemies on the ground do not touch the player in the air", 
   r.run(200);
   assert.equal(r.tk.state.player.hp, hp);
 });
+
+test("Shovel: digs plain ground (a drop by chance, a dug patch), not walls or rocks; buried treasure comes up once and stays dug", () => {
+  const r = createRig({ items: { shovel: { drops: { chance: 1, entries: [{ item: "rupees", count: 5, weight: 1 }] } } } });
+  r.tk.inventory.give("shovel", 1, { silent: true });
+  r.tk.inventory.equip("shovel");
+  face(r, 1, 0);
+  const p = r.host.player!;
+  let dug = 0;
+  r.tk.bus.on("zelda:ground:dug", () => dug++);
+  r.host.input.tap("useItem");
+  r.step(2);
+  assert.equal(dug, 1);
+  assert.ok(r.session.world.list("pickup").length >= 1, "the ground gave a drop");
+  r.run(500);
+  // A rock in front: a clink, nothing dug.
+  createObject(r.session, "rock", p.x + 16, p.y, { id: "rock1" });
+  r.host.input.tap("useItem");
+  r.step(2);
+  assert.equal(dug, 1);
+  r.session.world.remove(r.session.world.get("rock1")!);
+  r.step();
+  // Buried treasure in front (Create Chest: Buried).
+  const spot = createObject(r.session, "buried", p.x + 12, p.y, { id: "buried@1", overrides: { contents: { item: "heart_container", count: 1 } } }) as any;
+  assert.equal(spot.visible, false, "unseen until dug");
+  const max = r.tk.state.player.maxHp;
+  r.run(400);
+  r.host.input.tap("useItem");
+  r.step(2);
+  assert.equal(r.tk.state.player.maxHp, max + r.tk.config.player.heartValue, "the treasure");
+  assert.equal(spot.objState, "revealed");
+  assert.equal(spot.visible, true, "the hole stays");
+  r.run(400);
+  r.host.input.tap("useItem");
+  r.step(2);
+  assert.equal(r.tk.state.player.maxHp, max + r.tk.config.player.heartValue, "only once");
+});
+
+test("Magic Powder: comes with 10 powder; a cloud in front hurts and stuns the enemy and lights the torch; one powder a use", () => {
+  const r = createRig();
+  r.tk.inventory.give("magic_powder", 1, { silent: true });
+  assert.equal(r.tk.inventory.count("powder"), 10);
+  r.tk.inventory.equip("magic_powder");
+  face(r, 1, 0);
+  const p = r.host.player!;
+  const enemy = spawnEnemy(r.session, "slime", p.x + 16, p.y - 4, { overrides: STILL }) as Enemy;
+  const torch = createObject(r.session, "torch", p.x + 16, p.y + 8, { id: "torch1" }) as any;
+  r.host.input.tap("useItem");
+  r.step(2);
+  assert.equal(enemy.hp, 20 - r.tk.config.items.powder.damage);
+  assert.equal(enemy.state, "stunned");
+  assert.equal(torch.objState, "lit");
+  assert.equal(r.tk.inventory.count("powder"), 9);
+});
+
+test("bomb arrows: the bow and the bombs on the two item buttons pressed together shoot an arrow that explodes; one alone, after a moment, is a plain arrow", () => {
+  const r = createRig({ combat: { bombsHurtPlayer: false } });
+  const inv = r.tk.inventory;
+  inv.give("bow", 1, { silent: true });
+  inv.give("arrows", 10, { silent: true });
+  inv.give("bombs", 5, { silent: true });
+  inv.assign(1, "bow");
+  inv.assign(2, "bomb");
+  face(r, 1, 0);
+  const p = r.host.player!;
+  const enemy = spawnEnemy(r.session, "slime", p.x + 60, p.y, { overrides: STILL }) as Enemy;
+  let exploded = 0;
+  r.tk.bus.on("zelda:bomb:exploded", () => exploded++);
+  r.host.input.tap("useItem");
+  r.host.input.tap("useItem2");
+  r.step();
+  assert.ok(r.session.world.list("projectile").some((e) => e.id.startsWith("bomb_arrow")), "a bomb arrow flies");
+  assert.deepEqual([inv.count("arrows"), inv.count("bombs")], [9, 4]);
+  r.run(600);
+  assert.equal(exploded, 1);
+  assert.equal(enemy.hp, 20 - r.tk.config.items.bomb.damage, "the explosion hit it");
+  r.run(500);
+  r.host.input.tap("useItem");
+  r.step();
+  assert.equal(r.session.world.list("projectile").filter((e) => !e.removed).length, 0, "waits for the other button first");
+  r.run(r.tk.config.items.bombArrow.comboMs + 50);
+  assert.ok(r.session.world.list("projectile").some((e) => e.id.startsWith("arrow")), "then a plain arrow");
+  assert.deepEqual([inv.count("arrows"), inv.count("bombs")], [8, 4]);
+});

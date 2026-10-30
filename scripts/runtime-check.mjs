@@ -326,20 +326,23 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   await page.keyboard.press("z");
   const advice = await hudHas("Hold V to raise the shield");
   await page.screenshot({ path: path.join(OUT, "villager-advice.png") });
+  // Then "You got Shovel!" and how to dig (two pages); Z through all of it.
   let open = true;
-  for (let i = 0; i < 6 && open; i++) {
+  for (let i = 0; i < 16 && open; i++) {
     await page.keyboard.press("z");
-    await wait(500);
-    open = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null);
+    await wait(450);
+    open = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null || window.ZeldaMakerToolkit.session.isPaused("message"));
   }
   await wait(800);
   const again = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null || window.ZeldaMakerToolkit.session.isPaused("message"));
+  const shovel = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.owns("shovel"));
+  expect(shovel, "the advice event did not give the shovel");
   expect(page1 && during.screen === "dialogue" && !during.psDialogue && during.paused, JSON.stringify(during));
   expect(texts.includes("Villager"), `texts ${texts.join(" | ")}`);
   expect(page2 && answers && view.choices.join() === "Any advice?,Bye!" && view.text.endsWith("what you need."), `page 2 ${page2}, answers ${answers}, ${JSON.stringify(view)}`);
   expect(advice, "his advice (the answer's event) did not show");
   expect(!open && !again, `still open ${open}, started again ${again}`);
-  return "name plate, 2 pages, answers on plates, advice from the event, closed, not started again";
+  return "name plate, 2 pages, answers on plates, advice from the event (and his shovel), closed, not started again";
 });
 /** The leaf element of the page that shows a text, with its font. */
 const textOnPage = (part) =>
@@ -464,22 +467,96 @@ await check("items as in Link's Awakening: Pegasus Boots and Roc's Feather from 
   const back = await speed();
   // The boots on C: hold it, run up, dash to the right.
   await putOn("boots", "c");
-  await tp(130, 64);
-  await hold("ArrowRight", 60);
-  await wait(200);
-  const x0 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
-  await page.keyboard.down("c");
-  await wait(600);
-  await page.screenshot({ path: path.join(OUT, "boots-dash.png") });
-  await page.keyboard.up("c");
-  await wait(200);
-  const x1 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
+  // Slimes wander onto the row: a hit during the dash stops it (knockback), so then it is tried again.
+  let x0 = 0;
+  let x1 = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await tp(130, 64);
+    await hold("ArrowRight", 60);
+    await wait(1200);
+    const hp0 = await ev(() => window.ZeldaMakerToolkit.toolkit.state.player.hp);
+    x0 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
+    await page.keyboard.down("c");
+    await wait(600);
+    await page.screenshot({ path: path.join(OUT, "boots-dash.png") });
+    await page.keyboard.up("c");
+    await wait(200);
+    x1 = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.x);
+    const hp1 = await ev(() => window.ZeldaMakerToolkit.toolkit.state.player.hp);
+    if (x1 - x0 > 25 || hp1 === hp0) break;
+  }
   expect(owned.every(Boolean), `owned ${owned}`);
   expect(slots[1] === "feather", `item buttons ${JSON.stringify(slots)}`);
   expect(lift.top - lift.base > 6 && Math.abs(lift.last - lift.base) < 0.5, `lift ${JSON.stringify(lift)}`);
   expect(Math.abs(shielded - base * 0.5) < 0.01 && back === base, `speed ${base} → ${shielded} → ${back}`);
   expect(x1 - x0 > 25, `dash ${x1 - x0}`);
   return `buttons C=${slots[0]}, B=${slots[1]}; jump ${(lift.top - lift.base).toFixed(1)} px; speed ${base} → ${shielded} → ${back}; dash ${Math.round(x1 - x0)} px`;
+});
+await check("the shovel digs up the Magic Powder buried below the start (Create Chest: Buried); the powder (10) is sprinkled; bow and bombs on C and B pressed together shoot a bomb arrow that explodes", async () => {
+  const putOn = async (item, key) => {
+    await page.keyboard.press("i");
+    await wait(400);
+    const target = await ev((item) => window.ZeldaMakerToolkit.session.screens.gridItems().indexOf(item), item);
+    for (let n = 0; n < 16; n++) {
+      const cur = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.cursor ?? -1);
+      if (cur === target || cur < 0) break;
+      await page.keyboard.press(cur < target ? "ArrowRight" : "ArrowLeft");
+      await wait(120);
+    }
+    await page.keyboard.press(key);
+    await wait(200);
+    await page.keyboard.press("i");
+    await wait(400);
+  };
+  const inv = () => ev(() => { const t = window.ZeldaMakerToolkit.toolkit; return { powderItem: t.inventory.owns("magic_powder"), powder: t.inventory.count("powder"), arrows: t.inventory.count("arrows"), bombs: t.inventory.count("bombs"), spot: window.ZeldaMakerToolkit.session.world.get("buried@48,172")?.objState }; });
+  await putOn("shovel", "c");
+  await tp(48, 154);
+  await hold("ArrowDown", 60);
+  await wait(200);
+  await page.keyboard.press("c");
+  await wait(900);
+  await page.screenshot({ path: path.join(OUT, "shovel-dug.png") });
+  await dismiss();
+  const dug = await inv();
+  await putOn("magic_powder", "c");
+  await tp(130, 64);
+  await hold("ArrowRight", 60);
+  await wait(200);
+  await page.keyboard.press("c");
+  await wait(150);
+  await page.screenshot({ path: path.join(OUT, "magic-powder.png") });
+  await wait(400);
+  const sprinkled = await inv();
+  // The bow from its chest; bow on C, bombs on B; both pressed together.
+  await tp(248, 62);
+  await hold("ArrowUp", 200);
+  await page.keyboard.press("z");
+  await wait(800);
+  await dismiss();
+  await putOn("bow", "c");
+  await putOn("bomb", "b");
+  await tp(130, 64);
+  await hold("ArrowRight", 60);
+  await wait(200);
+  const before = await inv();
+  await ev(() => {
+    window.__booms = 0;
+    window.ZeldaMakerToolkit.toolkit.bus.on("zelda:bomb:exploded", () => window.__booms++);
+  });
+  await page.keyboard.down("c");
+  await page.keyboard.down("b");
+  await wait(80);
+  await page.keyboard.up("c");
+  await page.keyboard.up("b");
+  await wait(250);
+  await page.screenshot({ path: path.join(OUT, "bomb-arrow.png") });
+  await wait(1200);
+  const after = await inv();
+  const booms = await ev(() => window.__booms);
+  expect(dug.powderItem && dug.powder === 10 && dug.spot === "revealed", `dug ${JSON.stringify(dug)}`);
+  expect(sprinkled.powder === 9, `powder ${sprinkled.powder}`);
+  expect(booms === 1 && after.arrows === before.arrows - 1 && after.bombs === before.bombs - 1, `booms ${booms}, ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+  return `Magic Powder dug up (10), sprinkled (9 left); a bomb arrow: 1 explosion, arrows ${before.arrows}→${after.arrows}, bombs ${before.bombs}→${after.bombs}`;
 });
 await check("I opens the inventory screen (UI Designer, role Inventory): the items in a grid of the demo's item boxes, the cursor, the selected item's name; arrows move it; I closes", async () => {
   const look = () =>

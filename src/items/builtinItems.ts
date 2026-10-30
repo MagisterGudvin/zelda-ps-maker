@@ -2,9 +2,12 @@ import { changeHealth, changeMagic } from "../player/health.ts";
 import type { DamageType } from "../core/types.ts";
 import type { FlagValue } from "../core/events.ts";
 import { AttackInstance, isDamageable, makeDamage, resolveHit } from "../combat/combat.ts";
-import { boxCircleOverlap, makeBox } from "../core/math.ts";
+import { boxCircleOverlap, makeBox, overlaps } from "../core/math.ts";
+import type { Session } from "../core/session.ts";
+import { Interactable } from "../interactions/interactable.ts";
+import { spawnDrop } from "./pickup.ts";
 import type { Entity } from "../core/entity.ts";
-import { Bomb } from "./bomb.ts";
+import { Bomb, explodeAt } from "./bomb.ts";
 import { Boomerang } from "./boomerang.ts";
 import { Projectile } from "./projectile.ts";
 import { spawnEffect } from "./effect.ts";
@@ -96,6 +99,50 @@ export function registerBuiltinItems(reg: ItemRegistry): void {
     quickUse: true,
     cooldownMs: (s) => s.config.items.feather.jumpMs + s.config.items.feather.cooldownMs,
     use: (ctx) => ctx.session.moves?.jump() ?? false,
+  });
+
+  // Bomb arrow: the bow and the bombs on the two item buttons pressed together (ItemSystem).
+  reg.register({
+    id: "bomb_arrow",
+    icon: "bomb_arrow",
+    quickUse: false,
+    requires: ["bow", "bomb"],
+    resource: "arrows",
+    cost: 1,
+    cooldownMs: 400,
+    useMs: 150,
+    maxActive: 1,
+    use: (ctx) => {
+      const inv = ctx.session.toolkit.inventory;
+      if (!inv.has("bombs", 1)) {
+        ctx.session.bus.emit("zelda:message", { text: ctx.session.i18n.t("msg.no_resource", { resource: inv.displayName("bombs") }), durationMs: 1200, kind: "hint" });
+        return false;
+      }
+      inv.spend("bombs", 1);
+      return ctx.session.world.add(new BombArrow(ctx.session, ctx));
+    },
+  });
+
+  // Shovel: digs the spot in front (buried treasure, else a chance of a drop); a hole stays a while.
+  reg.register({
+    id: "shovel",
+    icon: "icon_shovel",
+    quickUse: true,
+    cooldownMs: 300,
+    useMs: 250,
+    use: (ctx) => dig(ctx.session, ctx.frontX, ctx.frontY),
+  });
+
+  // Magic Powder: a cloud in front that hurts and stuns enemies, lights torches and burns bushes.
+  reg.register({
+    id: "magic_powder",
+    icon: "icon_magic_powder",
+    quickUse: true,
+    resource: "powder",
+    cost: 1,
+    cooldownMs: 400,
+    useMs: 200,
+    use: (ctx) => sprinklePowder(ctx),
   });
 
   reg.register({
@@ -235,4 +282,101 @@ function areaBurst(ctx: ItemUseContext, radius: number, damage: number, type: Da
   for (const t of areaFound) if (isDamageable(t) && boxCircleOverlap(t, ctx.x, ctx.y, radius)) resolveHit(t, info, attack);
   areaFound.length = 0;
   return true;
+}
+
+const digBox = makeBox();
+
+/**
+ * Digs at a point in front of the player. Map collision and solid objects cannot be dug (a clink);
+ * other objects there (a pit, a plate, a chest) are left alone. Buried treasure there comes up
+ * (Create Chest: Buried); elsewhere the ground gives a drop by chance (items.shovel.drops). A dug
+ * patch shows for a few seconds.
+ */
+export function dig(s: Session, x: number, y: number): boolean {
+  digBox.x = x;
+  digBox.y = y;
+  digBox.hw = 3;
+  digBox.hh = 3;
+  if (s.world.isBlocked(digBox, null)) {
+    spawnEffect(s, "spark", x, y, 120);
+    s.bus.emit("zelda:item:failed", { itemId: "shovel", reason: "blocked" });
+    return false;
+  }
+  digBox.hw = digBox.hh = 6;
+  let other = false;
+  for (const e of s.world.list("object")) {
+    if (e.removed || !(e instanceof Interactable) || !overlaps(e, digBox)) continue;
+    if (e.dig()) {
+      spawnEffect(s, "poof", x, y, 250, 0.8);
+      return true;
+    }
+    if (e.visible) other = true;
+  }
+  if (other) return false;
+  spawnEffect(s, "obj_dug", x, y, 5000, 1);
+  spawnEffect(s, "poof", x, y, 250, 0.8);
+  spawnDrop(s, x, y, s.config.items.shovel.drops);
+  s.bus.emit("zelda:ground:dug", { x, y });
+  return true;
+}
+
+const powderBox = makeBox();
+const powderFound: Entity[] = [];
+
+/** Magic Powder: enemies in the cloud take magic damage and are stunned; objects take fire (torches, bushes). */
+function sprinklePowder(ctx: ItemUseContext): boolean {
+  const s = ctx.session;
+  const c = s.config.items.powder;
+  const x = ctx.frontX + ctx.dirX * 4;
+  const y = ctx.frontY + ctx.dirY * 4;
+  spawnEffect(s, "powder_cloud", x, y, 450, (c.radius * 2) / 16);
+  powderBox.x = x;
+  powderBox.y = y;
+  powderBox.hw = c.radius;
+  powderBox.hh = c.radius;
+  powderFound.length = 0;
+  s.world.query(powderBox, powderFound, (e) => isDamageable(e) && (e.kind === "enemy" || e.kind === "object"));
+  const targets = powderFound.slice();
+  powderFound.length = 0;
+  const attack = new AttackInstance(1);
+  for (const t of targets) {
+    if (!isDamageable(t) || !boxCircleOverlap(t, x, y, c.radius)) continue;
+    const enemy = t.kind === "enemy";
+    resolveHit(t, makeDamage({ amount: enemy ? c.damage : 1, type: enemy ? "magic" : "fire", team: "player", sourceId: "player", originX: ctx.x, originY: ctx.y, knockback: 60, stunMs: enemy ? c.stunMs : 0 }), attack);
+  }
+  return true;
+}
+
+/**
+ * A bomb arrow: flies like an arrow and explodes like a bomb where it hits (a wall, an enemy, an
+ * object) or at the end of its range.
+ */
+export class BombArrow extends Projectile {
+  constructor(s: Session, ctx: ItemUseContext) {
+    const c = s.config.items.bow;
+    super(s, { team: "player", ownerId: "player", x: ctx.frontX, y: ctx.frontY, dirX: ctx.dirX, dirY: ctx.dirY, speed: c.speed, range: c.range, sprite: "bomb_arrow", size: 6, damage: 0, damageType: "arrow", knockback: 0 }, "bomb_arrow");
+  }
+
+  private boom(s: Session): void {
+    if (this.removed) return;
+    s.world.remove(this);
+    explodeAt(s, this.x, this.y, this.id);
+  }
+
+  /** Touching an enemy or an object sets it off (the explosion does the damage, not the arrow). */
+  protected override checkTargets(s: Session): void {
+    this.found.length = 0;
+    s.world.query(this, this.found, (e) => e !== this && isDamageable(e) && (e.kind === "enemy" || e.kind === "object"));
+    const hit = this.found.length > 0;
+    this.found.length = 0;
+    if (hit) this.boom(s);
+  }
+
+  protected override onWall(s: Session): void {
+    this.boom(s);
+  }
+
+  protected override onRangeEnd(s: Session): void {
+    this.boom(s);
+  }
 }

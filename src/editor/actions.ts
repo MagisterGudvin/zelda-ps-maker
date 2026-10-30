@@ -606,6 +606,7 @@ const createChest = defineEvent({
     count: num("Count", "How many (rupees, bombs, arrows...). / Сколько.", 1),
     requiresBigKey: bool("Needs Big Key", "Big chest that needs the dungeon's Big Key.", false),
     hidden: bool("Hidden", "Starts invisible; reveal it with a rule or Zelda: Change Object (reveal).", false),
+    buried: bool("Buried", "No chest: the item is buried here, unseen, and the shovel digs it up (the hole stays). / Закопан: выкапывается лопатой.", false),
     look: mapObjectField("Look: closed", "A map object of your library for the closed chest. Built-in = the toolkit's chest. / Вид закрытого сундука."),
     lookOpen: mapObjectField("Look: open", "Map object for the opened chest. / Вид открытого сундука."),
   },
@@ -614,8 +615,11 @@ const createChest = defineEvent({
       const at = where(s, params.position, "Create Chest");
       if (!at) return;
       const overrides: Partial<ObjectConfig> = { contents: params.item ? { item: params.item, count: Math.max(1, params.count || 1) } : null, requires: params.requiresBigKey ? { bigKey: true } : {}, hidden: !!params.hidden };
+      // Buried: no chest, an unseen spot the shovel digs up (its hole stays, its item is given like a chest's).
+      const type = (params as Record<string, unknown>).buried === true ? "buried" : "chest";
+      if (type === "buried") delete overrides.hidden;
       applyObjectLook(s, overrides, params.look, params.lookOpen, "Create Chest", false);
-      createObject(s, "chest", at.x, at.y, { id: idFor(s, params, "chest", at.x, at.y), overrides });
+      createObject(s, type, at.x, at.y, { id: idFor(s, params, type, at.x, at.y), overrides });
     });
   },
 });

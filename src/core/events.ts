@@ -32,7 +32,7 @@ export interface ZeldaEventMap {
   "zelda:player:died": { mapId: string };
   "zelda:player:respawned": { x: number; y: number };
   "zelda:item:used": { itemId: string };
-  "zelda:item:failed": { itemId: string; reason: "noResource" | "cooldown" | "disabled" | "busy" | "maxActive" | "notOwned" };
+  "zelda:item:failed": { itemId: string; reason: "noResource" | "cooldown" | "disabled" | "busy" | "maxActive" | "notOwned" | "blocked" };
   "zelda:item:collected": { itemId: string; count: number; total: number };
   /** An item was put on an item button (slot 1 = useItem, 2 = useItem2). */
   "zelda:item:equipped": { itemId: string | null; slot?: 1 | 2 };
@@ -54,6 +54,10 @@ export interface ZeldaEventMap {
   "zelda:bomb:exploded": { x: number; y: number };
   "zelda:switch:activated": { switchId: string; on: boolean };
   "zelda:chest:opened": { chestId: string; itemId: string | null; count: number };
+  /** The shovel dug up buried treasure (Create Chest: Buried). */
+  "zelda:object:dug": { objectId: string; itemId: string | null; count: number };
+  /** The shovel dug plain ground. */
+  "zelda:ground:dug": { x: number; y: number };
   "zelda:door:unlocked": { doorId: string; lock: string };
   "zelda:door:opened": { doorId: string };
   "zelda:door:closed": { doorId: string };

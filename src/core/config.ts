@@ -208,6 +208,12 @@ export interface ToolkitConfig {
     boots: { chargeMs: number; speed: number; bounce: number };
     /** Roc's Feather: a jump over pits, spikes and enemies on the ground. */
     feather: { jumpMs: number; height: number; cooldownMs: number };
+    /** Shovel: digs the ground in front; buried treasure (Create Chest: Buried) or, by chance, a drop. */
+    shovel: { drops: DropTable };
+    /** Magic Powder: a cloud in front that hurts and stuns enemies and lights torches and burns bushes. */
+    powder: { damage: number; radius: number; stunMs: number };
+    /** Bomb arrows: the bow and the bombs on the two item buttons, both pressed together (within comboMs). */
+    bombArrow: { comboMs: number };
     thrown: { speed: number; range: number; damage: number };
   };
   inventory: {
@@ -385,11 +391,14 @@ export function createDefaultConfig(): ToolkitConfig {
       healingSpell: { magicCost: 8, heal: 2 },
       boots: { chargeMs: 300, speed: 190, bounce: 90 },
       feather: { jumpMs: 480, height: 10, cooldownMs: 120 },
+      shovel: { drops: { chance: 0.2, entries: [{ item: "rupees", count: 1, weight: 6 }, { item: "rupees", count: 5, weight: 1 }, { item: "heart", weight: 3 }] } },
+      powder: { damage: 2, radius: 14, stunMs: 800 },
+      bombArrow: { comboMs: 100 },
       thrown: { speed: 200, range: 64, damage: 2 },
     },
     inventory: {
-      capacities: { bombs: 10, arrows: 30, rupees: 999 },
-      order: ["bow", "boomerang", "bomb", "boots", "feather", "fire_rod", "healing_spell"],
+      capacities: { bombs: 10, arrows: 30, rupees: 999, powder: 20 },
+      order: ["bow", "boomerang", "bomb", "boots", "feather", "shovel", "magic_powder", "fire_rod", "healing_spell"],
       autoEquipFirst: true,
       autoEquipSecond: true,
     },

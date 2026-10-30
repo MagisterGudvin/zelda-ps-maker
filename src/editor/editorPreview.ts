@@ -169,8 +169,10 @@ export function previewItems(map: MapLike, story: PsStory | null): PreviewItem[]
       }
       case "Zelda: Create Chest": {
         const cfg = resolveObjectConfig("chest");
-        const lk = objectLook(p.look, "obj_chest", { w: cfg.width, h: cfg.height });
-        if (at) items.push({ kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, alpha: p.hidden === true ? 0.5 : 1, label: textOf(p.item), box: lk.box, boxIn: lk.boxIn, ref });
+        // Buried treasure: the dug patch, faint (unseen in the game until the shovel digs it).
+        const buried = p.buried === true;
+        const lk = objectLook(buried ? "" : p.look, buried ? "obj_dug" : "obj_chest", { w: cfg.width, h: cfg.height });
+        if (at) items.push({ kind: "sprite", sprite: lk.sprite, x: at.x, y: at.y, alpha: p.hidden === true || buried ? 0.5 : 1, label: buried ? `buried: ${textOf(p.item)}` : textOf(p.item), box: lk.box, boxIn: lk.boxIn, ref });
         break;
       }
       case "Zelda: Create Door": {

@@ -205,11 +205,11 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => join([show("type") ?? "bush", isPoint(p.position) && show("position")]),
   },
   "Zelda: Create Chest": {
-    keywords: ["chest", "treasure", "loot", "reward", "box"],
+    keywords: ["chest", "treasure", "loot", "reward", "box", "buried", "dig", "shovel"],
     fields: { position: { required: true }, count: { min: 1, step: 1 }, look: { group: "Look" }, lookOpen: { group: "Look" } },
-    visible: { count: (p) => countable(p.item) },
     collapsed: ["Look"],
-    preview: (p, show) => join([`${countable(p.item) && Number(p.count) > 1 ? `${p.count} ` : ""}${show("item") ?? "key"}`, p.requiresBigKey === true && "big chest", p.hidden === true && "hidden"]),
+    visible: { count: (p) => countable(p.item), look: (p) => p.buried !== true, lookOpen: (p) => p.buried !== true, hidden: (p) => p.buried !== true, requiresBigKey: (p) => p.buried !== true },
+    preview: (p, show) => join([`${countable(p.item) && Number(p.count) > 1 ? `${p.count} ` : ""}${show("item") ?? "key"}`, p.requiresBigKey === true && "big chest", p.hidden === true && "hidden", p.buried === true && "buried"]),
   },
   "Zelda: Create Door": {
     keywords: ["door", "gate", "shutter", "lock", "boss door"],

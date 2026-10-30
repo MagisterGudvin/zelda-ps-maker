@@ -210,6 +210,12 @@ const DEFS: Record<string, SpriteDef> = {
   poof: { w: 12, h: 12, paint: (c) => (circle(c, 4, 6, 3.5, "#e6e6e6"), circle(c, 8, 5, 3.5, "#f5f5f5"), circle(c, 6, 8, 3, "#cfcfcf")) },
   sparkle: { w: 12, h: 12, paint: (c) => (poly(c, [6, 0, 7, 5, 12, 6, 7, 7, 6, 12, 5, 7, 0, 6, 5, 5], "#9effa0"), circle(c, 6, 6, 1.5, "#fff")) },
   boomerang: { w: 10, h: 10, paint: (c) => (poly(c, [1, 1, 9, 1, 9, 4, 4, 4, 4, 9, 1, 9], "#b5622b"), rect(c, 2, 2, 6, 1, "#e8a066")) },
+  // An arrow with a bomb for a head.
+  bomb_arrow: { w: 16, h: 16, paint: (c) => (rect(c, 1, 7, 9, 2, "#c8a26a"), rect(c, 0, 6, 2, 1, "#e8e8e8"), rect(c, 0, 9, 2, 1, "#e8e8e8"), circle(c, 12, 8, 3.5, "#1b1f3a"), rect(c, 12, 3, 1, 2, "#ff9a2e")) },
+  // A patch of dug-up earth (shovel).
+  obj_dug: { w: 16, h: 16, paint: (c) => (circle(c, 8, 9, 6, "#5a3a1e"), circle(c, 8, 9, 4, "#3a2412"), rect(c, 2, 4, 2, 1, "#7a5a32"), rect(c, 12, 13, 2, 1, "#7a5a32")) },
+  // A cloud of magic powder.
+  powder_cloud: { w: 16, h: 16, paint: (c) => (circle(c, 8, 8, 6, "#c8a8f0"), circle(c, 5, 6, 3, "#e8d8ff"), circle(c, 11, 10, 3, "#e8d8ff"), rect(c, 3, 11, 1, 1, "#fff6b0"), rect(c, 12, 4, 1, 1, "#fff6b0")) },
   arrow: {
     w: 14,
     h: 4,
@@ -379,6 +385,10 @@ const DEFS: Record<string, SpriteDef> = {
   icon_boots: { w: 16, h: 16, paint: (c) => (rect(c, 5, 3, 5, 9, "#8a4b22"), rect(c, 5, 10, 9, 4, "#8a4b22"), rect(c, 5, 13, 9, 1, "#4a2a10"), poly(c, [10, 4, 15, 2, 14, 5, 11, 7], "#f0f0f0")) },
   // Roc's Feather: a long feather, its quill across.
   icon_feather: { w: 16, h: 16, paint: (c) => (poly(c, [3, 14, 6, 9, 11, 3, 14, 2, 13, 6, 8, 11], "#e8e0c8"), poly(c, [3, 14, 13, 3, 13.6, 3.6, 3.6, 14.6], "#9a7a4a")) },
+  // Shovel: a wooden handle and a grey blade.
+  icon_shovel: { w: 16, h: 16, paint: (c) => (poly(c, [10, 2, 12, 2, 6, 10, 4, 10], "#8a5a2b"), poly(c, [3, 9, 7, 9, 7, 13, 5, 15, 3, 13], "#b8c0c8")) },
+  // Magic Powder: a small sack with sparkles.
+  icon_magic_powder: { w: 16, h: 16, paint: (c) => (circle(c, 8, 10, 5, "#7a4fb5"), rect(c, 6, 4, 4, 3, "#7a4fb5"), rect(c, 6, 6, 4, 1, "#e8d070"), rect(c, 12, 2, 1, 1, "#fff6b0"), rect(c, 3, 3, 1, 1, "#fff6b0"), rect(c, 13, 6, 1, 1, "#fff6b0")) },
   icon_glove: { w: 16, h: 16, paint: (c) => (rect(c, 3, 6, 10, 8, "#c9a227"), rect(c, 3, 2, 2, 5, "#c9a227"), rect(c, 6, 1, 2, 5, "#c9a227"), rect(c, 9, 1, 2, 5, "#c9a227")) },
   icon_bomb: { w: 16, h: 16, paint: (c) => (circle(c, 8, 9, 6, "#1b1f3a"), circle(c, 6, 7, 2, "#5a6390"), rect(c, 8, 1, 1, 3, "#c9a24a"), rect(c, 9, 1, 1, 1, "#ff9a2e")) },
   icon_boomerang: { w: 16, h: 16, paint: (c) => poly(c, [2, 2, 14, 2, 14, 6, 6, 6, 6, 14, 2, 14], "#b5622b") },

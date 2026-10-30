@@ -8,7 +8,10 @@ export interface GiveOptions {
 }
 
 /** Stackable resources and the item that becomes owned with them. */
-const RESOURCE_UNLOCKS: Record<string, string> = { bombs: "bomb" };
+const RESOURCE_UNLOCKS: Record<string, string> = { bombs: "bomb", powder: "magic_powder" };
+
+/** Items that come with some of their resource the first time they are got (a bag of Magic Powder). */
+const ITEM_COMES_WITH: Record<string, [string, number]> = { magic_powder: ["powder", 10] };
 
 /**
  * Inventory model operating on the persistent `GameState`. Works without a
@@ -118,6 +121,8 @@ export class Inventory {
         } else {
           // Already-owned items apply 0 but still emit `item:collected` below.
           applied = this.addOwned(id) ? 1 : 0;
+          const comes = ITEM_COMES_WITH[id];
+          if (applied && comes) this.setCount(comes[0], (this.inv.counts[comes[0]] ?? 0) + comes[1]);
         }
     }
     tk.bus.emit("zelda:item:collected", { itemId: id, count: n, total: this.count(id) });

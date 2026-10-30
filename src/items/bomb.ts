@@ -10,11 +10,9 @@ import { spawnEffect } from "./effect.ts";
  * Bombs are team "neutral" so they hit everyone in range exactly once.
  */
 export class Bomb extends Entity {
-  private fuseMs: number;
+  fuseMs: number;
   private readonly fuseTotal: number;
   private readonly attack = new AttackInstance(1);
-  private readonly found: Entity[] = [];
-  private readonly area = makeBox();
 
   constructor(session: Session, x: number, y: number) {
     super(session.world.nextId("bomb"), "projectile", x, y, 10, 10);
@@ -34,31 +32,47 @@ export class Bomb extends Entity {
 
   explode(session: Session): void {
     if (this.removed) return;
-    const cfg = session.config.items.bomb;
-    const r = cfg.radius;
-    spawnEffect(session, "explosion", this.x, this.y, 350, (r * 2) / 16);
-    session.bus.emit("zelda:bomb:exploded", { x: this.x, y: this.y });
-    this.area.x = this.x;
-    this.area.y = this.y;
-    this.area.hw = r;
-    this.area.hh = r;
-    const found = this.found;
-    found.length = 0;
-    session.world.query(this.area, found, (e) => e !== this && isDamageable(e));
-    const info = makeDamage({ amount: cfg.damage, type: "bomb", team: "neutral", sourceId: this.id, originX: this.x, originY: this.y, knockback: cfg.knockback });
-    for (const target of found) {
-      if (!isDamageable(target) || !boxCircleOverlap(target, this.x, this.y, r)) continue;
-      resolveHit(target, info, this.attack);
-    }
-    found.length = 0;
-    // Chain reaction: other bombs in range go off immediately.
-    for (const other of session.world.list("projectile")) {
-      if (other instanceof Bomb && other !== this && !other.removed && boxCircleOverlap(other, this.x, this.y, r)) other.fuseMs = Math.min(other.fuseMs, 1);
-    }
-    const player = session.player;
-    if (session.config.combat.bombsHurtPlayer && player.present && boxCircleOverlap(player.hurtbox, this.x, this.y, r)) {
-      player.applyDamage(cfg.playerDamage, { type: "bomb", sourceId: this.id, originX: this.x, originY: this.y, knockback: cfg.knockback });
-    }
+    explodeAt(session, this.x, this.y, this.id, this.attack);
     session.world.remove(this);
+  }
+
+  /** Lights the fuse to go off now (another explosion in range). */
+  goOff(): void {
+    this.fuseMs = Math.min(this.fuseMs, 1);
+  }
+}
+
+const area = makeBox();
+const found: Entity[] = [];
+
+/**
+ * A bomb's explosion at a point (a placed bomb, a bomb arrow): damages enemies, breaks objects
+ * that accept the "bomb" tool, sets off other bombs in range and (optionally) hurts the player.
+ */
+export function explodeAt(session: Session, x: number, y: number, sourceId: string, attack = new AttackInstance(1)): void {
+  const cfg = session.config.items.bomb;
+  const r = cfg.radius;
+  spawnEffect(session, "explosion", x, y, 350, (r * 2) / 16);
+  session.bus.emit("zelda:bomb:exploded", { x, y });
+  area.x = x;
+  area.y = y;
+  area.hw = r;
+  area.hh = r;
+  found.length = 0;
+  session.world.query(area, found, (e) => e.id !== sourceId && isDamageable(e));
+  const info = makeDamage({ amount: cfg.damage, type: "bomb", team: "neutral", sourceId, originX: x, originY: y, knockback: cfg.knockback });
+  const targets = found.slice();
+  found.length = 0;
+  for (const target of targets) {
+    if (!isDamageable(target) || !boxCircleOverlap(target, x, y, r)) continue;
+    resolveHit(target, info, attack);
+  }
+  // Chain reaction: other bombs in range go off immediately.
+  for (const other of session.world.list("projectile")) {
+    if (other instanceof Bomb && other.id !== sourceId && !other.removed && boxCircleOverlap(other, x, y, r)) other.goOff();
+  }
+  const player = session.player;
+  if (session.config.combat.bombsHurtPlayer && player.present && boxCircleOverlap(player.hurtbox, x, y, r)) {
+    player.applyDamage(cfg.playerDamage, { type: "bomb", sourceId, originX: x, originY: y, knockback: cfg.knockback });
   }
 }

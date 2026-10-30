@@ -293,6 +293,17 @@ export class Interactable extends Entity implements Damageable {
     }
   }
 
+  /** The shovel digs here: buried treasure comes up (once; the hole stays), its item given like a chest's. */
+  dig(): boolean {
+    if (this.cfg.type !== "buried" || this.objState !== "hidden") return false;
+    const s = this.session;
+    const c = this.cfg.contents;
+    this.setState("revealed");
+    s.bus.emit("zelda:object:dug", { objectId: this.id, itemId: c?.item ?? null, count: c?.count ?? 0 });
+    if (c && c.item) s.toolkit.inventory.give(c.item, c.count ?? 1);
+    return true;
+  }
+
   close(): void {
     if (this.cfg.type !== "door" || (this.objState !== "opened" && this.objState !== "unlocked")) return;
     // Don't trap the player inside a closing door: wait until they step out.

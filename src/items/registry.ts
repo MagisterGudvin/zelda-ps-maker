@@ -46,6 +46,8 @@ export interface ItemDefinition {
   maxActive?: number | ((s: Session) => number);
   /** How long the player is busy (movement locked) after using it. */
   useMs?: number;
+  /** Owned items it needs instead of itself (a bomb arrow: the bow and the bombs). */
+  requires?: string[];
   /** Resource shown next to the item in the HUD (defaults to `resource`). */
   counter?: string;
   use?(ctx: ItemUseContext): ItemUseResult;

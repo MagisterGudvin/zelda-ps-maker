@@ -21,7 +21,7 @@ const DEATH_ANIM_MS = 1000;
  */
 const WALK_GRACE_MS = 120;
 /** Item ids with their own animation slot (others use `item`). */
-const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb"> = { bow: "bow", boomerang: "boomerang", bomb: "bomb" };
+const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb"> = { bow: "bow", bomb_arrow: "bow", boomerang: "boomerang", bomb: "bomb" };
 
 /**
  * Wraps the PS Maker player Actor. Movement stays under PS Maker's control;
@@ -99,6 +99,9 @@ export class PlayerSystem implements SessionSystem, Damageable {
       session.bus.on("zelda:object:lifted", () => this.playPose(sp().lift, POSE_MIN_MS)),
       session.bus.on("zelda:object:thrown", () => this.playPose(sp().throw, POSE_MIN_MS)),
       session.bus.on("zelda:chest:opened", ({ itemId }) => {
+        if (itemId) this.playPose(sp().itemGet, ITEM_GET_MS, true);
+      }),
+      session.bus.on("zelda:object:dug", ({ itemId }) => {
         if (itemId) this.playPose(sp().itemGet, ITEM_GET_MS, true);
       }),
     );

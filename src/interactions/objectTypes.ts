@@ -21,7 +21,8 @@ export type ObjectType =
   | "reactive"
   | "spikes"
   | "pit"
-  | "sign";
+  | "sign"
+  | "buried";
 
 export const OBJECT_TYPES: readonly ObjectType[] = [
   "bush",
@@ -43,6 +44,7 @@ export const OBJECT_TYPES: readonly ObjectType[] = [
   "spikes",
   "pit",
   "sign",
+  "buried",
 ];
 
 export type DoorLock = "none" | "small_key" | "big_key" | "switch";
@@ -175,6 +177,8 @@ const PRESETS: Record<ObjectType, Partial<ObjectConfig>> = {
   spikes: { sprite: "obj_spikes", activeSprite: "obj_spikes", solid: false, hazardDamage: 1 },
   pit: { sprite: "obj_pit", activeSprite: "obj_pit", solid: false, hazardDamage: 1 },
   sign: { sprite: "obj_sign", activeSprite: "obj_sign", actionable: true },
+  // Buried treasure (Create Chest: Buried): unseen until the shovel digs it up; the hole stays.
+  buried: { sprite: "obj_dug", activeSprite: "obj_dug", solid: false, hidden: true, persistent: true },
 };
 
 export function isObjectType(v: unknown): v is ObjectType {

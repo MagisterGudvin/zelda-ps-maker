@@ -207,7 +207,13 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     ],
   };
   // The villager's advice: a project event run by his answer "Any advice?".
-  globalStoryEvents.push({ name: "Villager: advice", id: VILLAGER_HINT_EVENT, actions: [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_HINT })], hidden: false });
+  // ... and he gives his shovel: the Magic Powder is buried below the start (Create Chest: Buried on the field).
+  globalStoryEvents.push({
+    name: "Villager: advice",
+    id: VILLAGER_HINT_EVENT,
+    actions: [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_HINT }), pluginAction("Zelda: Give Item", { item: "shovel", count: 1 }), pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_DIG })],
+    hidden: false,
+  });
   // Short notes ("You got 5 bombs!", "Saved"): a small plate under the HUD, one per note.
   const notificationLayout = {
     v: 1,
@@ -532,6 +538,7 @@ const VILLAGER = { x: 80, y: 118 };
 /** The villager's answer "Any advice?" runs this project event. */
 const VILLAGER_HINT_EVENT = "zelda-villager-advice";
 const VILLAGER_HINT = "Hold V to raise the shield: it stops the shots of the fiery slime in the lower right. The shield is in the chest under the sign.";
+const VILLAGER_DIG = "Take my old shovel. I buried a bag of Magic Powder two steps below where you started. Dig there!\\n\\nShoot an arrow with a bomb: put the bow and the bombs on C and B and press both.";
 
 /** What the villager says (Zelda: Dialogue: "\\n" typed in the field is a new line, two of them a new page). */
 const VILLAGER_TEXT = "It's dangerous out there. Slimes in the grass, and a knight by the gate.\\n\\nRead the sign for the controls. The chests hold what you need.";

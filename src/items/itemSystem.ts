@@ -41,13 +41,46 @@ export class ItemSystem implements SessionSystem {
       this.busyMs -= dtMs;
       if (this.busyMs <= 0) this.s.player.unlock("item");
     }
-    // Two item buttons, each with its own item (chosen with Q/E or in the inventory screen).
-    for (const [button, slot] of [["useItem", 1], ["useItem2", 2]] as const) {
-      if (!this.s.host.input.pressed(button)) continue;
-      const id = this.s.toolkit.inventory.slotItem(slot);
-      if (id) this.use(id, { button });
-    }
+    this.readButtons(dtMs);
   }
+
+  /**
+   * Two item buttons, each with its own item (chosen with Q/E or in the inventory screen). With the
+   * bow on one and the bombs on the other, both pressed together (within items.bombArrow.comboMs,
+   * or one pressed while the other is held) shoot a bomb arrow; one alone waits that long first.
+   */
+  private readButtons(dtMs: number): void {
+    const input = this.s.host.input;
+    const inv = this.s.toolkit.inventory;
+    const first = inv.slotItem(1);
+    const second = inv.slotItem(2);
+    const paired = (first === "bow" && second === "bomb") || (first === "bomb" && second === "bow");
+    const p1 = input.pressed("useItem");
+    const p2 = input.pressed("useItem2");
+    if (!paired) {
+      this.waiting = null;
+      if (p1 && first) this.use(first, { button: "useItem" });
+      if (p2 && second) this.use(second, { button: "useItem2" });
+      return;
+    }
+    const both = (p1 && (p2 || input.isDown("useItem2") || this.waiting?.button === "useItem2")) || (p2 && (input.isDown("useItem") || this.waiting?.button === "useItem"));
+    if (both) {
+      this.waiting = null;
+      this.use("bomb_arrow", { button: p1 ? "useItem" : "useItem2" });
+      return;
+    }
+    if (p1 || p2) this.waiting ??= { button: p1 ? "useItem" : "useItem2", ms: this.s.config.items.bombArrow.comboMs };
+    if (!this.waiting) return;
+    this.waiting.ms -= dtMs;
+    if (this.waiting.ms > 0) return;
+    const button = this.waiting.button;
+    this.waiting = null;
+    const id = inv.slotItem(button === "useItem" ? 1 : 2);
+    if (id) this.use(id, { button });
+  }
+
+  /** A press of one of the paired buttons (bow and bombs) waiting for the other (bomb arrow). */
+  private waiting: { button: "useItem" | "useItem2"; ms: number } | null = null;
 
   /** Number of live entities created by this item (bombs on screen, boomerangs in flight). */
   activeCount(itemId: string): number {
@@ -66,7 +99,7 @@ export class ItemSystem implements SessionSystem {
     const def = s.toolkit.items.get(itemId);
     const inv = s.toolkit.inventory;
     if (!def || !def.use) return this.fail(itemId, "notOwned");
-    if (!options.free && !inv.owns(itemId)) return this.fail(itemId, "notOwned");
+    if (!options.free && !(def.requires ?? [itemId]).every((id) => inv.owns(id))) return this.fail(itemId, "notOwned");
     if (!inv.isAbilityEnabled(itemId)) return this.fail(itemId, "disabled");
     const p = s.player;
     if (!p.present || p.isDead || p.isKnockedBack || this.busyMs > 0 || s.sword?.isBusy() || s.interactions?.isCarrying() || s.moves?.isDashing) return this.fail(itemId, "busy");
