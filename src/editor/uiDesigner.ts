@@ -3,7 +3,7 @@ import { fontFamilyCss, type PsStory } from "../host/psmakerAssets.ts";
 import { ensureProjectFont } from "../host/projectFonts.ts";
 import { anchorPoint, classicLayout, MESSAGE_KINDS, offsetFrom, type Box, type ElementType, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 import { DesignerPanel, TYPE_ITEMS, type MenuItem } from "./designerPanel.ts";
-import { projectUi } from "./projectUi.ts";
+import { projectUi, usedInstead } from "./projectUi.ts";
 import {
   History,
   LAYOUT_FIELD_LABEL,
@@ -57,7 +57,7 @@ const ROLE_NAMES: Record<string, string> = {
   title: " (title screen, no HUD)",
 };
 /** The screen name a HUD gets when it is given a role in the designer. */
-const ROLE_SCREEN_NAMES: Record<string, string> = { none: "screen", menu: "pause", message: "message", dialogue: "dialogue", notification: "notification", inventory: "inventory", title: "title" };
+const ROLE_SCREEN_NAMES: Record<string, string> = { none: "screen", title: "title" };
 const SAVE_DELAY_MS = 250;
 /** A map update that does not match what the designer wrote this long after its write is someone else's. */
 const ECHO_MS = 2000;
@@ -90,6 +90,7 @@ export class UiDesigner {
   private readonly host: DesignerHost;
   private readonly painter: LayoutPainter;
   private readonly underPainter: LayoutPainter;
+  private noteShown = "";
   private readonly frameG: any;
   private readonly label: any;
   private setup: DesignerSetup | null = null;
@@ -149,7 +150,10 @@ export class UiDesigner {
     // "This map only" ticked or another shared HUD added: the panel's note changes.
     const resharing = setup?.sharing !== this.setup?.sharing || setup?.screen !== this.setup?.screen;
     this.setup = setup;
-    if (resharing && this.layout) this.panel.render();
+    // The note at the top of the panel follows the project (another layout of the same role added, a role changed).
+    const note = setup ? this.sharingNote.text : "";
+    if ((resharing || note !== this.noteShown) && this.layout) this.panel.render();
+    this.noteShown = note;
     if (setup && editing && setup.action) {
       this.panel.show();
       if (!this.layout || this.ref !== setup.action.id) {
@@ -205,10 +209,14 @@ export class UiDesigner {
   get sharingNote(): { text: string; warn: boolean } {
     const st = this.setup;
     if (!st) return { text: "", warn: false };
-    if (st.screen) return { text: "A screen: it opens on any map of the project.", warn: false };
+    if (st.screen) {
+      const other = st.action ? usedInstead(this.host.story() as Parameters<typeof usedInstead>[0], st.action.id) : null;
+      if (other) return { text: `Not used in the game: the ${other.what} on map "${other.mapName}" is the one used (the first by map order, as for every role). Give this one another role, or delete it.`, warn: true };
+      return { text: "A screen: it works on every map of the project.", warn: false };
+    }
     if (st.sharing === "thisMap") return { text: "The HUD of this map only (This map only is ticked).", warn: false };
     if (st.sharing === "conflict")
-      return { text: `Not shown in the game: the project's shared HUD is the one on map "${st.sharedMap}". Edit that one, delete this action, or tick "This map only" in its settings to keep it for this map.`, warn: true };
+      return { text: `Not used in the game: the HUD on map "${st.sharedMap}" is the one used (the first by map order, as for every role). Give this one another role, delete it, or tick "This map only" in its settings to keep it for this map.`, warn: true };
     return { text: "The HUD of every map that has no HUD of its own.", warn: false };
   }
 
@@ -326,29 +334,28 @@ export class UiDesigner {
   }
 
   /**
-   * The Role list: the HUD is a layout without a screen name, a screen has one. Turning one into the
-   * other writes the action's Screen name field (as typing in it would); a screen's role is in its layout.
+   * The Role list: what the layout is — the HUD or a screen with a role — is its role, like every
+   * other role. Only a plain or title screen, which Open UI Screen opens by name, needs a screen
+   * name: one without gets its role's name (numbered when the project has it) in the action's
+   * Screen name field, as typing it there would.
    */
   setRole(role: string): void {
     const L = this.layout;
-    if (!L) return;
-    if (role === "hud") {
-      if (!this.isScreen) return;
-      this.change({ ...cloneLayout(L), screen: { ...L.screen, role: "none" } });
-      this.flush();
-      if (!writeFormText(this.win.document, UI_LAYOUT_ACTION, SCREEN_FIELD_LABEL, "")) this.panel.status(`Not changed: the "${SCREEN_FIELD_LABEL}" field of ${UI_LAYOUT_ACTION} was not found.`);
-      return;
-    }
+    const st = this.setup;
+    if (!L || !st) return;
     const roleOf = role as UiLayout["screen"]["role"];
-    if (this.isScreen) return this.setField("screen.role", roleOf);
-    // A HUD becomes a screen: the name of its role, numbered when the project has a screen of that name.
-    const taken = new Set(projectUi(this.host.story() as Parameters<typeof projectUi>[0]).screens.map((x) => x.name));
-    const base = ROLE_SCREEN_NAMES[role] ?? "screen";
-    let name = base;
-    for (let n = 2; taken.has(name); n++) name = `${base}${n}`;
-    this.change({ ...cloneLayout(L), screen: { ...L.screen, role: roleOf, dim: role === "notification" || role === "title" ? "" : L.screen.dim } });
+    const wasHud = !this.isScreen;
+    if (roleOf === (wasHud ? "hud" : L.screen.role)) return;
+    const dim = wasHud && (role === "notification" || role === "title") ? "" : L.screen.dim;
+    this.change({ ...cloneLayout(L), screen: { ...L.screen, role: roleOf, dim } }, { rebuild: true });
     this.flush();
-    if (!writeFormText(this.win.document, UI_LAYOUT_ACTION, SCREEN_FIELD_LABEL, name)) this.panel.status(`Not changed: the "${SCREEN_FIELD_LABEL}" field of ${UI_LAYOUT_ACTION} was not found.`);
+    if ((role === "none" || role === "title") && !st.name) {
+      const taken = new Set(projectUi(this.host.story() as Parameters<typeof projectUi>[0]).screens.map((x) => x.name));
+      const base = ROLE_SCREEN_NAMES[role] ?? "screen";
+      let name = base;
+      for (let n = 2; taken.has(name); n++) name = `${base}${n}`;
+      if (!writeFormText(this.win.document, UI_LAYOUT_ACTION, SCREEN_FIELD_LABEL, name)) this.panel.status(`Not changed: the "${SCREEN_FIELD_LABEL}" field of ${UI_LAYOUT_ACTION} was not found.`);
+    }
   }
 
   /** The game window in layout pixels. */
@@ -526,7 +533,7 @@ export class UiDesigner {
     const values = this.layout ? sampleValues(layout, st.start) : st.values;
     // Inventory grids show a few built-in item icons, the cursor on the bow (the sample {inv.name}).
     const inventory = { cells: ["sword", "bow", "bomb", "boomerang"].map((id) => ({ icon: layout.theme.icons[id] || `icon_${id}`, count: id === "bow" ? 30 : id === "bomb" ? 10 : null })), cursor: 1 };
-    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory });
+    this.painted = this.painter.paint(layout, values, this.fonts(layout), { x: f.x, y: f.y, w: f.w, h: f.h, k }, { inventory, choices: { items: ["Yes", "No"], cursor: 0 } });
     this.painter.end();
     const under = st.screen && layout.screen.role !== "title" ? st.under : null;
     if (under) this.underPainter.paint(under, sampleValues(under, st.start), this.fonts(under), { x: f.x, y: f.y, w: f.w, h: f.h, k: boardScale(st, under) });
@@ -549,7 +556,7 @@ export class UiDesigner {
     dash(f.x + f.w, f.y, f.x + f.w, f.y + f.h);
     dash(f.x + f.w, f.y + f.h, f.x, f.y + f.h);
     dash(f.x, f.y + f.h, f.x, f.y);
-    const what = st.screen ? `screen "${st.screen}"${ROLE_NAMES[layout.screen.role]}` : st.sharing === "thisMap" ? "HUD of this map" : st.sharing === "conflict" ? "second shared HUD (not shown in the game)" : "HUD of all maps";
+    const what = st.screen ? `${st.name ? `screen "${st.name}"` : "screen"}${ROLE_NAMES[layout.screen.role] ?? ""}` : st.sharing === "thisMap" ? "HUD of this map" : st.sharing === "conflict" ? "HUD, not used (another HUD comes first)" : "HUD of all maps";
     const text = this.layout
       ? `Game window · ${what}: drag to move, right-click for more; the wheel and the middle button still move the map`
       : st.sharing === "project"

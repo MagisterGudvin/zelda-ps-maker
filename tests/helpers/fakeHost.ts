@@ -210,9 +210,9 @@ export class FakeHost implements HostAdapter {
   }
   /** PS Maker events run by id (Run event). */
   events: string[] = [];
-  runStoryEvent(id: string): boolean {
+  runStoryEvent(id: string): Promise<unknown> | null {
     this.events.push(id);
-    return true;
+    return Promise.resolve();
   }
   variables = new Map<string, string | number | boolean>();
   getVariable(id: string): string | number | boolean | undefined {

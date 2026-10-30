@@ -46,7 +46,7 @@ test("constructor: text is asked only for content (sign text, messages, item nam
   for (const e of plugin.events as unknown as AnyAction[]) {
     for (const [key, def] of Object.entries(e.parameterDefs)) {
       // "layout" is the UI designer's data, written by the designer on the map, not typed.
-      if (def.type === "string") assert.ok(["text", "message", "name", "layout"].includes(key), `${e.name}.${key} is a text field`);
+      if (def.type === "string") assert.ok(["text", "message", "name", "layout"].includes(key) || /^choice\d$/.test(key), `${e.name}.${key} is a text field`);
       if (def.type === "number") assert.ok(def.description.length > 12, `${e.name}.${key}: a number needs an explanation`);
     }
   }

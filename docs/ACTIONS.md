@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.27.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.28.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
@@ -396,14 +396,23 @@ Shows a toolkit message: a short HUD note, or a box that waits for a key (the me
 
 ## Zelda: Dialogue
 
-An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture); else in the message box, else in PS Maker's dialogue. The event waits until the player closes it. Type \n for a new line, \n\n for a new page. / Реплика NPC в окне диалога из дизайнера.
+An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture, a Choice list); else in the message box, else in PS Maker's dialogue. Up to 4 answers: the one picked runs its PS Maker event and can be kept in a variable. The event waits until the player closes it (and the answer's event ends). Type \n for a new line, \n\n for a new page. / Реплика NPC в окне диалога из дизайнера, с вариантами ответа.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
 | `name` (Speaker) | string | `""` | Who speaks, shown by {speaker}; empty = nobody. / Кто говорит. |
 | `text` (Text) | string | `""` | What they say. \n = new line, \n\n = new page. / Текст; \n — новая строка, \n\n — новая страница. |
 | `portrait` (Portrait) | image | — | Optional picture shown by a Picture element whose picture is {portrait}. / Портрет (необязательно). |
-| `wait` (Wait until closed) | boolean | `true` | The event's next action runs after the player closed the dialogue. / Ждать, пока игрок закроет. |
+| `wait` (Wait until closed) | boolean | `true` | The event's next action runs after the player closed the dialogue (and the answer's event ended). / Ждать, пока игрок закроет. |
+| `choice1` (Answer 1) | string | `""` | Answer 1 the player can pick after the last page; empty = none. / Вариант ответа 1. |
+| `event1` (Event of answer 1) | string-enum | `""` | The PS Maker event (project or this map) that runs when answer 1 is picked; none = only close. / Событие варианта 1. Варианты: None. |
+| `choice2` (Answer 2) | string | `""` | Answer 2 the player can pick after the last page; empty = none. / Вариант ответа 2. |
+| `event2` (Event of answer 2) | string-enum | `""` | The PS Maker event (project or this map) that runs when answer 2 is picked; none = only close. / Событие варианта 2. Варианты: None. |
+| `choice3` (Answer 3) | string | `""` | Answer 3 the player can pick after the last page; empty = none. / Вариант ответа 3. |
+| `event3` (Event of answer 3) | string-enum | `""` | The PS Maker event (project or this map) that runs when answer 3 is picked; none = only close. / Событие варианта 3. Варианты: None. |
+| `choice4` (Answer 4) | string | `""` | Answer 4 the player can pick after the last page; empty = none. / Вариант ответа 4. |
+| `event4` (Event of answer 4) | string-enum | `""` | The PS Maker event (project or this map) that runs when answer 4 is picked; none = only close. / Событие варианта 4. Варианты: None. |
+| `answer` (Answer variable) | variable | `""` | Optional: gets the answer picked — its number (1-4) in a Number variable, its text in a Text variable. / Переменная для выбранного ответа. |
 
 ## Zelda: UI Layout
 
@@ -411,7 +420,7 @@ Your own HUD or a menu screen, made with the mouse: open this action and the des
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `name` (Screen name) | string | `""` | Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key, on any map. / Пусто — HUD; имя — экран меню. |
+| `name` (Screen name) | string | `""` | The name Zelda: Open UI Screen and buttons open the screen by (e.g. pause). What the layout is — HUD, pause menu, message box… — is its Role in the designer; empty name with no role = the HUD. / Имя экрана; что это за макет — его роль в дизайнере. |
 | `thisMapOnly` (This map only) | boolean | `false` | Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт). |
 | `layout` (Layout data) | string | `""` | Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер. |
 

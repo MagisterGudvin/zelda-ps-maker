@@ -68,6 +68,8 @@ export interface PaintOptions {
   minimap?: MinimapData | null;
   /** Inventory grids: the owned items' cells and the cell under the cursor (-1 = no cursor). */
   inventory?: { cells: InventoryCell[]; cursor: number } | null;
+  /** Choice lists: the answers and the selected one (none = the list is not drawn). */
+  choices?: { items: string[]; cursor: number } | null;
 }
 
 /** What a paint produced: each shown element's box (layout pixels) and the size of the game window. */
@@ -250,6 +252,9 @@ export class LayoutPainter {
         return b;
       case "inventory":
         this.inventory(e, b, fonts, layout, opts.inventory ?? null);
+        return b;
+      case "choices":
+        this.choices(e, b, fonts, layout, opts.choices ?? null);
         return b;
       case "button":
         this.button(e, b, values, fonts, layout, focused);
@@ -511,6 +516,21 @@ export class LayoutPainter {
       if (i !== (data?.cursor ?? -1)) continue;
       if (!this.picture(e.cursor, cell, "stretch")) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(cell.x) + this.k / 2, this.sy(cell.y) + this.k / 2, cell.w * this.k - this.k, cell.h * this.k - this.k);
     }
+  }
+
+  /** The answers of a dialogue, one row each from the top of the box; the selected one marked. */
+  private choices(e: Extract<UiElement, { type: "choices" }>, b: Box, fonts: Record<string, string>, layout: UiLayout, data: { items: string[]; cursor: number } | null): void {
+    if (!data?.items.length) return;
+    const family = fonts[e.font || layout.theme.font] ?? "monospace";
+    data.items.forEach((item, i) => {
+      const row = { x: b.x, y: b.y + i * (e.rowHeight + e.gap), w: b.w, h: e.rowHeight };
+      const on = i === data.cursor;
+      const pic = on && e.selected ? e.selected : e.image;
+      if (pic) this.picture(pic, row, e.slice > 0 ? "nine" : "stretch", e.slice);
+      if (on && !e.selected) this.gfx(true).lineStyle(this.k, 0xffd23a, this.a).strokeRect(this.sx(row.x) + this.k / 2, this.sy(row.y) + this.k / 2, row.w * this.k - this.k, row.h * this.k - this.k);
+      const t = this.text(`${on ? e.marker : ""}${item}`, family, e.size, on ? e.selectedColor || "#ffd23a" : e.color || layout.theme.textColor);
+      t.setPosition(Math.round(this.sx(row.x + 3)), Math.round(this.sy(row.y + (row.h - t.height / this.k) / 2)));
+    });
   }
 
   /** The world around the player squeezed into the box, cut to its shape. */

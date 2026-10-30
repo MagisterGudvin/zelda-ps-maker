@@ -259,6 +259,14 @@ export const MAP_OBJECT_OPTIONS: { label: string; value: string }[] = [{ label: 
 export const mapObjectField = (label: string, description: string) =>
   ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: MAP_OBJECT_OPTIONS }) as unknown as ReturnType<typeof str>;
 
+/** The project's events (global ones and the open map's), for answers of Zelda: Dialogue. */
+export const EVENT_OPTIONS: { label: string; value: string }[] = [{ label: "None", value: "" }];
+export const eventField = (label: string, description: string) =>
+  ({ type: "string-enum", ui: "dropdown", label, description, defaultValue: "", options: EVENT_OPTIONS }) as unknown as ReturnType<typeof str>;
+export function fillEventOptions(events: readonly { id: string; name: string }[] | undefined): boolean {
+  return fillOptions(EVENT_OPTIONS, events);
+}
+
 /** Refills MAP_OBJECT_OPTIONS in place; true when it changed. */
 export function fillMapObjectOptions(objects: readonly { id: string; name: string }[] | undefined): boolean {
   return fillOptions(MAP_OBJECT_OPTIONS, objects);

@@ -27,8 +27,8 @@ export interface Visibility {
   hideInDialogue?: boolean;
 }
 
-export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button" | "inventory";
-export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button", "inventory"];
+export type ElementType = "image" | "text" | "bar" | "hearts" | "counter" | "item" | "icon" | "slot" | "minimap" | "button" | "inventory" | "choices";
+export const ELEMENT_TYPES: readonly ElementType[] = ["image", "text", "bar", "hearts", "counter", "item", "icon", "slot", "minimap", "button", "inventory", "choices"];
 
 /** A looping effect on an element while it shows. */
 export type Effect = "none" | "blink" | "pulse" | "bob" | "shake";
@@ -210,7 +210,29 @@ export interface InventoryElement extends Base {
   counts: boolean;
 }
 
-export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement | InventoryElement;
+/**
+ * The answers of a Zelda: Dialogue with choices, one row each, shown once the last page is typed
+ * out: arrows move the selection, the action key or a click picks one.
+ */
+export interface ChoicesElement extends Base {
+  type: "choices";
+  /** Project font id ("" = the layout's font). */
+  font: string;
+  size: number;
+  color: string;
+  /** Text colour of the selected answer ("" = gold). */
+  selectedColor: string;
+  rowHeight: number;
+  gap: number;
+  /** Row pictures (9-slice with `slice`), plain and selected ("" = none; the selected row gets a gold frame). */
+  image: string;
+  selected: string;
+  slice: number;
+  /** Text before the selected answer ("" = none). */
+  marker: string;
+}
+
+export type UiElement = ImageElement | TextElement | BarElement | HeartsElement | CounterElement | ItemElement | IconElement | SlotElement | MinimapElement | ButtonElement | InventoryElement | ChoicesElement;
 
 /** Look of things the toolkit draws around the layout (inventory panel, item icons, notes). */
 export interface LayoutTheme {
@@ -227,10 +249,11 @@ export interface LayoutTheme {
  * What a screen is for: a plain screen (opened by actions and buttons), the pause menu (the Menu
  * key, Escape), the box for toolkit messages, the box for NPC dialogue (Zelda: Dialogue), the
  * short notifications over the game, the inventory (the inventory key, I), or the title screen
- * (the HUD hidden, no key closes it). The HUD is a layout without a screen name.
+ * (the HUD hidden, no key closes it); or the HUD itself, always on screen (also a layout without a
+ * screen name and without a role, as made before 0.27.0).
  */
-export type ScreenRole = "none" | "menu" | "message" | "dialogue" | "notification" | "inventory" | "title";
-export const SCREEN_ROLES: readonly ScreenRole[] = ["none", "menu", "message", "dialogue", "notification", "inventory", "title"];
+export type ScreenRole = "hud" | "none" | "menu" | "message" | "dialogue" | "notification" | "inventory" | "title";
+export const SCREEN_ROLES: readonly ScreenRole[] = ["hud", "none", "menu", "message", "dialogue", "notification", "inventory", "title"];
 export const MESSAGE_KINDS = ["sign", "item", "hint", "info"] as const;
 export type MessageKindName = (typeof MESSAGE_KINDS)[number];
 
@@ -373,6 +396,8 @@ export function readElement(v: unknown, index = 0): UiElement | null {
         enemyColor: str(v.enemyColor, "#ffd23a"),
         objectColor: str(v.objectColor, "#5ad8ff"),
       };
+    case "choices":
+      return { ...base, type, font: str(v.font), size: Math.max(1, num(v.size, 8)), color: str(v.color), selectedColor: str(v.selectedColor), rowHeight: int(v.rowHeight, 14, 4), gap: int(v.gap, 2, 0), image: str(v.image), selected: str(v.selected), slice: int(v.slice, 0, 0), marker: str(v.marker, "> ") };
     case "inventory":
       return { ...base, type, cols: int(v.cols, 6, 1, 16), cell: int(v.cell, 20, 8), gap: int(v.gap, 2, 0), frame: str(v.frame), cursor: str(v.cursor), counts: v.counts !== false };
     case "button": {
@@ -503,6 +528,8 @@ export function pictureKeys(e: UiElement): string[] {
                 ? [e.frame, e.selected]
                 : e.type === "inventory"
                   ? [e.frame, e.cursor]
+                : e.type === "choices"
+                  ? [e.image, e.selected]
                 : e.type === "button"
                   ? [e.image, e.hover]
                   : [];

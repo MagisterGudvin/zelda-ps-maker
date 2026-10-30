@@ -203,7 +203,9 @@ export class HudSystem {
         if (!cur) return null;
         const grid = cur.layout.elements.some((e) => e.type === "inventory");
         const inventory = grid ? { cells: s.screens!.gridItems().map((id) => ({ icon: this.iconOf(id, cur.layout), count: this.countOf(id) })), cursor: cur.cursor } : null;
-        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus, inventory };
+        const view = s.screens!.messageView();
+        const choices = view.choices.length ? { items: view.choices, cursor: view.choice } : null;
+        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: cur.focus, inventory, choices };
       })(),
       layers: [
         ...(s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),

@@ -14,14 +14,14 @@ import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/he
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
-import { useLayoutFonts } from "./projectUi.ts";
+import { layoutKind, useLayoutFonts } from "./projectUi.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import type { Facing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, eventField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -974,16 +974,18 @@ const uiLayout = defineEvent({
   name: "Zelda: UI Layout",
   description: "Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or its role (pause menu on Escape, inventory on I, message box, title screen). Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.",
   parameterDefs: {
-    name: str("Screen name", "Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key, on any map. / Пусто — HUD; имя — экран меню.", ""),
+    name: str("Screen name", "The name Zelda: Open UI Screen and buttons open the screen by (e.g. pause). What the layout is — HUD, pause menu, message box… — is its Role in the designer; empty name with no role = the HUD. / Имя экрана; что это за макет — его роль в дизайнере.", ""),
     thisMapOnly: bool("This map only", "Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт).", false),
     layout: str("Layout data", "Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер.", ""),
   },
   execute(params, ctx) {
     run("Zelda: UI Layout", ctx, params, (s, tk) => {
       const p = params as Record<string, unknown>;
-      const screen = textOf(p.name).trim();
+      const name = textOf(p.name).trim();
       const { layout: parsed, error } = parseLayout(textOf(p.layout));
-      if (error) s.logger.warn(`UI Layout${screen ? ` "${screen}"` : ""}: ${error}; ${screen ? "the screen is empty" : "the classic HUD is shown"}.`);
+      // The HUD is the role HUD (or, as before 0.27.0, a layout without a screen name and role).
+      const screen = layoutKind(name, parsed?.screen.role ?? "none").key;
+      if (error) s.logger.warn(`UI Layout${name ? ` "${name}"` : ""}: ${error}; ${screen ? "the screen is empty" : "the classic HUD is shown"}.`);
       const layout = parsed ?? (screen ? { ...classicLayout(), elements: [] } : classicLayout());
       const shared = tk.sharedHud;
       if (screen) tk.uiScreens.set(screen, layout);
@@ -1038,14 +1040,23 @@ const showMessage = defineEvent({
   },
 });
 
+const CHOICE_SLOTS = [1, 2, 3, 4] as const;
+
 const dialogue = defineEvent({
   name: "Zelda: Dialogue",
-  description: "An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture); else in the message box, else in PS Maker's dialogue. The event waits until the player closes it. Type \\n for a new line, \\n\\n for a new page. / Реплика NPC в окне диалога из дизайнера.",
+  description: "An NPC speaks in the dialogue box made in the UI Designer (UI Layout with the role Dialogue: {speaker}, {message}, a {portrait} picture, a Choice list); else in the message box, else in PS Maker's dialogue. Up to 4 answers: the one picked runs its PS Maker event and can be kept in a variable. The event waits until the player closes it (and the answer's event ends). Type \\n for a new line, \\n\\n for a new page. / Реплика NPC в окне диалога из дизайнера, с вариантами ответа.",
   parameterDefs: {
     name: str("Speaker", "Who speaks, shown by {speaker}; empty = nobody. / Кто говорит.", ""),
     text: str("Text", "What they say. \\n = new line, \\n\\n = new page. / Текст; \\n — новая строка, \\n\\n — новая страница.", ""),
     portrait: img("Portrait", "Optional picture shown by a Picture element whose picture is {portrait}. / Портрет (необязательно)."),
-    wait: bool("Wait until closed", "The event's next action runs after the player closed the dialogue. / Ждать, пока игрок закроет.", true),
+    ...Object.fromEntries(
+      CHOICE_SLOTS.flatMap((n) => [
+        [`choice${n}`, str(`Answer ${n}`, `Answer ${n} the player can pick after the last page; empty = none. / Вариант ответа ${n}.`, "")],
+        [`event${n}`, eventField(`Event of answer ${n}`, `The PS Maker event (project or this map) that runs when answer ${n} is picked; none = only close. / Событие варианта ${n}.`)],
+      ]),
+    ),
+    answer: variable("Answer variable", "Optional: gets the answer picked — its number (1-4) in a Number variable, its text in a Text variable. / Переменная для выбранного ответа."),
+    wait: bool("Wait until closed", "The event's next action runs after the player closed the dialogue (and the answer's event ended). / Ждать, пока игрок закроет.", true),
   },
   execute(params, ctx) {
     const end = endOnce(ctx);
@@ -1057,12 +1068,55 @@ const dialogue = defineEvent({
         s.logger.warnOnce("dialogue-no-hud", "Zelda: Dialogue needs the toolkit HUD (Start Toolkit → Show HUD).");
         return;
       }
+      // Answers keep their slot: answer 2 runs event 2 even when answer 1 is empty.
+      const slots = CHOICE_SLOTS.map((n) => ({ text: s.i18n.text(textOf(p[`choice${n}`])).trim(), event: textOf(p[`event${n}`]), n })).filter((c) => c.text);
       waits = p.wait !== false;
-      s.messageBox.say(text, s.i18n.text(textOf(p.name)), assetId(p.portrait), waits ? end : undefined);
+      s.messageBox.say(
+        text,
+        s.i18n.text(textOf(p.name)),
+        assetId(p.portrait),
+        slots.map((c) => c.text),
+        (picked) => {
+          const answer = picked === null ? null : slots[picked];
+          let after: Promise<unknown> | null = null;
+          if (answer) {
+            const variableId = textOf(p.answer);
+            if (variableId) {
+              const now = s.host.getVariable?.(variableId);
+              if (!s.host.setVariable?.(variableId, typeof now === "string" ? answer.text : answer.n)) s.logger.warnOnce(`dialogue-var-${variableId}`, `Zelda: Dialogue: no project variable "${variableId}".`);
+            }
+            if (answer.event) {
+              after = runEvent(ctx, s, answer.event);
+              if (!after) s.logger.warnOnce(`dialogue-event-${answer.event}`, `Zelda: Dialogue: the PS Maker event "${answer.event}" could not be run.`);
+            }
+          }
+          if (!waits) return;
+          if (after) void after.then(end, end);
+          else end();
+        },
+      );
     });
     if (!waits) end();
   },
 });
+
+/**
+ * Runs a PS Maker event as its "Run event" action does: inside the running event when PS Maker
+ * gives the action a way to (ctx.runActions, as its own Choices action uses), else through the map's
+ * story runner. Resolves when the event ended; null when it cannot run.
+ */
+function runEvent(ctx: Ctx, s: Session, eventId: string): Promise<unknown> | null {
+  const runActions = (ctx as { runActions?: (actions: unknown[]) => unknown } | undefined)?.runActions;
+  if (typeof runActions === "function") {
+    try {
+      return Promise.resolve(runActions([{ id: `zmt-choice-${eventId}`, name: "Run event", type: "runStoryEventAction", storyEventId: eventId, loopMode: "none", waitForCompletion: true }]));
+    } catch (err) {
+      s.logger.warn(`PS Maker event "${eventId}" failed:`, err);
+      return null;
+    }
+  }
+  return s.host.runStoryEvent?.(eventId) ?? null;
+}
 
 const STAT_OPTIONS = [
   ["rupees", "Rupees"],

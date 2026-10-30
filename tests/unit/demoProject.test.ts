@@ -184,6 +184,10 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   assert.equal(ev.actions[0].pluginParams.name, "Villager");
   assert.match(ev.actions[0].pluginParams.text, /\\n\\n/, "two pages");
   assert.equal(ev.actions[0].pluginParams.wait, true);
+  // His answer "Any advice?" runs a project event with another Zelda: Dialogue.
+  assert.deepEqual([ev.actions[0].pluginParams.choice1, ev.actions[0].pluginParams.choice2], ["Any advice?", "Bye!"]);
+  const advice = story.globalStoryEvents.find((e: Any) => e.id === ev.actions[0].pluginParams.event1);
+  assert.equal(advice.actions[0].actionName, "Zelda: Dialogue");
 });
 
 test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI HUD; one font with Cyrillic everywhere", async () => {
@@ -218,6 +222,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     const talk = screenOf("dialogue");
     assert.equal(talk.screen.role, "dialogue");
     assert.ok(talk.elements.some((e) => e.type === "text" && e.text === "{speaker}") && talk.elements.some((e) => e.type === "text" && e.text === "{message}" && e.wrap));
+    assert.ok(talk.elements.some((e) => e.type === "choices"), "a Choice list for the answers");
     const note = screenOf("notification");
     assert.equal(note.screen.role, "notification");
     assert.ok(note.elements.some((e) => e.type === "text" && e.text === "{note}"));

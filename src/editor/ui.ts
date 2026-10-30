@@ -333,7 +333,10 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p) => (p.all === true ? "all" : set(p.name) ? String(p.name) : "top screen"),
   },
   "Zelda: Dialogue": {
-    keywords: ["dialogue", "dialog", "npc", "talk", "say", "speak", "conversation"],
+    keywords: ["dialogue", "dialog", "npc", "talk", "say", "speak", "conversation", "choice", "choices", "answer", "question"],
+    fields: Object.fromEntries([1, 2, 3, 4].flatMap((n) => [[`choice${n}`, { group: "Answers" }], [`event${n}`, { group: "Answers" }]]).concat([["answer", { group: "Answers" }]])),
+    // An answer's event field shows once the answer has a text.
+    visible: Object.fromEntries([1, 2, 3, 4].map((n) => [`event${n}`, (p: Record<string, unknown>) => set(p[`choice${n}`])])),
     preview: (p) => join([set(p.name) ? `${String(p.name)}:` : undefined, set(p.text) ? `"${String(p.text).slice(0, 40)}"` : undefined], " "),
   },
   "Zelda: Show Message": {

@@ -57,8 +57,10 @@ export interface DesignerSetup {
   values: LayoutValues;
   /** The UI Layout action shown (the designer edits it), or null (the classic HUD is shown). */
   action: { id: string; root: string } | null;
-  /** Its screen name ("" = the HUD). */
+  /** Its screen key ("" = the HUD): the screen name, or "(role)" for a screen without one. */
   screen: string;
+  /** Its Screen name field. */
+  name: string;
   /** Screen names of the map's UI Layout actions (for buttons that open one). */
   screens: string[];
   /** The map's own events (for buttons that run one). */
@@ -75,7 +77,6 @@ export interface DesignerSetup {
   under: UiLayout | null;
 }
 
-const screenOf = (a: ActionLike) => (typeof a.pluginParams?.name === "string" ? a.pluginParams.name.trim() : "");
 
 /**
  * What the game window frame of a map shows: the UI Layout action open in the editor (`openId`),
@@ -92,8 +93,9 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
     for (const a of map[list] ?? []) {
       if (a?.actionName === "Zelda: Start Toolkit" && !start) start = a;
       if (a?.actionName === UI_LAYOUT_ACTION) {
-        if (!screenOf(a)) hud = { action: a, root };
-        else screens.push(screenOf(a));
+        const la = layoutAction(a);
+        if (la.hud) hud = { action: a, root };
+        else if (la.name) screens.push(la.name);
         if (openId && a.id === openId) opened = { action: a, root };
       }
       if (a?.type === "movePlayerAction" && a.moveType === "absolute-position" && !spawn && typeof a.position?.x === "number" && typeof a.position?.y === "number") spawn = { x: a.position.x, y: a.position.y };
@@ -103,8 +105,8 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
   if (!opened && (!start || sp.hud === false)) return null;
   const shared = projectUi(story as Parameters<typeof projectUi>[0]).hud;
   let own = opened ?? hud;
-  const screen = own ? screenOf(own.action) : "";
   const mine = own ? layoutAction(own.action) : null;
+  const screen = mine && !mine.hud ? mine.screen : "";
   const sharing: DesignerSetup["sharing"] = screen
     ? "shared"
     : own
@@ -147,6 +149,7 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
     values: sampleValues(layout, sp),
     action: own?.action.id ? { id: own.action.id, root: own.root } : null,
     screen,
+    name: mine?.name ?? "",
     screens: [...new Set(screens)],
     mapEvents: (map.storyEvents ?? []).filter((e) => e?.id && !e.hidden).map((e) => ({ id: e.id!, name: e.name || e.id! })),
     sharing,
@@ -239,6 +242,7 @@ const NEW: Record<ElementType, Raw> = {
   minimap: { w: 64, h: 64, shape: "circle" },
   button: { w: 72, h: 16, text: "Button", anchor: "c" },
   inventory: { w: 130, h: 42, cols: 6, cell: 20, gap: 2, anchor: "c" },
+  choices: { w: 96, h: 46, rowHeight: 14, gap: 2, anchor: "c" },
 };
 
 /** A new element of a type with its defaults, its top-left at a point of the game window (view size for its anchor). */

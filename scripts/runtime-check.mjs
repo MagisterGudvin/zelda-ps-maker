@@ -305,11 +305,12 @@ await check("message screen (UI Designer, role Message): reading the sign types 
   expect(!still && !again, `still open ${still}, opened again ${again}`);
   return `typed ("${typing.text}"), 2 pages, closed`;
 });
-await check("the villager talks in the dialogue box made in the UI Designer (Zelda: Dialogue: his name on a plate, two pages); the game waits; Z closes it and he does not start again", async () => {
+await check("the villager talks in the dialogue box made in the UI Designer (Zelda: Dialogue: name plate, two pages, then the answers \"Any advice?\" / \"Bye!\"); \"Any advice?\" runs a project event with his advice; Z closes it and he does not start again", async () => {
+  const hudHas = (part) => page.waitForFunction((part) => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.includes(part)), part, { timeout: 6000 }).then(() => true, () => false);
   await tp(80, 140);
   await hold("ArrowUp", 150);
   await page.keyboard.press("z");
-  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.endsWith("by the gate.")), null, { timeout: 6000 }).catch(() => {});
+  const page1 = await hudHas("by the gate.");
   const during = await ev(() => ({
     screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null,
     psDialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
@@ -318,8 +319,13 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   const texts = (await hudTexts()).map((t) => t.text);
   await page.screenshot({ path: path.join(OUT, "villager-dialogue.png") });
   await page.keyboard.press("z");
-  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("Read the sign")), null, { timeout: 6000 }).catch(() => {});
-  const page2 = (await hudTexts()).some((t) => t.text.startsWith("Read the sign"));
+  const page2 = await hudHas("what you need.");
+  const answers = (await hudHas("Any advice?")) && (await hudHas("Bye!"));
+  const view = await ev(() => window.ZeldaMakerToolkit.session.screens.messageView());
+  await page.screenshot({ path: path.join(OUT, "villager-answers.png") });
+  await page.keyboard.press("z");
+  const advice = await hudHas("Hold V to raise the shield");
+  await page.screenshot({ path: path.join(OUT, "villager-advice.png") });
   let open = true;
   for (let i = 0; i < 6 && open; i++) {
     await page.keyboard.press("z");
@@ -328,11 +334,12 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   }
   await wait(800);
   const again = await ev(() => window.ZeldaMakerToolkit.session.screens.current !== null || window.ZeldaMakerToolkit.session.isPaused("message"));
-  expect(during.screen === "dialogue" && !during.psDialogue && during.paused, JSON.stringify(during));
+  expect(page1 && during.screen === "dialogue" && !during.psDialogue && during.paused, JSON.stringify(during));
   expect(texts.includes("Villager"), `texts ${texts.join(" | ")}`);
-  expect(page2, "the second page did not show");
+  expect(page2 && answers && view.choices.join() === "Any advice?,Bye!" && view.text.endsWith("what you need."), `page 2 ${page2}, answers ${answers}, ${JSON.stringify(view)}`);
+  expect(advice, "his advice (the answer's event) did not show");
   expect(!open && !again, `still open ${open}, started again ${again}`);
-  return "name plate, 2 pages, closed, not started again";
+  return "name plate, 2 pages, answers on plates, advice from the event, closed, not started again";
 });
 /** The leaf element of the page that shows a text, with its font. */
 const textOnPage = (part) =>

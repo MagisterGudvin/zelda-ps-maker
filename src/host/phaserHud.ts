@@ -162,7 +162,7 @@ export class PhaserHud implements HudSink {
     if (sc) {
       const k = layoutScale(sc.layout.scale || model.scale, model.mapZoom, W, H);
       dim(sp, sc.layout.screen.dim);
-      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { focus: sc.focus, time: model.time, minimap: model.minimap, inventory: sc.inventory });
+      sp.paint(sc.layout, sc.values, model.fonts, { x: 0, y: 0, w: W, h: H, k }, { focus: sc.focus, time: model.time, minimap: model.minimap, inventory: sc.inventory, choices: sc.choices });
       this.screenK = k;
     }
     sp.end();

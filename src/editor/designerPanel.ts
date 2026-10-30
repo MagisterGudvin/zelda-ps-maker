@@ -22,6 +22,7 @@ export const TYPE_ITEMS: readonly [ElementType, string][] = [
   ["minimap", "Minimap"],
   ["button", "Button"],
   ["inventory", "Inventory grid"],
+  ["choices", "Choice list"],
 ];
 const TYPE_LABELS = Object.fromEntries(TYPE_ITEMS) as Record<ElementType, string>;
 const ROTATABLE: readonly ElementType[] = ["image", "text", "icon"];
@@ -48,8 +49,8 @@ const ROLE_OPTIONS: readonly Opt[] = [
   ["title", "Title screen (hides the HUD)"],
 ];
 const ROLE_HINTS: Record<string, string> = {
-  hud: "The HUD: no screen name. Choosing another role gives this action a screen name; the map then shows the project's shared HUD (or the classic one).",
-  dialogue: "Zelda: Dialogue shows what an NPC says here: {speaker}, {message} (tick \"Wrap lines\"), a Picture whose picture is {portrait}. Z, X or Escape: next page; the event waits until it closes.",
+  hud: "Always on screen. Like every role, the first HUD by map order is the HUD of every map; tick \"This map only\" in the action's settings to keep one for its map.",
+  dialogue: "Zelda: Dialogue shows what an NPC says here: {speaker}, {message} (tick \"Wrap lines\"), a Picture whose picture is {portrait}, a Choice list for its answers. Z, X or Escape: next page; arrows and Z (or a click) pick an answer; the event waits until it closes.",
   notification: "Each short note (\"You got 5 bombs\", \"Saved\", hints the message box does not show) is drawn with this layout while it lasts: texts show {note}. Several notes stack one height apart. The game plays on.",
   menu: "Escape (the Menu key) opens and closes it; PS Maker's options menu opens from a button that runs an event with \"Open options menu\".",
   message: "Texts show {message} (tick \"Wrap lines\"); {message.ready} is 1 when the page waits for a key, {message.more} while more pages follow. Z, X or Escape: next page.",
@@ -142,6 +143,18 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "frame", label: "Frame picture", kind: "pic" },
     { path: "selected", label: "Frame when selected", kind: "pic" },
     { path: "keyLabel", label: "Show its key", kind: "check" },
+  ],
+  choices: [
+    { path: "font", label: "Font", kind: "font" },
+    { path: "size", label: "Size", kind: "num" },
+    { path: "color", label: "Colour", kind: "color" },
+    { path: "selectedColor", label: "Selected colour (empty = gold)", kind: "color" },
+    { path: "marker", label: "Before the selected answer", kind: "text" },
+    { path: "rowHeight", label: "Row height", kind: "num" },
+    { path: "gap", label: "Gap", kind: "num" },
+    { path: "image", label: "Row picture", kind: "pic" },
+    { path: "selected", label: "Selected row picture", kind: "pic" },
+    { path: "slice", label: "Corner size (9-slice)", kind: "num" },
   ],
   inventory: [
     { path: "cols", label: "Columns", kind: "num" },

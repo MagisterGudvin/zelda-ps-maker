@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createFakeScene } from "../helpers/fakePhaser.ts";
-import { projectUi } from "../../src/editor/projectUi.ts";
+import { projectUi, usedInstead } from "../../src/editor/projectUi.ts";
 import { designerSetup } from "../../src/editor/layoutEdit.ts";
 
 const layoutText = (...ids: string[]) => JSON.stringify({ v: 1, elements: ids.map((id) => ({ id, type: "text" })) });
@@ -93,4 +93,31 @@ test("editor frame of a screen: the HUD the game shows under it (none under a ti
   const noHud = designerSetup({ id: "t", initialActions: [{ ...start, pluginParams: { hud: false } }, ui("title", { name: "title", layout: layoutText("go") })] }, story, 0, "title")!;
   assert.equal(noHud.under, null);
   assert.equal(designerSetup(story.maps[0], story, 0)!.under, null, "the HUD itself has nothing under it");
+});
+
+const roleLayout = (role: string, ...ids: string[]) => JSON.stringify({ v: 1, screen: { role }, elements: ids.map((id) => ({ id, type: "text" })) });
+
+test("the HUD is a role like the others: a named layout with the role HUD is the HUD, a layout with a role and no name is a screen; the first of a role counts", () => {
+  const story = {
+    maps: [
+      { id: "a", name: "A", initialActions: [ui("h", { name: "main", layout: roleLayout("hud", "named") }), ui("p1", { name: "", layout: roleLayout("menu", "first") })] },
+      { id: "b", name: "B", initialActions: [ui("p2", { name: "pause2", layout: roleLayout("menu", "second") }), ui("old", { name: "", layout: layoutText("legacy") })] },
+    ],
+  };
+  const p = projectUi(story as any);
+  assert.equal(p.hud?.actionId, "h", "the role decides, not the empty name");
+  assert.deepEqual(p.screens.map((x) => [x.name, x.role]), [["(menu)", "menu"], ["pause2", "menu"]]);
+  assert.deepEqual(usedInstead(story as any, "p2"), { mapName: "A", what: "pause menu" }, "a second pause menu is not used");
+  assert.equal(usedInstead(story as any, "p1"), null);
+  assert.deepEqual(usedInstead(story as any, "old"), { mapName: "A", what: "HUD" }, "an old unnamed layout is a HUD, the second one");
+});
+
+test("Zelda: UI Layout: the role HUD makes the HUD whatever the name; a role without a name is a screen", async () => {
+  const { tk, run, done } = await startOn("dungeon", project());
+  run("Zelda: UI Layout", { name: "hud", thisMapOnly: true, layout: roleLayout("hud", "mine") });
+  assert.deepEqual(tk.hudLayout?.elements.map((e) => e.id), ["mine"]);
+  assert.ok(!tk.uiScreens.has("hud"));
+  run("Zelda: UI Layout", { name: "", layout: roleLayout("dialogue", "box") });
+  assert.equal(tk.uiScreens.get("(dialogue)")?.screen.role, "dialogue");
+  done();
 });

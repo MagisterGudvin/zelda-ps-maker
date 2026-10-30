@@ -11,7 +11,11 @@ interface MessageState {
   /** Zelda: Dialogue: who speaks and their portrait (a picture of the project). */
   speaker: string;
   portrait: string;
-  done: () => void;
+  /** Answers to pick from once the last page is shown, the selected one, the one picked. */
+  choices: string[];
+  choice: number;
+  picked: number | null;
+  done: (picked: number | null) => void;
 }
 
 interface Open {
@@ -106,17 +110,18 @@ export class UiScreenSystem {
 
   /**
    * Shows a message in a message screen: one page per paragraph (a blank line), typed out at the
-   * screen's speed. Resolves when the player closed the last page.
+   * screen's speed; with answers, the player picks one after the last page. Resolves when the
+   * player closed it: with the number of the answer picked (0 = the first), or null.
    */
-  showMessage(name: string, text: string, who: { speaker?: string; portrait?: string } = {}): Promise<void> | null {
+  showMessage(name: string, text: string, who: { speaker?: string; portrait?: string } = {}, choices: string[] = []): Promise<number | null> | null {
     const layout = this.s.toolkit.uiScreens.get(name);
     if (!layout) return null;
     const pages = text.split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p);
-    return new Promise<void>((resolve) => {
-      const message: MessageState = { pages: pages.length ? pages : [""], page: 0, startedAt: this.now(), whole: false, speaker: who.speaker ?? "", portrait: who.portrait ?? "", done: resolve };
+    return new Promise<number | null>((resolve) => {
+      const message: MessageState = { pages: pages.length ? pages : [""], page: 0, startedAt: this.now(), whole: false, speaker: who.speaker ?? "", portrait: who.portrait ?? "", choices: choices.filter((c) => c.trim()), choice: 0, picked: null, done: resolve };
       const i = this.stack.findIndex((t) => t.name === name);
       if (i >= 0) {
-        this.stack[i].message?.done();
+        this.stack[i].message?.done(null);
         this.stack[i].message = message;
         this.s.hud?.markDirty();
         return;
@@ -127,16 +132,25 @@ export class UiScreenSystem {
     });
   }
 
-  /** The message screen's text as shown now (typed so far), whether it waits for a key, who speaks. */
-  messageView(): { text: string; ready: boolean; more: boolean; speaker: string; portrait: string } {
+  /**
+   * The message screen's text as shown now (typed so far), whether it waits for a key, who speaks,
+   * and the answers once they can be picked. A layout without a Choice list gets them as lines
+   * under the text.
+   */
+  messageView(): { text: string; ready: boolean; more: boolean; speaker: string; portrait: string; choices: string[]; choice: number } {
     const top = [...this.stack].reverse().find((t) => t.message);
     const m = top?.message;
-    if (!m) return { text: "", ready: false, more: false, speaker: "", portrait: "" };
+    if (!m) return { text: "", ready: false, more: false, speaker: "", portrait: "", choices: [], choice: 0 };
     const page = m.pages[m.page];
-    const typing = this.s.toolkit.uiScreens.get(top.name)?.screen.typing ?? 0;
+    const layout = this.s.toolkit.uiScreens.get(top.name);
+    const typing = layout?.screen.typing ?? 0;
     const shown = m.whole || typing <= 0 ? page.length : Math.floor(((this.now() - m.startedAt) / 1000) * typing);
     const ready = shown >= page.length;
-    return { text: ready ? page : page.slice(0, shown), ready, more: m.page < m.pages.length - 1, speaker: m.speaker, portrait: m.portrait };
+    const more = m.page < m.pages.length - 1;
+    const choices = ready && !more ? m.choices : [];
+    let text = ready ? page : page.slice(0, shown);
+    if (choices.length && !layout?.elements.some((e) => e.type === "choices")) text += `\n${choices.map((c, i) => `${i === m.choice ? "> " : "  "}${c}`).join("\n")}`;
+    return { text, ready, more, speaker: m.speaker, portrait: m.portrait, choices, choice: m.choice };
   }
 
   /** Closes a screen or layer by name, else the top screen (back to the one under it); `all` closes every screen and layer. */
@@ -160,7 +174,7 @@ export class UiScreenSystem {
     } else closed = [this.stack.pop()!];
     this.sound(this.s.toolkit.uiScreens.get(closed[0].name)?.screen.soundClose ?? "");
     for (const t of closed.reverse()) {
-      t.message?.done();
+      t.message?.done(t.message.picked);
       this.changed(t.name, false);
     }
   }
@@ -233,6 +247,15 @@ export class UiScreenSystem {
     const role = cur.layout.screen.role;
     if (top.message) {
       if (this.s.tick % 2 === 0) this.s.hud?.markDirty();
+      const view = this.messageView();
+      if (view.choices.length) {
+        // Answers: arrows move the selection, the action key picks; back keys do not skip the question.
+        const m = top.message;
+        const step = input.pressed("up") || input.pressed("left") ? -1 : input.pressed("down") || input.pressed("right") ? 1 : 0;
+        if (step) this.moved(cur.layout, () => (m.choice = (m.choice + step + view.choices.length) % view.choices.length));
+        if (input.pressed("action")) this.pick(top, m.choice);
+        return;
+      }
       if (input.pressed("action") || input.pressed("sword") || input.pressed("menu")) this.nextPage(top);
       return;
     }
@@ -259,6 +282,14 @@ export class UiScreenSystem {
     apply();
     this.sound(layout.screen.soundMove);
     this.s.hud?.markDirty();
+  }
+
+  /** Picks an answer and closes the message. */
+  private pick(top: Open, index: number): void {
+    const m = top.message!;
+    m.picked = index;
+    this.sound(this.s.toolkit.uiScreens.get(top.name)?.screen.soundPress ?? "");
+    this.close(false, top.name);
   }
 
   /** A key on a message page: shows the whole page, else the next page, else closes the message. */
@@ -291,12 +322,22 @@ export class UiScreenSystem {
     const cur = this.current;
     if (!cur || this.s.host.isDialogueOpen?.()) return;
     const top = this.stack.at(-1)!;
-    if (top.message) {
-      if (type === "down") this.nextPage(top);
-      return;
-    }
     const boxes = this.boxes(cur.layout);
     const inside = (r: { x: number; y: number; w: number; h: number } | undefined) => !!r && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+    if (top.message) {
+      const view = this.messageView();
+      const list = cur.layout.elements.find((e) => e.type === "choices");
+      if (view.choices.length && list?.type === "choices") {
+        // Hover selects an answer, a click picks it.
+        const r = boxes[list.id];
+        const i = r && x >= r.x && x < r.x + r.w ? Math.floor((y - r.y) / (list.rowHeight + list.gap)) : -1;
+        if (i < 0 || i >= view.choices.length || (y - r.y) % (list.rowHeight + list.gap) >= list.rowHeight) return;
+        const m = top.message;
+        if (m.choice !== i) this.moved(cur.layout, () => (m.choice = i));
+        if (type === "down") this.pick(top, i);
+      } else if (type === "down" && !view.choices.length) this.nextPage(top);
+      return;
+    }
     const grid = this.grid(cur.layout);
     if (grid && inside(boxes[grid.id])) {
       const r = boxes[grid.id];
@@ -350,7 +391,7 @@ export class UiScreenSystem {
     this.offPointer();
     this.offMenuKeys();
     this.layerNames.length = 0;
-    for (const t of this.stack) t.message?.done();
+    for (const t of this.stack) t.message?.done(null);
     if (this.stack.length) {
       this.stack.length = 0;
       this.s.setPaused("screen", false);

@@ -200,8 +200,12 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       { id: "speaker", type: "text", x: -136, y: -67, w: 76, h: 10, anchor: "b", show: always, text: "{speaker}", font: "", size: 8, color: "#ffd23a", align: "center" },
       { id: "text", type: "text", x: -128, y: -48, w: 256, h: 34, anchor: "b", show: always, text: "{message}", font: "", size: 8, color: "", align: "left", wrap: true },
       { id: "next", type: "text", x: 120, y: -18, w: 8, h: 8, anchor: "b", show: { when: "compare", id: "message.ready", op: "==", value: 1 }, effect: "blink", text: "Z", font: "", size: 7, color: "#ffd23a", align: "center" },
+      // The answers, on button plates over the right end of the panel.
+      { id: "answers", type: "choices", x: 52, y: -106, w: 88, h: 46, anchor: "b", show: always, font: "", size: 8, color: "", selectedColor: "", rowHeight: 14, gap: 2, image: "zelda-ui-button", selected: "", slice: 6, marker: "" },
     ],
   };
+  // The villager's advice: a project event run by his answer "Any advice?".
+  globalStoryEvents.push({ name: "Villager: advice", id: VILLAGER_HINT_EVENT, actions: [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_HINT })], hidden: false });
   // Short notes ("You got 5 bombs!", "Saved"): a small plate under the HUD, one per note.
   const notificationLayout = {
     v: 1,
@@ -336,7 +340,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     if (key === Object.keys(maps)[0]) {
       // A villager who talks in the toolkit's dialogue box (an "interact" trigger around him runs Zelda: Dialogue).
       setupActions.push({ id: makeId(), name: "Spawn NPC", type: "spawnNPCAction", characterId: character.guard, inGameCharacterId: `in-game-character-${makeId()}`, position: { ...VILLAGER }, faceDirection: "down", fadeInEnabled: false, fadeInDurationMs: 750, waitForCompletion: true, instanceName: "Villager" });
-      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_TEXT })]));
+      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_TEXT, choice1: "Any advice?", event1: VILLAGER_HINT_EVENT, choice2: "Bye!" })]));
     }
     for (const n of m.npcs ?? []) {
       npcIds[n.name] = `in-game-character-${makeId()}`;
@@ -523,6 +527,10 @@ export function demoGameUi(source) {
  * page, and a line "Name: text" sets the speaker, so the text itself has no ": ".
  */
 const VILLAGER = { x: 80, y: 118 };
+/** The villager's answer "Any advice?" runs this project event. */
+const VILLAGER_HINT_EVENT = "zelda-villager-advice";
+const VILLAGER_HINT = "Hold V to raise the shield: it stops the shots of the fiery slime in the lower right. The shield is in the chest under the sign.";
+
 /** What the villager says (Zelda: Dialogue: "\\n" typed in the field is a new line, two of them a new page). */
 const VILLAGER_TEXT = "It's dangerous out there. Slimes in the grass, and a knight by the gate.\\n\\nRead the sign for the controls. The chests hold what you need.";
 

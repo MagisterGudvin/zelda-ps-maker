@@ -7,8 +7,10 @@ interface Queued {
   kind: MessageKind | "dialogue";
   speaker: string;
   portrait: string;
-  /** Called once it was shown and closed (or could not be shown). */
-  done?: () => void;
+  /** Answers to pick from (Zelda: Dialogue). */
+  choices: string[];
+  /** Called once it was shown and closed (or could not be shown), with the answer picked (0 = the first) or null. */
+  done?: (picked: number | null) => void;
 }
 
 /**
@@ -23,13 +25,13 @@ interface Queued {
 export class MessageBoxSystem {
   private readonly s: Session;
   private readonly queue: Queued[] = [];
-  private current: { done: boolean; entry: Queued } | null = null;
+  private current: { done: boolean; picked: number | null; entry: Queued } | null = null;
   private readonly off: () => void;
 
   constructor(session: Session) {
     this.s = session;
     this.off = session.bus.on("zelda:message", (m) => {
-      if (this.accepts(m.kind)) this.queue.push({ text: m.text, kind: m.kind ?? "info", speaker: "", portrait: "" });
+      if (this.accepts(m.kind)) this.queue.push({ text: m.text, kind: m.kind ?? "info", speaker: "", portrait: "", choices: [] });
     });
   }
 
@@ -45,9 +47,9 @@ export class MessageBoxSystem {
     return !!this.screen("message")?.kinds.includes(kind ?? "info");
   }
 
-  /** What an NPC says (Zelda: Dialogue): queued like a message; `done` runs when it was closed. */
-  say(text: string, speaker: string, portrait: string, done?: () => void): void {
-    this.queue.push({ text, kind: "dialogue", speaker, portrait, done });
+  /** What an NPC says (Zelda: Dialogue), with answers to pick: queued like a message; `done` runs when it was closed. */
+  say(text: string, speaker: string, portrait: string, choices: string[] = [], done?: (picked: number | null) => void): void {
+    this.queue.push({ text, kind: "dialogue", speaker, portrait, choices, done });
   }
 
   get isOpen(): boolean {
@@ -65,28 +67,33 @@ export class MessageBoxSystem {
     const shown = this.show(next);
     if (!shown) {
       this.s.hud?.note(next.speaker ? `${next.speaker}: ${next.text}` : next.text);
-      next.done?.();
+      next.done?.(null);
       return;
     }
-    const state = { done: false, entry: next };
+    const state = { done: false, picked: null as number | null, entry: next };
     this.current = state;
-    shown.then(() => (state.done = true));
+    shown.then((picked) => {
+      state.picked = picked;
+      state.done = true;
+    });
     this.setHold(true);
   }
 
-  private show(m: Queued): Promise<void> | null {
+  private show(m: Queued): Promise<number | null> | null {
     const screen = m.kind === "dialogue" ? (this.screen("dialogue") ?? this.screen("message")) : this.screen("message");
-    if (screen && this.s.screens) return this.s.screens.showMessage(screen.name, m.text, { speaker: m.speaker, portrait: m.portrait });
-    return this.s.host.playDialogue?.(dialogueSourceOf(m.text, m.speaker)) ?? null;
+    if (screen && this.s.screens) return this.s.screens.showMessage(screen.name, m.text, { speaker: m.speaker, portrait: m.portrait }, m.choices);
+    if (m.choices.length) this.s.logger.warnOnce("dialogue-choices", "Zelda: Dialogue with answers needs a dialogue box or a message box made in the UI Designer; no answer is picked.");
+    return this.s.host.playDialogue?.(dialogueSourceOf(m.text, m.speaker))?.then(() => null) ?? null;
   }
 
   private close(): void {
     const entry = this.current?.entry;
+    const picked = this.current?.picked ?? null;
     this.current = null;
     // The press that closed the message must not read the sign again in this same tick.
     this.s.host.input.reset();
     if (this.queue.length === 0) this.setHold(false);
-    entry?.done?.();
+    entry?.done?.(picked);
   }
 
   private setHold(on: boolean): void {
@@ -102,7 +109,7 @@ export class MessageBoxSystem {
     const waiting = [this.current?.entry, ...this.queue];
     this.current = null;
     this.queue.length = 0;
-    for (const e of waiting) e?.done?.();
+    for (const e of waiting) e?.done?.(null);
   }
 }
 

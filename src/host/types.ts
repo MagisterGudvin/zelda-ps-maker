@@ -39,8 +39,8 @@ export interface HostAdapter {
   getVariable?(id: string): string | number | boolean | undefined;
   /** Optional: sets a project variable; the value is converted to the variable's type. False when unknown. */
   setVariable?(id: string, value: string | number | boolean): boolean;
-  /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does. False when it cannot. */
-  runStoryEvent?(eventId: string): boolean;
+  /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does; resolves when it ended. Null when it cannot. */
+  runStoryEvent?(eventId: string): Promise<unknown> | null;
   /**
    * Optional: while `wants()` is true, the Menu key (controls.menu, Escape) goes to the toolkit and
    * PS Maker does not open its options menu on it. Returns the unsubscribe.
@@ -186,7 +186,7 @@ export interface HudModel {
   /** A title screen is open: the HUD layout and its notes are hidden. */
   hudHidden: boolean;
   /** The open UI screen over the game (its selected button; an inventory screen's grid), or null. */
-  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null } | null;
+  screen: { name: string; layout: UiLayout; values: LayoutValues; focus: string; inventory: { cells: InventoryCell[]; cursor: number } | null; choices: { items: string[]; cursor: number } | null } | null;
   /**
    * Open screens that do not take the keys (layers over the HUD: a boss bar, a notice), under the
    * screen; then one notification layer per note, `stack` = its place (0 = the oldest), each drawn
