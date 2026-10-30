@@ -315,10 +315,11 @@ export const ACTION_UI: Record<string, ActionUi> = {
     keywords: ["hud", "ui", "interface", "designer", "layout", "hearts", "counter", "bar", "menu", "screen", "button", "skin"],
     fields: { layout: { group: "Data" } },
     collapsed: ["Data"],
+    visible: { thisMapOnly: (p) => !set(p.name) },
     preview: (p) => {
       const text = typeof p.layout === "string" ? p.layout : "";
       const n = text ? (text.match(/"type":/g) ?? []).length : 0;
-      const what = set(p.name) ? `screen "${String(p.name)}"` : "HUD";
+      const what = set(p.name) ? `screen "${String(p.name)}"` : p.thisMapOnly === true ? "HUD of this map" : "HUD of all maps";
       return text ? `${what}, ${n} elements` : set(p.name) ? `${what}, empty` : "classic HUD";
     },
   },

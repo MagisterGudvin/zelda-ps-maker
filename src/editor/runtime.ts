@@ -3,6 +3,7 @@ import type { Session } from "../core/session.ts";
 import { mapSceneOf, PhaserHost, type PluginContextLike } from "../host/phaserHost.ts";
 import { installPublicApi } from "./publicApi.ts";
 import { capturePageErrors } from "./pageErrors.ts";
+import { applyProjectUi } from "./projectUi.ts";
 
 /**
  * Process-wide toolkit instance and its binding to PS Maker scenes. PS Maker
@@ -59,6 +60,8 @@ export function startSession(ctx: PluginContextLike, mapId: string, reason?: str
   if (reason && tk.session) tk.logger.info(`Restarting: ${reason}.`);
   const host = new PhaserHost(ctx, tk.config, tk.logger);
   const session = tk.start(host, mapId);
+  // The project's shared HUD and its screens, from the project data every map scene carries.
+  applyProjectUi(tk, host.psMakerStory() as Parameters<typeof applyProjectUi>[1]);
   host.attach(
     (delta) => session.update(delta),
     () => {

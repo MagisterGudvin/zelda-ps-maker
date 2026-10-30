@@ -1,4 +1,5 @@
 import { parseLayout, pictureKeys } from "../../src/ui/uiLayout.ts";
+import { projectUi } from "../../src/editor/projectUi.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { assetKeysOf, buildDemoStory, DEMO_ASSETS, DEMO_FONT, sanitizeName } from "../../scripts/demo-project.mjs";
@@ -162,7 +163,7 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   assert.equal(style.background.imageId, "zelda-ui-button");
   assert.equal(ui.optionsMenu.background.imageId, "zelda-ui-panel");
   assert.equal(ui.loadGameMenu.background.imageId, "zelda-ui-panel");
-  for (const m of story.maps.filter((x: Any) => x !== title)) {
+  for (const m of story.maps.filter((x: Any) => x !== title && x.initialActions.some((a: Any) => a.actionName === "Zelda: UI Layout"))) {
     const names = m.initialActions.map((a: Any) => a.actionName).filter(Boolean);
     assert.ok(names.indexOf("Zelda: UI Layout") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: UI Layout after Start Toolkit`);
     const { layout } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout").pluginParams.layout);
@@ -183,9 +184,18 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
 
 test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI HUD; one font with Cyrillic everywhere", async () => {
   const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
+  // The HUD and the pause screen are on the first map only; the dungeon uses them from the project.
+  const shared = projectUi(story);
+  assert.equal(shared.hud?.mapId, story.maps[0].id);
+  assert.deepEqual(shared.screens.map((x) => x.name), ["pause"]);
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
     assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
+    assert.deepEqual(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.kinds, ["sign", "item"]);
+    if (m !== story.maps[0]) {
+      assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: UI Layout"), `${m.name}: no copy of the HUD`);
+      continue;
+    }
     const { layout, error } = parseLayout(m.initialActions.find((a: Any) => a.actionName === "Zelda: UI Layout").pluginParams.layout);
     assert.equal(error, null);
     assert.deepEqual(layout!.elements.map((e) => e.type).sort(), ["bar", "counter", "counter", "counter", "counter", "hearts", "image", "image", "item", "text", "text"]);
@@ -198,7 +208,6 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     const events = screen.elements.filter((e) => e.type === "button" && e.action.kind === "event").map((e: Any) => e.action.id);
     assert.deepEqual(events, ["zelda-pause-settings", "zelda-pause-title"]);
     for (const id of events) assert.ok(story.globalStoryEvents.some((e: Any) => e.id === id && e.actions.length > 0), id);
-    assert.deepEqual(m.initialActions.find((a: Any) => a.actionName === "Zelda: Message Style").pluginParams.kinds, ["sign", "item"]);
   }
   assert.deepEqual(story.variables.map((v: Any) => v.id), ["zelda-progress"]);
   const ui = story.gameUI;

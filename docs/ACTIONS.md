@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.24.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.25.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **38**. Все имена начинаются с `Zelda: `.
 
@@ -409,7 +409,8 @@ Your own HUD or a menu screen, made with the mouse: open this action and the des
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|
-| `name` (Screen name) | string | `""` | Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key. / Пусто — HUD; имя — экран меню. |
+| `name` (Screen name) | string | `""` | Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key, on any map. / Пусто — HUD; имя — экран меню. |
+| `thisMapOnly` (This map only) | boolean | `false` | Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт). |
 | `layout` (Layout data) | string | `""` | Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер. |
 
 ## Zelda: Open UI Screen

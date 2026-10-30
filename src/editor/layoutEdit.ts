@@ -1,6 +1,7 @@
 import { createDefaultConfig } from "../core/config.ts";
 import { layoutScale } from "../host/layoutPainter.ts";
 import type { PsStory } from "../host/psmakerAssets.ts";
+import { UI_LAYOUT_ACTION, layoutAction, projectUi } from "./projectUi.ts";
 import { I18n } from "../ui/i18n.ts";
 import { classicLayout, layoutBindings, offsetFrom, parseLayout, readElement, type Anchor, type Box, type ElementType, type LayoutValues, type UiElement, type UiLayout } from "../ui/uiLayout.ts";
 
@@ -10,7 +11,7 @@ import { classicLayout, layoutBindings, offsetFrom, parseLayout, readElement, ty
  * game, and the edits themselves.
  */
 
-export const UI_LAYOUT_ACTION = "Zelda: UI Layout";
+export { UI_LAYOUT_ACTION } from "./projectUi.ts";
 /** Label of the action's data field (the designer writes the layout there). */
 export const LAYOUT_FIELD_LABEL = "Layout data";
 /** PS Maker 1.2.1 plugin text fields keep up to 50000 characters (`maxlength`). */
@@ -60,6 +61,14 @@ export interface DesignerSetup {
   screens: string[];
   /** The map's own events (for buttons that run one). */
   mapEvents: { id: string; name: string }[];
+  /**
+   * How the shown HUD is shared: the classic HUD; this map's own ("thisMap"); the project's shared
+   * HUD on this map ("shared") or from another map ("project"); or a second shared HUD that the
+   * game does not show ("conflict"). Screens are "shared".
+   */
+  sharing: "classic" | "thisMap" | "shared" | "project" | "conflict";
+  /** The map that holds the project's shared HUD. */
+  sharedMap: string;
 }
 
 const screenOf = (a: ActionLike) => (typeof a.pluginParams?.name === "string" ? a.pluginParams.name.trim() : "");
@@ -88,9 +97,25 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
   }
   const sp = start?.pluginParams ?? {};
   if (!opened && (!start || sp.hud === false)) return null;
-  const own = opened ?? hud;
+  const shared = projectUi(story as Parameters<typeof projectUi>[0]).hud;
+  let own = opened ?? hud;
   const screen = own ? screenOf(own.action) : "";
-  const raw = typeof own?.action.pluginParams?.layout === "string" ? (own.action.pluginParams.layout as string) : "";
+  const mine = own ? layoutAction(own.action) : null;
+  const sharing: DesignerSetup["sharing"] = screen
+    ? "shared"
+    : own
+      ? mine!.thisMapOnly
+        ? "thisMap"
+        : !shared || shared.actionId === own.action.id || shared.raw === mine!.raw
+          ? "shared"
+          : "conflict"
+      : shared
+        ? "project"
+        : "classic";
+  // What the game shows: a second shared HUD gives way to the project's (shown until it is opened).
+  let raw = own ? mine!.raw : (shared?.raw ?? "");
+  if (sharing === "conflict" && !opened) raw = shared!.raw;
+  if (sharing === "project") own = null;
   const parsed = parseLayout(raw);
   const empty = { ...classicLayout(), elements: [] };
   const layout = parsed.layout ?? (screen ? empty : classicLayout({ magic: sp.magicBar !== false, bottom: sp.hudBottom === true }));
@@ -114,6 +139,8 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
     screen,
     screens: [...new Set(screens)],
     mapEvents: (map.storyEvents ?? []).filter((e) => e?.id && !e.hidden).map((e) => ({ id: e.id!, name: e.name || e.id! })),
+    sharing,
+    sharedMap: shared?.mapName ?? "",
   };
 }
 

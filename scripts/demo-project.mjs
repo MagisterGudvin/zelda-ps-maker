@@ -318,8 +318,11 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
-        zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
-        zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
+        // The HUD and the pause screen are made once, on the first map: the other maps use them from the project.
+        if (key === Object.keys(maps)[0]) {
+          zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
+        }
         zelda.push(pluginAction("Zelda: Message Style", { layout: DIALOG_LAYOUT_ID, kinds: ["sign", "item"] }));
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));

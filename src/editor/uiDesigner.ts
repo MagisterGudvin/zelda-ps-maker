@@ -129,7 +129,10 @@ export class UiDesigner {
   /** Called a few times a second with the map's setup and whether the action's settings are open. */
   update(setup: DesignerSetup | null, editing: boolean): void {
     if (this.drag) return;
+    // "This map only" ticked or another shared HUD added: the panel's note changes.
+    const resharing = setup?.sharing !== this.setup?.sharing;
     this.setup = setup;
+    if (resharing && this.layout) this.panel.render();
     if (setup && editing && setup.action) {
       this.panel.show();
       if (!this.layout || this.ref !== setup.action.id) {
@@ -179,6 +182,17 @@ export class UiDesigner {
   /** The edited layout is a screen (not the HUD). */
   get isScreen(): boolean {
     return !!this.setup?.screen;
+  }
+
+  /** Who sees the edited layout (shown at the top of the panel). */
+  get sharingNote(): { text: string; warn: boolean } {
+    const st = this.setup;
+    if (!st) return { text: "", warn: false };
+    if (st.screen) return { text: "A screen: it opens on any map of the project.", warn: false };
+    if (st.sharing === "thisMap") return { text: "The HUD of this map only (This map only is ticked).", warn: false };
+    if (st.sharing === "conflict")
+      return { text: `Not shown in the game: the project's shared HUD is the one on map "${st.sharedMap}". Edit that one, delete this action, or tick "This map only" in its settings to keep it for this map.`, warn: true };
+    return { text: "The HUD of every map that has no HUD of its own.", warn: false };
   }
 
   /** Events a button can run: the project's and this map's. */
@@ -483,12 +497,16 @@ export class UiDesigner {
     dash(f.x + f.w, f.y, f.x + f.w, f.y + f.h);
     dash(f.x + f.w, f.y + f.h, f.x, f.y + f.h);
     dash(f.x, f.y + f.h, f.x, f.y);
-    const what = st.screen ? `screen "${st.screen}"` : "UI Layout";
+    const what = st.screen ? `screen "${st.screen}"` : st.sharing === "thisMap" ? "HUD of this map" : st.sharing === "conflict" ? "second shared HUD (not shown in the game)" : "HUD of all maps";
     const text = this.layout
       ? `Game window · ${what}: drag to move, right-click for more; the wheel and the middle button still move the map`
-      : st.action
-        ? "Game window · UI Layout (click the HUD to edit it)"
-        : "Game window · classic Zelda HUD (add Zelda: UI Layout after Start Toolkit to design your own)";
+      : st.sharing === "project"
+        ? `Game window · the shared HUD from map "${st.sharedMap}" (open its UI Layout there to edit it)`
+        : st.sharing === "conflict"
+          ? `Game window · the shared HUD from map "${st.sharedMap}"; this map's UI Layout is a second one (click to see it)`
+          : st.action
+            ? `Game window · ${what} (click it to edit)`
+            : "Game window · classic Zelda HUD (add Zelda: UI Layout after Start Toolkit to design your own)";
     this.label.setText(text).setPosition(f.x, f.y - 1).setVisible(true);
   }
 
@@ -543,18 +561,22 @@ export class UiDesigner {
     const cs = rect.width / (canvas.width || rect.width || 1);
     const k = boardScale(st, layout);
     const z = cam.zoom * cs;
+    const s = k * z;
     const fx = rect.left + (st.frame.x - cam.worldView.x) * z;
     const fy = rect.top + (st.frame.y - cam.worldView.y) * z;
-    // The visible part of the frame: inside the canvas.
-    const left = Math.max(fx, rect.left);
-    const top = Math.max(fy, rect.top);
-    const right = Math.min(fx + st.frame.w * z, rect.right);
-    const bottom = Math.min(fy + st.frame.h * z, rect.bottom);
+    // The designer's area: the frame and every element, also one dragged out of the frame (with
+    // room for its handles), so no press on the layout reaches the map below. Inside the canvas.
+    const area = boundsOf([{ x: 0, y: 0, w: st.frame.w / k, h: st.frame.h / k }, ...Object.values(this.painted?.boxes ?? {})])!;
+    const pad = this.layout ? (HANDLE_PX * 3) / s : 0;
+    const left = Math.max(fx + (area.x - pad) * s, rect.left);
+    const top = Math.max(fy + (area.y - pad) * s, rect.top);
+    const right = Math.min(fx + (area.x + area.w + pad) * s, rect.right);
+    const bottom = Math.min(fy + (area.y + area.h + pad) * s, rect.bottom);
     if (right <= left || bottom <= top) {
       o.style.display = "none";
       return;
     }
-    this.view = { ox: fx, oy: fy, s: k * z, left, top };
+    this.view = { ox: fx, oy: fy, s, left, top };
     Object.assign(o.style, { display: "block", left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px`, pointerEvents: this.layout ? "auto" : "none", cursor: "default" });
     this.drawOverlay();
   }

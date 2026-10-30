@@ -48,6 +48,8 @@ export class Toolkit {
   hudLayout: UiLayout | null = null;
   /** Project font id → CSS family, for the fonts the layouts use. */
   readonly uiFonts: Record<string, string> = {};
+  /** The project's shared HUD (a UI Layout for every map), found when a map starts; null = none. */
+  sharedHud: { actionId: string; mapName: string; raw: string } | null = null;
   /** UI screens by name (Zelda: UI Layout with a screen name), kept across maps. */
   readonly uiScreens = new Map<string, UiLayout>();
   private progressWritten: string | null = null;

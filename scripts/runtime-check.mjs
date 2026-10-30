@@ -448,6 +448,20 @@ await check("PS Maker Change map trigger takes the player to the dungeon", async
   await page.waitForFunction(() => window.ZeldaMakerToolkit.session?.mapId === "zelda-demo-dungeon", null, { timeout: 8000 });
   await wait(1000);
 });
+await check("the dungeon has no UI Layout of its own: it shows the project's shared HUD (made on the field) and its pause screen opens with Enter", async () => {
+  const keys = await ev(() => [...new Set(window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort());
+  const own = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).map.initialActions.some((a) => a.actionName === "Zelda: UI Layout"));
+  await page.keyboard.press("Enter");
+  await wait(400);
+  const screen = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.name ?? null);
+  await page.keyboard.press("Enter");
+  await wait(400);
+  const closed = await ev(() => window.ZeldaMakerToolkit.session.screens.current);
+  expect(!own, "the dungeon has its own UI Layout");
+  for (const k of ["zelda-ui-hud-bar", "zelda-ui-heart-full", "zelda-ui-digits", "zelda-ui-item-box"]) expect(keys.includes(k), `${k} not drawn in the dungeon (${keys.join(", ")})`);
+  expect(screen === "pause" && closed === null, `pause ${screen}, then ${JSON.stringify(closed)}`);
+  return `shared HUD in the demo's pictures, pause opened and closed`;
+});
 await check("the block slides onto the plate and the shutter opens", async () => {
   await tp(66, 168);
   await hold("ArrowRight", 1500);

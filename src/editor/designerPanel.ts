@@ -328,6 +328,8 @@ export class DesignerPanel {
     this.root.append(this.statusEl);
     if (message) this.status(message);
     if (this.collapsed || !L) return;
+    const note = this.d.sharingNote;
+    if (note.text) this.root.append(this.el("div", `margin:2px 0 4px;${note.warn ? "color:#1f1a24;background:#ffd23a;padding:4px;border-radius:3px" : "color:#9ad"}`, note.text));
     this.body = this.el("div");
     this.root.append(this.body);
 

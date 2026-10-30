@@ -974,7 +974,8 @@ const uiLayout = defineEvent({
   name: "Zelda: UI Layout",
   description: "Your own HUD or a menu screen, made with the mouse: open this action and the designer works on the map (game window frame) with a panel beside it — pictures, texts, meters, hearts, counters, the item box, buttons. Without a screen name it is the HUD; with one it is a screen opened by Open UI Screen, a button or the Menu key. Put it after Start Toolkit. / Свой HUD или экран меню из дизайнера.",
   parameterDefs: {
-    name: str("Screen name", "Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key. / Пусто — HUD; имя — экран меню.", ""),
+    name: str("Screen name", "Empty = the HUD. A name (e.g. pause) makes this a screen opened by Zelda: Open UI Screen, a button or the Menu key, on any map. / Пусто — HUD; имя — экран меню.", ""),
+    thisMapOnly: bool("This map only", "Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт).", false),
     layout: str("Layout data", "Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер.", ""),
   },
   execute(params, ctx) {
@@ -984,8 +985,11 @@ const uiLayout = defineEvent({
       const { layout: parsed, error } = parseLayout(textOf(p.layout));
       if (error) s.logger.warn(`UI Layout${screen ? ` "${screen}"` : ""}: ${error}; ${screen ? "the screen is empty" : "the classic HUD is shown"}.`);
       const layout = parsed ?? (screen ? { ...classicLayout(), elements: [] } : classicLayout());
+      const shared = tk.sharedHud;
       if (screen) tk.uiScreens.set(screen, layout);
-      else tk.hudLayout = layout;
+      else if (p.thisMapOnly === true || !shared || shared.raw === textOf(p.layout)) tk.hudLayout = layout;
+      // A second shared HUD: the project's first one (by map order) stays, so every map shows the same HUD.
+      else s.logger.warnOnce(`second-hud-${shared.actionId}`, `UI Layout on this map is a second shared HUD; the shared HUD on map "${shared.mapName}" is shown. Delete this one, or tick "This map only" to use it here.`);
       const story = psStory(s, "UI Layout");
       // Fonts of the texts: PS Maker loads a project font only when it first shows its own text.
       for (const id of new Set([layout.theme.font, ...layout.elements.map((e) => (e.type === "text" || e.type === "button" ? e.font : ""))].filter(Boolean))) {
