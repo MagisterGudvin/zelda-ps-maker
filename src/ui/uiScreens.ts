@@ -2,6 +2,7 @@ import type { Session } from "../core/session.ts";
 import { isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type KeybindsElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
 import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
 import { bindAction, resetPlayerControls } from "../core/playerControls.ts";
+import { setPlayerLanguage } from "../core/playerLanguage.ts";
 import { keyLabel } from "./keyLabels.ts";
 
 /** A message shown in the message screen: its pages, the page on screen and when it began typing. */
@@ -475,6 +476,9 @@ export class UiScreenSystem {
       case "resetControls":
         resetPlayerControls(this.s.toolkit);
         this.s.hud?.markDirty();
+        break;
+      case "language":
+        setPlayerLanguage(this.s.toolkit, a.value.trim());
         break;
     }
   }

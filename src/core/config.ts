@@ -9,7 +9,8 @@ import type { Facing } from "./math.ts";
  * Durations are milliseconds, distances pixels, speeds pixels per second.
  */
 export interface ToolkitConfig {
-  language: "auto" | "en" | "ru";
+  /** "auto" (the browser's), or a language code: the toolkit's own (en, ru) or one of the translation table's. */
+  language: string;
   features: FeatureFlags;
   debug: {
     hitboxes: boolean;

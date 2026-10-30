@@ -64,6 +64,7 @@ export interface ZeldaEventMap {
   "zelda:door:opened": { doorId: string };
   "zelda:door:closed": { doorId: string };
   "zelda:flag:changed": { flag: string; value: FlagValue };
+  "zelda:language:changed": { language: string };
   "zelda:puzzle:progress": { puzzleId: string; step: number; total: number };
   "zelda:puzzle:failed": { puzzleId: string };
   "zelda:puzzle:solved": { puzzleId: string };

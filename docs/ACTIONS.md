@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.32.1) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.33.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **38**. Все имена начинаются с `Zelda: `.
+Всего действий: **39**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -35,6 +35,7 @@
 - [Zelda: Show Message](#zelda-show-message)
 - [Zelda: Dialogue](#zelda-dialogue)
 - [Zelda: UI Layout](#zelda-ui-layout)
+- [Zelda: Translations](#zelda-translations)
 - [Zelda: Open UI Screen](#zelda-open-ui-screen)
 - [Zelda: Close UI Screen](#zelda-close-ui-screen)
 - [Zelda: Show Stat In Variable](#zelda-show-stat-in-variable)
@@ -55,7 +56,7 @@ Starts Zelda Maker Toolkit on this map with the main game settings. Put it first
 | `hearts` (Hearts) | number | `3` | Starting and maximum hearts. / Сердца в начале игры. |
 | `swordDamage` (Sword damage) | number | `2` | Damage of one sword hit (a slime has 2 HP). / Урон меча. |
 | `shieldMode` (Shield) | string-enum | `"hold"` | The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят. Варианты: Hold its key to block, Always up (blocks shots from the front). |
-| `language` (Language) | string-enum | `"auto"` | Interface language. / Язык интерфейса. Варианты: Auto, English, Русский. |
+| `language` (Language) | string-enum | `"auto"` | The game's language. Auto: the browser's, if the toolkit or the translation sheet (Zelda: Translations) has it. A language button of a UI screen lets the player change it. / Язык игры. Варианты: Auto, English, Русский. |
 | `progressVariable` (Progress variable) | variable | `""` | A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker. |
 | `tileUnits` (Positions in tiles) | boolean | `false` | Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах. |
 | `debugHitboxes` (Show hitboxes) | boolean | `false` | Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы. |
@@ -440,6 +441,14 @@ Your own HUD or a menu screen, made with the mouse: open this action and the des
 | `name` (Screen name) | string | `""` | The name Zelda: Open UI Screen and buttons open the screen by (e.g. pause). What the layout is — HUD, pause menu, message box… — is its Role in the designer; empty name with no role = the HUD. / Имя экрана; что это за макет — его роль в дизайнере. |
 | `thisMapOnly` (This map only) | boolean | `false` | Off: this HUD is the HUD of every map that has none of its own (one per project). On: only this map. / Только эта карта (иначе — HUD всех карт). |
 | `layout` (Layout data) | string | `""` | Written by the designer on the map; do not edit by hand. Empty = the classic Zelda HUD. / Данные макета — пишет дизайнер. |
+
+## Zelda: Translations
+
+The game in other languages without changing its texts: a sheet with a row per text (PS Maker dialogues, choices, images; toolkit messages, signs, item names, UI layout texts) and a column per language. Open it to edit the sheet, find the project's texts, or exchange it with a CSV file. One per project. / Переводы игры без правки текстов.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `data` (Translation data) | string | `""` | Written by the translation sheet on the map; do not edit by hand. / Данные переводов — пишет редактор таблицы. |
 
 ## Zelda: Open UI Screen
 

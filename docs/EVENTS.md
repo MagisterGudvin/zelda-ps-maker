@@ -46,6 +46,7 @@ API плагинов PS Maker 0.0.3 позволяет регистрирова�
 | `zelda:door:unlocked` | `{ doorId, lock }` |
 | `zelda:door:opened` / `zelda:door:closed` | `{ doorId }` |
 | `zelda:flag:changed` | `{ flag, value }` |
+| `zelda:language:changed` | `{ language }` — игрок сменил язык (кнопка экрана, с 0.33.0) |
 | `zelda:puzzle:progress` | `{ puzzleId, step, total }` |
 | `zelda:puzzle:failed` / `zelda:puzzle:solved` | `{ puzzleId }` |
 | `zelda:rule:fired` | `{ ruleId, branch: "then" \| "else" }` |

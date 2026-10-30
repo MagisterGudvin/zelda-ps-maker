@@ -296,3 +296,22 @@ test("demo story: a project without the pack gets a clear message", async () => 
   source.characters = [];
   assert.throws(() => buildDemoStory({ source, plugin: {} as Any, maps: MAPS }), /terrain "Fence".*character "Slime".*Tiles 'N Such Assets/s);
 });
+
+test("demo translations: every text of the demo has its Russian translation; the villager's goodbye is PS Maker's Dialogue", async () => {
+  const { extractTexts, parseTable } = await import("../../src/core/translations.ts");
+  const { findTranslations } = await import("../../src/editor/projectTranslations.ts");
+  const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7, now: 1 });
+  const found = findTranslations(story);
+  assert.ok(found, "a Zelda: Translations in the project");
+  const table = parseTable(found!.raw).table!;
+  assert.deepEqual(table.languages.map((l) => l.code), ["en", "ru"]);
+  const keep = new Set(["Z", "Zelda Maker Toolkit · PS Maker"]);
+  for (const f of extractTexts(story)) {
+    if (f.type === "toolkit" || keep.has(f.source)) continue;
+    assert.ok(table.rows.find((r) => r.type === f.type && r.source === f.source)?.tr.ru, `no Russian for ${f.type} "${f.source}" (${f.where})`);
+  }
+  const bye = story.globalStoryEvents.find((e: Any) => e.id === "zelda-villager-bye");
+  assert.equal(bye.actions[0].type, "dialogueAction");
+  const pause = projectUi(story).screens.find((s) => s.name === "pause")!;
+  assert.ok(parseLayout(pause.raw).layout!.elements.some((e) => e.type === "button" && e.action.kind === "language"), "a language button in the pause menu");
+});

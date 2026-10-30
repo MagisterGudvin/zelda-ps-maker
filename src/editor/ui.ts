@@ -310,6 +310,17 @@ export const ACTION_UI: Record<string, ActionUi> = {
     keywords: ["ability", "disable", "enable"],
     preview: (p, show) => `${show("ability") ?? "sword"} ${p.enabled === false ? "off" : "on"}`,
   },
+  "Zelda: Translations": {
+    keywords: ["translation", "translate", "localization", "localisation", "language", "csv", "i18n", "multilingual"],
+    fields: { data: { group: "Data" } },
+    collapsed: ["Data"],
+    preview: (p) => {
+      const text = typeof p.data === "string" ? p.data : "";
+      const languages = text.match(/"code":"([^"]*)"/g)?.map((m) => m.slice(8, -1)) ?? [];
+      const rows = (text.match(/"source":/g) ?? []).length;
+      return languages.length ? `${languages.join(", ")} · ${rows} texts` : "open it to start the translation sheet";
+    },
+  },
   "Zelda: UI Layout": {
     keywords: ["hud", "ui", "interface", "designer", "layout", "hearts", "counter", "bar", "menu", "screen", "button", "skin"],
     fields: { layout: { group: "Data" } },

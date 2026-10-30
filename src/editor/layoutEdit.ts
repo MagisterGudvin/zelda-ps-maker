@@ -179,6 +179,7 @@ export function sampleValues(layout: UiLayout, startParams: Record<string, unkno
     else if (key.startsWith("var:") || key.startsWith("owned:")) out[key] = 1;
     else if (key === "health" || key === "maxHealth") out[key] = hearts * heart;
     else if (key === "heartValue") out[key] = heart;
+    else if (key === "language") out[key] = i18n.languageName();
     else if (key === "hearts" || key === "maxHearts" || key === "fullHearts") out[key] = hearts;
     else if (key === "magic" || key === "maxMagic") out[key] = 1;
     else if (key === "magicPercent") out[key] = 100;

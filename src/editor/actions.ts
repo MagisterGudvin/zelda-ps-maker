@@ -16,6 +16,8 @@ import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
 import { layoutKind, useLayoutFonts } from "./projectUi.ts";
 import { applyPlayerControls, rememberProjectControls } from "../core/playerControls.ts";
+import { loadPlayerLanguage } from "../core/playerLanguage.ts";
+import { applyProjectTranslations, translateRunningScenes, type StoryLike } from "./projectTranslations.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
@@ -234,7 +236,7 @@ const startToolkit = defineEvent({
     hearts: num("Hearts", "Starting and maximum hearts. / Сердца в начале игры.", 3),
     swordDamage: num("Sword damage", "Damage of one sword hit (a slime has 2 HP). / Урон меча.", 2),
     shieldMode: choice("Shield", "The shield (found in a chest or given with Give Item) blocks only while its key (V) is held, from the front. Always up: it blocks shots from the front whenever you are not attacking. / Щит: держать кнопку или всегда поднят.", [["hold", "Hold its key to block"], ["passive", "Always up (blocks shots from the front)"]], "hold"),
-    language: choice("Language", "Interface language. / Язык интерфейса.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
+    language: choice("Language", "The game's language. Auto: the browser's, if the toolkit or the translation sheet (Zelda: Translations) has it. A language button of a UI screen lets the player change it. / Язык игры.", [["auto", "Auto"], ["en", "English"], ["ru", "Русский"]], "auto"),
     progressVariable: variable("Progress variable", "A Text variable (global) that holds the toolkit's progress: then PS Maker's own Save / Load game menus keep opened chests, items and hearts too. / Текстовая переменная: прогресс Toolkit в сохранениях PS Maker."),
     tileUnits: bool("Positions in tiles", "Tick if objects appear about 16 times too close to the top-left: Position values are then read as tiles. / Координаты в тайлах.", false),
     debugHitboxes: bool("Show hitboxes", "Draw collision/hitbox overlay (toggle with F9). / Показать хитбоксы.", false),
@@ -249,6 +251,13 @@ const startToolkit = defineEvent({
       // 0.5.0–0.5.3 saved Difficulty as a number (projects still carry it).
       const d = old.difficulty;
       const preset = typeof d === "number" ? (DIFFICULTY_PRESETS[Math.round(d)] ?? "alttp") : textOf(d) || "alttp";
+      // The project (its PS Maker story id) for what the player chose in this game (keys, language),
+      // and its translations, before the language is set.
+      const story = (ctx as { scene?: { story?: { metadata?: { storyId?: string }; storyName?: string } } } | undefined)?.scene?.story;
+      tk.projectKey = story?.metadata?.storyId || story?.storyName || tk.projectKey;
+      applyProjectTranslations(tk, story as StoryLike | undefined);
+      loadPlayerLanguage(tk);
+      translateRunningScenes((ctx as { scene?: unknown } | undefined)?.scene, tk);
       tk.applyPreset(preset);
       // Only fields PS Maker actually passed: an action saved by an older version keeps
       // its difficulty preset values instead of being reset to these defaults.
@@ -268,8 +277,6 @@ const startToolkit = defineEvent({
       );
       if (params.language) tk.configure({ language: params.language }, "Start Toolkit");
       // The player's own keys and buttons (a key bindings screen) lie over the project's controls.
-      const story = (ctx as { scene?: { story?: { metadata?: { storyId?: string }; storyName?: string } } } | undefined)?.scene?.story;
-      tk.projectKey = story?.metadata?.storyId || story?.storyName || tk.projectKey;
       rememberProjectControls(tk);
       applyPlayerControls(tk);
       if (has("progressVariable")) tk.progressVariable = textOf(old.progressVariable) || null;
@@ -1041,6 +1048,18 @@ const uiLayout = defineEvent({
   },
 });
 
+const translations = defineEvent({
+  name: "Zelda: Translations",
+  description: "The game in other languages without changing its texts: a sheet with a row per text (PS Maker dialogues, choices, images; toolkit messages, signs, item names, UI layout texts) and a column per language. Open it to edit the sheet, find the project's texts, or exchange it with a CSV file. One per project. / Переводы игры без правки текстов.",
+  parameterDefs: {
+    data: str("Translation data", "Written by the translation sheet on the map; do not edit by hand. / Данные переводов — пишет редактор таблицы.", ""),
+  },
+  execute(_params, ctx) {
+    // The table is read from the project when a map starts (it works on every map); here only reread it.
+    run("Zelda: Translations", ctx, _params, (s, tk) => applyProjectTranslations(tk, (s.host as PsHost).psMakerStory?.() as StoryLike | null));
+  },
+});
+
 const openUiScreen = defineEvent({
   name: "Zelda: Open UI Screen",
   description: "Opens a UI screen made with Zelda: UI Layout (by its screen name) over the game. Arrow keys choose a button, the action key presses it, the sword or inventory key goes back. / Открывает экран меню.",
@@ -1112,7 +1131,7 @@ const dialogue = defineEvent({
       waits = p.wait !== false;
       s.messageBox.say(
         text,
-        s.i18n.text(textOf(p.name)),
+        s.i18n.name(textOf(p.name)),
         assetId(p.portrait),
         slots.map((c) => c.text),
         (picked) => {
@@ -1367,6 +1386,7 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   showMessage,
   dialogue,
   uiLayout,
+  translations,
   openUiScreen,
   closeUiScreen,
   linkVariable,

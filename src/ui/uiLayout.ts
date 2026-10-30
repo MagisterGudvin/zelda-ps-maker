@@ -169,15 +169,18 @@ export interface MinimapElement extends Base {
   objectColor: string;
 }
 
-/** What a button does: run a PS Maker event, open or close a screen, set a project variable. */
+/**
+ * What a button does: run a PS Maker event, open or close a screen, set a project variable, reset
+ * the player's controls, change the game's language (Zelda: Translations).
+ */
 export interface ButtonAction {
-  kind: "none" | "event" | "open" | "close" | "variable" | "resetControls";
+  kind: "none" | "event" | "open" | "close" | "variable" | "resetControls" | "language";
   /** Event id, screen name or variable id. */
   id: string;
-  /** The variable's new value. */
+  /** The variable's new value; the language code ("" = the next language). */
   value: string;
 }
-export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable", "resetControls"];
+export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable", "resetControls", "language"];
 
 /**
  * A button of a screen: a picture (another one while it is selected) or a colour, and a text.

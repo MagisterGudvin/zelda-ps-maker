@@ -12,13 +12,13 @@ export interface PlayerControls {
   pad: Partial<Record<PadAction, number>>;
 }
 
-interface StorageLike {
+export interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-function storage(): StorageLike | null {
+export function storage(): StorageLike | null {
   try {
     return (globalThis as { localStorage?: StorageLike }).localStorage ?? null;
   } catch {

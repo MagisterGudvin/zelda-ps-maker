@@ -2,6 +2,7 @@ import type { Session } from "../core/session.ts";
 import type { HudItemSlot, HudModel } from "../host/types.ts";
 import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
 import { keyLabel } from "./keyLabels.ts";
+import type { Translator } from "../core/translations.ts";
 import { classicLayout, isShown, layoutBindings, type LayoutValues, type MinimapData, type UiLayout } from "./uiLayout.ts";
 
 const MAX_MESSAGES = 3;
@@ -134,6 +135,7 @@ export class HudSystem {
         out[key] = typeof v === "boolean" ? (v ? 1 : 0) : (v ?? 0);
       } else if (key.startsWith("t:")) out[key] = s.i18n.t(key.slice(2));
       else if (key === "heartValue") out[key] = s.config.player.heartValue;
+      else if (key === "language") out[key] = s.i18n.languageName();
       else if (key === "magic") out[key] = st.player.magic;
       else if (key === "maxMagic") out[key] = st.player.maxMagic;
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;
@@ -162,6 +164,36 @@ export class HudSystem {
     }
     return out;
   }
+
+  /**
+   * A layout as it reads in the game's language (Zelda: Translations): its texts translated, its
+   * pictures swapped for the language's, its texts in the language's font. The same layout when
+   * there is nothing to change.
+   */
+  private translated(layout: UiLayout): UiLayout {
+    const i18n = this.s.i18n;
+    const tr = i18n.translator;
+    if (!tr) return layout;
+    const lang = i18n.language;
+    const font = tr.lang(lang)?.font ?? "";
+    if (lang === tr.source && !font) return layout;
+    const cached = this.translations.get(layout);
+    if (cached?.lang === lang && cached.tr === tr) return cached.layout;
+    const out: UiLayout = {
+      ...layout,
+      theme: font ? { ...layout.theme, font } : layout.theme,
+      elements: layout.elements.map((e) => {
+        if (e.type === "text" || e.type === "button") return { ...e, text: tr.text(e.text, lang), ...(font ? { font } : {}), ...(e.type === "button" && e.image ? { image: tr.image(e.image, lang), hover: e.hover && tr.image(e.hover, lang) } : {}) };
+        if (e.type === "bar") return { ...e, text: tr.text(e.text, lang) };
+        if (e.type === "image" && e.image && !e.image.includes("{")) return { ...e, image: tr.image(e.image, lang) };
+        return e;
+      }),
+    };
+    this.translations.set(layout, { lang, tr, layout: out });
+    return out;
+  }
+
+  private readonly translations = new WeakMap<UiLayout, { lang: string; tr: Translator; layout: UiLayout }>();
 
   /** The project's notification screen (role Notification), or null: it shows each note. */
   private notification(): { name: string; layout: UiLayout } | null {
@@ -214,7 +246,7 @@ export class HudSystem {
     });
     return {
       visible: true,
-      layout,
+      layout: this.translated(layout),
       values: this.values(layout),
       fonts: s.toolkit.uiFonts,
       scale: s.config.ui.scale,
@@ -236,11 +268,11 @@ export class HudSystem {
         const choices = view.choices.length ? { items: view.choices, cursor: view.choice } : null;
         const keybinds = s.screens!.keybindsView();
         // While a key bindings row is selected no button is.
-        return { name: cur.name, layout: cur.layout, values: this.values(cur.layout), focus: keybinds && keybinds.row >= 0 ? "" : cur.focus, inventory, choices, keybinds };
+        return { name: cur.name, layout: this.translated(cur.layout), values: this.values(cur.layout), focus: keybinds && keybinds.row >= 0 ? "" : cur.focus, inventory, choices, keybinds };
       })(),
       layers: [
-        ...(s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: l.layout, values: this.values(l.layout) })),
-        ...(note ? this.messages.map((m, i) => ({ name: note.name, layout: note.layout, values: { ...this.values(note.layout), note: m.text }, stack: i })) : []),
+        ...(s.screens?.layers ?? []).map((l) => ({ name: l.name, layout: this.translated(l.layout), values: this.values(l.layout) })),
+        ...(note ? this.messages.map((m, i) => ({ name: note.name, layout: this.translated(note.layout), values: { ...this.values(note.layout), note: m.text }, stack: i })) : []),
       ],
       time: s.tick * (1000 / s.config.world.fixedStepHz),
       minimap: this.minimapData(),

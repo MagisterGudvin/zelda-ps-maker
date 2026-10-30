@@ -170,12 +170,14 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     theme: hudLayout.theme,
     screen: screen("menu"),
     elements: [
-      { id: "panel", type: "image", x: -60, y: -61, w: 120, h: 122, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
-      { id: "title", type: "text", x: -60, y: -54, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
-      button("continue", "Continue", -37, { kind: "close", id: "" }),
-      button("settings", "Settings", -15, { kind: "event", id: "zelda-pause-settings" }),
-      button("mainMenu", "Main menu", 7, { kind: "event", id: "zelda-pause-title" }),
-      button("controls", "Controls", 29, { kind: "open", id: "controls" }),
+      { id: "panel", type: "image", x: -60, y: -72, w: 120, h: 144, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -60, y: -65, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
+      button("continue", "Continue", -48, { kind: "close", id: "" }),
+      button("settings", "Settings", -26, { kind: "event", id: "zelda-pause-settings" }),
+      button("mainMenu", "Main menu", -4, { kind: "event", id: "zelda-pause-title" }),
+      button("controls", "Controls", 18, { kind: "open", id: "controls" }),
+      // The next language of the translation sheet (Zelda: Translations), its name on the button.
+      button("language", "Language: {language}", 40, { kind: "language", id: "" }),
     ],
   };
   // The player's own keys and gamepad buttons (opened from the pause menu).
@@ -229,6 +231,13 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     name: "Villager: advice",
     id: VILLAGER_HINT_EVENT,
     actions: [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_HINT }), pluginAction("Zelda: Give Item", { item: "shovel", count: 1 }), pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_DIG })],
+    hidden: false,
+  });
+  // ... and says goodbye in PS Maker's own dialogue box (translated by the sheet as it runs).
+  globalStoryEvents.push({
+    name: "Villager: bye",
+    id: VILLAGER_BYE_EVENT,
+    actions: [{ id: makeId(), name: "Dialogue", type: "dialogueAction", dialogueSource: VILLAGER_BYE }],
     hidden: false,
   });
   // Short notes ("You got 5 bombs!", "Saved"): a small plate under the HUD, one per note.
@@ -365,7 +374,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     if (key === Object.keys(maps)[0]) {
       // A villager who talks in the toolkit's dialogue box (an "interact" trigger around him runs Zelda: Dialogue).
       setupActions.push({ id: makeId(), name: "Spawn NPC", type: "spawnNPCAction", characterId: character.guard, inGameCharacterId: `in-game-character-${makeId()}`, position: { ...VILLAGER }, faceDirection: "down", fadeInEnabled: false, fadeInDurationMs: 750, waitForCompletion: true, instanceName: "Villager" });
-      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_TEXT, choice1: "Any advice?", event1: VILLAGER_HINT_EVENT, choice2: "Bye!" })]));
+      extra.push(eventTrigger({ x: VILLAGER.x - 24, y: VILLAGER.y - 24, w: 48, h: 48 }, "interact", "Talk to the villager", [pluginAction("Zelda: Dialogue", { name: "Villager", text: VILLAGER_TEXT, choice1: "Any advice?", event1: VILLAGER_HINT_EVENT, choice2: "Bye!", event2: VILLAGER_BYE_EVENT })]));
     }
     for (const n of m.npcs ?? []) {
       npcIds[n.name] = `in-game-character-${makeId()}`;
@@ -396,6 +405,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
           zelda.push(pluginAction("Zelda: UI Layout", { name: "inventory", layout: JSON.stringify(inventoryLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "dialogue", layout: JSON.stringify(dialogueLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "notification", layout: JSON.stringify(notificationLayout) }));
+          zelda.push(pluginAction("Zelda: Translations", { data: JSON.stringify(demoTranslations()) }));
         }
         if (needsSlots)
           for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
@@ -560,6 +570,42 @@ const VILLAGER_DIG = "Take my old shovel. I buried a bag of Magic Powder two ste
 
 /** What the villager says (Zelda: Dialogue: "\\n" typed in the field is a new line, two of them a new page). */
 const VILLAGER_TEXT = "It's dangerous out there. Slimes in the grass, and a knight by the gate.\\n\\nRead the sign for the controls. The chests hold what you need.";
+const VILLAGER_BYE_EVENT = "zelda-villager-bye";
+/** PS Maker's Dialogue: "Name: text", one newline a new line. */
+export const VILLAGER_BYE = "Villager: Take care out there!\nCome back if you need advice.";
+export const SIGN_TEXT = "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.\n\nC and B: the two item buttons. Q/E: switch the C item. I: all items (C or B puts one on that button). V: hold up the shield (in the chest below). Esc: pause.";
+
+/** The demo in Russian (Zelda: Translations): what each text of the demo reads in it. */
+const DEMO_RU = [
+  ["text", "LOW HEALTH", "МАЛО ЗДОРОВЬЯ"],
+  ["text", "Paused", "Пауза"],
+  ["text", "Continue", "Продолжить"],
+  ["text", "Settings", "Настройки"],
+  ["text", "Main menu", "Главное меню"],
+  ["text", "Controls", "Управление"],
+  ["text", "Language: {language}", "Язык: {language}"],
+  ["text", "Reset", "Сбросить"],
+  ["text", "Back", "Назад"],
+  ["text", SIGN_TEXT, "Стрелки: ходьба. X: меч, удерживайте для кругового удара. Z: открыть, поднять, говорить.\n\nC и B: две кнопки предметов. Q/E: сменить предмет на C. I: все предметы (C или B ставит предмет на эту кнопку). V: поднять щит (он в сундуке ниже). Esc: пауза."],
+  ["text", "The gate opened!", "Ворота открылись!"],
+  ["text", "Field cleared!", "Поле зачищено!"],
+  ["text", "Zelda Toolkit Demo", "Демо Zelda Toolkit"],
+  ["text", "New game", "Новая игра"],
+  ["text", "Exit", "Выход"],
+  ["name", "Villager", "Житель"],
+  ["text", VILLAGER_TEXT, "Снаружи опасно. В траве слаймы, а у ворот рыцарь.\\n\\nПрочитай табличку про управление. В сундуках есть всё, что нужно."],
+  ["text", "Any advice?", "Есть совет?"],
+  ["text", "Bye!", "Пока!"],
+  ["text", VILLAGER_HINT, "Держи V, чтобы поднять щит: он остановит выстрелы огненного слайма справа внизу. Щит — в сундуке под табличкой."],
+  ["text", VILLAGER_DIG, "Возьми мою старую лопату. Я закопал мешочек волшебного порошка в двух шагах ниже места, откуда ты пришёл. Копай там!\\n\\nВыстрели стрелой с бомбой: поставь лук и бомбы на C и B и нажми обе."],
+  ["text", "Take care out there!\nCome back if you need advice.", "Береги себя!\nВозвращайся, если нужен совет."],
+];
+
+/** The translation sheet of the demo: English as written, Russian. */
+export function demoTranslations() {
+  const lang = (code, name) => ({ code, name, dialogueLayout: "", choiceLayout: "", font: "" });
+  return { v: 1, languages: [lang("en", "English"), lang("ru", "Русский")], rows: DEMO_RU.map(([type, source, ru]) => ({ type, source, where: "demo", tr: { ru } })) };
+}
 
 /** File names the story refers to (asset keys are plain file names in <project>/assets). */
 export function assetKeysOf(story) {

@@ -45,8 +45,8 @@ test("constructor: text is asked only for content (sign text, messages, item nam
   const { default: plugin } = await import("../../src/index.ts");
   for (const e of plugin.events as unknown as AnyAction[]) {
     for (const [key, def] of Object.entries(e.parameterDefs)) {
-      // "layout" is the UI designer's data, written by the designer on the map, not typed.
-      if (def.type === "string") assert.ok(["text", "message", "name", "layout"].includes(key) || /^choice\d$/.test(key), `${e.name}.${key} is a text field`);
+      // "layout" and "data" are written by the UI designer and the translation sheet, not typed.
+      if (def.type === "string") assert.ok(["text", "message", "name", "layout", "data"].includes(key) || /^choice\d$/.test(key), `${e.name}.${key} is a text field`);
       if (def.type === "number") assert.ok(def.description.length > 12, `${e.name}.${key}: a number needs an explanation`);
     }
   }

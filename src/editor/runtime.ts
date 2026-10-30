@@ -4,6 +4,7 @@ import { mapSceneOf, PhaserHost, type PluginContextLike } from "../host/phaserHo
 import { installPublicApi } from "./publicApi.ts";
 import { capturePageErrors } from "./pageErrors.ts";
 import { applyProjectUi } from "./projectUi.ts";
+import { applyProjectTranslations, translateRunningScenes, useLanguageFonts } from "./projectTranslations.ts";
 
 /**
  * Process-wide toolkit instance and its binding to PS Maker scenes. PS Maker
@@ -62,6 +63,10 @@ export function startSession(ctx: PluginContextLike, mapId: string, reason?: str
   const session = tk.start(host, mapId);
   // The project's shared HUD and its screens, from the project data every map scene carries.
   applyProjectUi(tk, host.psMakerStory() as Parameters<typeof applyProjectUi>[1]);
+  // Its translations, also of PS Maker's own dialogues on every map scene.
+  applyProjectTranslations(tk, host.psMakerStory() as Parameters<typeof applyProjectTranslations>[1]);
+  translateRunningScenes(host.scene, tk);
+  useLanguageFonts(tk, host.psMakerStory(), host);
   host.attach(
     (delta) => session.update(delta),
     () => {

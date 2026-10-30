@@ -198,11 +198,12 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "slice", label: "Corner size (9-slice, 0 = stretch)", kind: "num" },
     { path: "color", label: "Colour without a picture", kind: "color" },
     { path: "hoverColor", label: "Colour when selected", kind: "color" },
-    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"], ["resetControls", "Reset the player's controls"]] },
+    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"], ["resetControls", "Reset the player's controls"], ["language", "Change the language"]] },
     { path: "action.id", label: "Event", kind: "event" },
     { path: "action.id", label: "Screen", kind: "screen" },
     { path: "action.id", label: "Variable", kind: "var" },
     { path: "action.value", label: "Value", kind: "text" },
+    { path: "action.value", label: "Language (code; empty = next)", kind: "text" },
   ],
 };
 
@@ -214,7 +215,7 @@ function applies(f: FieldDef, e: UiElement): boolean {
   if (f.path === "rotation") return ROTATABLE.includes(e.type);
   if (e.type === "button" && f.path.startsWith("action.") && f.path !== "action.kind") {
     const k = e.action.kind;
-    return (f.kind === "event" && k === "event") || (f.kind === "screen" && k === "open") || (f.kind === "var" && k === "variable") || (f.path === "action.value" && k === "variable");
+    return (f.kind === "event" && k === "event") || (f.kind === "screen" && k === "open") || (f.kind === "var" && k === "variable") || (f.path === "action.value" && (f.label === "Value" ? k === "variable" : k === "language"));
   }
   return true;
 }

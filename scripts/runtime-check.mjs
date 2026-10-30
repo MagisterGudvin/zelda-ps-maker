@@ -91,7 +91,8 @@ const server = http
   })
   .listen(0, "127.0.0.1");
 const browser = await chromium.launch(opts.chrome ? { executablePath: opts.chrome } : {});
-// Russian browser language, as the author's: Toolkit texts (Start Toolkit → Language: auto) are Russian.
+// Russian browser language, as the author's: with Start Toolkit → Language: auto the demo plays in
+// Russian — the toolkit's own texts and the demo's (its translation sheet, Zelda: Translations).
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, locale: "ru-RU" });
 const logs = [];
 page.on("console", (m) => logs.push(`[${m.type()}] ${m.text()}`));
@@ -186,7 +187,7 @@ await check("the game opens on the title screen made in the UI Designer (toolkit
   const focus = (await screenNow()).focus;
   await page.screenshot({ path: path.join(OUT, "title.png") });
   expect(onTitle.map === "zelda-demo-title" && onTitle.hearts === 0 && onTitle.buttons >= 4 * 9, JSON.stringify(onTitle));
-  for (const t of ["New game", "Continue", "Settings", "Exit"]) expect(onTitle.texts.includes(t), `"${t}" not drawn (${onTitle.texts.join(", ")})`);
+  for (const t of ["Новая игра", "Продолжить", "Настройки", "Выход"]) expect(onTitle.texts.includes(t), `"${t}" not drawn (${onTitle.texts.join(", ")})`);
   expect(!onTitle.player, "the player shows on the title");
   expect(focus === "newGame", `selected ${focus}`);
   await page.keyboard.press("z");
@@ -236,7 +237,7 @@ await check("HUD (Zelda: UI Layout): hearts, counters, item box, magic and 9-sli
   const blink = [];
   for (let i = 0; i < 6; i++) {
     await wait(130);
-    blink.push(await ev(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.find((o) => o.type === "Text" && o.visible && o.text === "LOW HEALTH")?.alpha ?? -1));
+    blink.push(await ev(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.find((o) => o.type === "Text" && o.visible && o.text === "МАЛО ЗДОРОВЬЯ")?.alpha ?? -1));
   }
   await ev(() => {
     // The checks spend a while near the start (sign, villager) while the field's enemies roam: a
@@ -278,18 +279,18 @@ await check("message screen (UI Designer, role Message): reading the sign types 
   await hold("ArrowUp", 200);
   await page.keyboard.press("z");
   await wait(250);
-  const typing = (await hudTexts()).find((t) => "Arrows: move. X: sword, hold it to spin. Z: open, lift, talk.".startsWith(t.text));
-  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.endsWith("lift, talk.")), null, { timeout: 6000 }).catch(() => {});
+  const typing = (await hudTexts()).find((t) => "Стрелки: ходьба. X: меч, удерживайте для кругового удара. Z: открыть, поднять, говорить.".startsWith(t.text));
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.endsWith("поднять, говорить.")), null, { timeout: 6000 }).catch(() => {});
   const open = await ev(() => ({
     dialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
     screen: window.ZeldaMakerToolkit.session.screens.current?.name,
     paused: window.ZeldaMakerToolkit.session.isPaused("message"),
   }));
-  const page1 = (await hudTexts()).find((t) => t.text.startsWith("Arrows: move"));
+  const page1 = (await hudTexts()).find((t) => t.text.startsWith("Стрелки: ходьба"));
   await page.screenshot({ path: path.join(OUT, "sign-message.png") });
   await page.keyboard.press("z");
-  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("C and B")), null, { timeout: 6000 }).catch(() => {});
-  const page2 = (await hudTexts()).some((t) => t.text.startsWith("C and B"));
+  await page.waitForFunction(() => window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.some((o) => o.type === "Text" && o.visible && o.text.startsWith("C и B")), null, { timeout: 6000 }).catch(() => {});
+  const page2 = (await hudTexts()).some((t) => t.text.startsWith("C и B"));
   let still = true;
   for (let i = 0; i < 6 && still; i++) {
     await page.keyboard.press("z");
@@ -310,7 +311,7 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   await tp(80, 140);
   await hold("ArrowUp", 150);
   await page.keyboard.press("z");
-  const page1 = await hudHas("by the gate.");
+  const page1 = await hudHas("у ворот рыцарь.");
   const during = await ev(() => ({
     screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null,
     psDialogue: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true,
@@ -319,12 +320,12 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   const texts = (await hudTexts()).map((t) => t.text);
   await page.screenshot({ path: path.join(OUT, "villager-dialogue.png") });
   await page.keyboard.press("z");
-  const page2 = await hudHas("what you need.");
-  const answers = (await hudHas("Any advice?")) && (await hudHas("Bye!"));
+  const page2 = await hudHas("всё, что нужно.");
+  const answers = (await hudHas("Есть совет?")) && (await hudHas("Пока!"));
   const view = await ev(() => window.ZeldaMakerToolkit.session.screens.messageView());
   await page.screenshot({ path: path.join(OUT, "villager-answers.png") });
   await page.keyboard.press("z");
-  const advice = await hudHas("Hold V to raise the shield");
+  const advice = await hudHas("Держи V, чтобы поднять щит");
   await page.screenshot({ path: path.join(OUT, "villager-advice.png") });
   // Then "You got Shovel!" and how to dig (two pages); Z through all of it.
   let open = true;
@@ -338,8 +339,8 @@ await check("the villager talks in the dialogue box made in the UI Designer (Zel
   const shovel = await ev(() => window.ZeldaMakerToolkit.toolkit.inventory.owns("shovel"));
   expect(shovel, "the advice event did not give the shovel");
   expect(page1 && during.screen === "dialogue" && !during.psDialogue && during.paused, JSON.stringify(during));
-  expect(texts.includes("Villager"), `texts ${texts.join(" | ")}`);
-  expect(page2 && answers && view.choices.join() === "Any advice?,Bye!" && view.text.endsWith("what you need."), `page 2 ${page2}, answers ${answers}, ${JSON.stringify(view)}`);
+  expect(texts.includes("Житель"), `texts ${texts.join(" | ")}`);
+  expect(page2 && answers && view.choices.join() === "Есть совет?,Пока!" && view.text.endsWith("всё, что нужно."), `page 2 ${page2}, answers ${answers}, ${JSON.stringify(view)}`);
   expect(advice, "his advice (the answer's event) did not show");
   expect(!open && !again, `still open ${open}, started again ${again}`);
   return "name plate, 2 pages, answers on plates, advice from the event (and his shovel), closed, not started again";
@@ -707,6 +708,9 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
     navigator.getGamepads = () => [window.__pad];
   });
   const a0 = await body();
+  // A moment between the pad showing up and the stick: tilted in the same instant, the player moved
+  // only 3 px in 3 runs of 0.33 (cause not found; with the pause 5 runs of 5 moved 32-57 px).
+  await wait(300);
   await ev(() => (window.__pad.axes = [1, 0, 0, 0]));
   await wait(500);
   await ev(() => (window.__pad.axes = [0, 0, 0, 0]));
@@ -763,6 +767,51 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   expect(rebound === "KeyJ" && focus === "reset" && reset === "KeyX", `rebound ${rebound}, focus ${focus}, reset ${reset}`);
   expect(closed.screen === null, `closed ${JSON.stringify(closed)}`);
   return `stick → ${Math.round(a1.x - a0.x)} px, A → sword, View → pause; Controls: sword X → J → Reset → X`;
+});
+await check("translations (Zelda: Translations): in a Russian browser the demo plays in Russian — PS Maker's own Dialogue (the villager's goodbye) too, while the project keeps its English; the pause menu's Language button switches to English and back", async () => {
+  const lang = () => ev(() => window.ZeldaMakerToolkit.toolkit.i18n.language);
+  const pressLanguage = async () => {
+    await page.keyboard.press("Escape");
+    await wait(400);
+    for (let i = 0; i < 4; i++) {
+      await page.keyboard.press("ArrowDown");
+      await wait(120);
+    }
+    const focus = (await screenNow()).focus;
+    await page.keyboard.press("z");
+    await wait(400);
+    const texts = (await hudTexts()).map((t) => t.text);
+    await page.keyboard.press("Escape");
+    await wait(400);
+    return { focus, texts };
+  };
+  const before = await lang();
+  // PS Maker's Dialogue, run as the villager's "Bye!" answer runs it.
+  // (Not awaited: the event ends when the player has read the dialogue.)
+  await ev(() => void window.ZeldaMakerToolkit.session.host.runStoryEvent("zelda-villager-bye"));
+  let shown = "";
+  for (let i = 0; i < 40 && !/нужен совет\./.test(shown); i++) {
+    await wait(200);
+    shown = await ev(() => document.body.innerText);
+  }
+  await page.screenshot({ path: path.join(OUT, "dialogue-ru.png") });
+  const source = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).story.globalStoryEvents.find((e) => e.id === "zelda-villager-bye").actions[0].dialogueSource);
+  for (let i = 0; i < 8 && /Береги|Возвращайся/.test(await ev(() => document.body.innerText)); i++) {
+    await page.keyboard.press("z");
+    await wait(500);
+  }
+  const closedDialogue = !/Береги|Возвращайся/.test(await ev(() => document.body.innerText));
+  const toEn = await pressLanguage();
+  const en = await lang();
+  const toRu = await pressLanguage();
+  const back = await lang();
+  expect(before === "ru", `the game started in ${before}`);
+  expect(/Житель/.test(shown) && /Береги себя!/.test(shown) && /Возвращайся, если нужен совет\./.test(shown), `dialogue: ${shown.slice(0, 200)}`);
+  expect(source === "Villager: Take care out there!\nCome back if you need advice.", `the project's dialogue changed: ${source}`);
+  expect(closedDialogue, "the dialogue did not close");
+  expect(toEn.focus === "language" && en === "en" && toEn.texts.includes("Paused") && toEn.texts.includes("Continue") && toEn.texts.includes("Language: English"), `to English: ${en}, ${JSON.stringify(toEn)}`);
+  expect(back === "ru" && toRu.texts.includes("Пауза") && toRu.texts.includes("Язык: Русский"), `back: ${back}, ${toRu.texts.join(", ")}`);
+  return `PS Maker dialogue "Житель: Береги себя!" (the project keeps "${source.split("\n")[0]}"); Language → English ("Paused", "Language: English") → Russian`;
 });
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.

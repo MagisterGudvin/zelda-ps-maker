@@ -45,6 +45,8 @@ export class Toolkit {
   projectKey = "";
   /** The project's controls (Start Toolkit, Set Controls) under the player's choices (playerControls.ts). */
   projectControls: ToolkitConfig["controls"] | null = null;
+  /** The language the player picked in the game (kept in the browser, playerLanguage.ts); null = the project's. */
+  playerLanguage: string | null = null;
   /** The HUD made in the designer (Zelda: UI Layout); null = the classic HUD. */
   hudLayout: UiLayout | null = null;
   /** Project font id → CSS family, for the fonts the layouts use. */
@@ -88,7 +90,7 @@ export class Toolkit {
 
   private applyRuntimeSettings(): void {
     this.logger.level = this.config.debug.logLevel;
-    this.i18n.setLanguage(this.config.language);
+    this.i18n.setLanguage(this.playerLanguage || this.config.language);
     this.session?.hud?.markDirty();
     this.session?.debug?.setEnabled(this.config.debug.hitboxes);
     if (this.session?.debug && this.session.debug.diagnosticsOn !== this.config.debug.diagnostics) this.session.debug.setDiagnostics(this.config.debug.diagnostics);

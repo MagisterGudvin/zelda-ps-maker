@@ -3,6 +3,8 @@ import { isObjectType, resolveObjectConfig } from "../interactions/objectTypes.t
 import { resolveTexture, type TextureManagerLike } from "../host/textures.ts";
 import { characterFromParam, mapObjectLook, storyOfScene, type PsAnimationSet, type PsCharacter, type PsStory } from "../host/psmakerAssets.ts";
 import { UiDesigner } from "./uiDesigner.ts";
+import { TranslationSheet } from "./translationSheet.ts";
+import { TRANSLATIONS_ACTION } from "./projectTranslations.ts";
 import { UI_LAYOUT_ACTION, designerSetup, openPanel } from "./layoutEdit.ts";
 import { areaOf, fillEventOptions, fillMapObjectOptions, pathOf, pointOf, textOf } from "./fields.ts";
 
@@ -246,6 +248,8 @@ export function startEditorPreview(win: any = globalThis): void {
   win[REGISTRY_KEY]?.stop?.();
   let overlay: Overlay | null = null;
   let hud: UiDesigner | null = null;
+  let sheet: TranslationSheet | null = null;
+  let sheetScene: any = null;
   let failed = false;
   let selected = "";
   let lastClick = { id: "", at: 0 };
@@ -261,6 +265,7 @@ export function startEditorPreview(win: any = globalThis): void {
   };
   const clear = () => {
     clearOverlay();
+    sheet?.update(null);
     try {
       hud?.destroy();
     } catch {
@@ -309,6 +314,11 @@ export function startEditorPreview(win: any = globalThis): void {
     hud ??= new UiDesigner(scene, win, { story: () => storyOfScene(scene), openAction: (ref) => openAction(win, scene.map.id, ref) });
     const editing = !!openPanel(win.document, UI_LAYOUT_ACTION);
     hud.update(designerSetup(scene.map, storyOfScene(scene), Number(scene.CAMERA_ZOOM) || 0, editing && opened ? decodeURIComponent(opened) : ""), editing);
+    // The translation sheet while Zelda: Translations is open.
+    sheetScene = scene;
+    sheet ??= new TranslationSheet(win, { story: () => storyOfScene(sheetScene) as never });
+    const tr = opened && openPanel(win.document, TRANSLATIONS_ACTION) ? zeldaActions(scene.map).find(({ action }) => action.id === decodeURIComponent(opened) && action.actionName === TRANSLATIONS_ACTION)?.action : null;
+    sheet.update(tr ? { id: tr.id ?? "", raw: textOf(tr.pluginParams?.data) } : null);
   };
   const timer = win.setInterval(() => {
     try {
@@ -322,13 +332,16 @@ export function startEditorPreview(win: any = globalThis): void {
     stop() {
       win.clearInterval(timer);
       clear();
+      sheet?.destroy();
+      sheet = null;
     },
   };
 }
 
 function signature(map: MapLike): string {
   const npcs = [map.setupActions, map.initialActions].flatMap((l) => l ?? []).filter((a) => a?.type === "spawnNPCAction");
-  return JSON.stringify([map.id, zeldaActions(map).map(({ action: a, root }) => [a.id, root, a.actionName, a.pluginParams]), npcs.map((a) => [a.inGameCharacterId, a.position])]);
+  // The translation table draws nothing on the map (and can be long).
+  return JSON.stringify([map.id, zeldaActions(map).map(({ action: a, root }) => [a.id, root, a.actionName, a.actionName === TRANSLATIONS_ACTION ? null : a.pluginParams]), npcs.map((a) => [a.inGameCharacterId, a.position])]);
 }
 
 /** The editor's collision toggle, read from its own collision boxes (shown or hidden together). */
