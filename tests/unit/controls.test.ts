@@ -139,7 +139,13 @@ test("key bindings screen: arrows pick an action and a column, Z waits for the n
   r.session.screens!.open("controls");
   r.step();
   const view = () => r.session.screens!.keybindsView()!;
-  assert.deepEqual(view().rows.slice(0, 2).map((x) => [x.label, x.key, x.pad]), [["Sword", "X", "A"], ["Item 1", "C", "X"]]);
+  assert.deepEqual(view().rows.map((x) => x.label).slice(0, 5), ["Move up", "Move down", "Move left", "Move right", "Sword"], "walking first, then the toolkit's actions");
+  assert.equal(view().rows[0].pad, "Up", "walking keeps the d-pad");
+  assert.deepEqual(view().rows.slice(4, 6).map((x) => [x.label, x.key, x.pad]), [["Sword", "X", "A"], ["Item 1", "C", "X"]]);
+  for (let i = 0; i < 4; i++) {
+    r.host.input.tap("down");
+    r.step();
+  }
   r.host.input.tap("action");
   r.step();
   assert.ok(view().waiting && r.host.input.capture, "waiting for the new key");
@@ -178,5 +184,28 @@ test("key bindings screen: arrows pick an action and a column, Z waits for the n
   r.host.input.tap("action");
   r.step();
   assert.deepEqual([r.tk.config.controls.sword[0], r.tk.config.controls.gamepad.useItem], ["KeyX", 2]);
+  delete (globalThis as { localStorage?: unknown }).localStorage;
+});
+
+test("walking keys: the player gives Move up a key of their own; keys swap between rows; PS Maker is handed its own key for it (walking and Interact); the gamepad keeps the d-pad", () => {
+  memoryStorage();
+  const r = createRig();
+  rememberProjectControls(r.tk);
+  bindAction(r.tk, "up", { key: "KeyK" });
+  assert.deepEqual(r.tk.config.controls.move.up, ["KeyK", "KeyW"], "the main key changes, the second stays");
+  assert.deepEqual(r.host.gameKeys?.moveUp, ["KeyK", "KeyW"], "PS Maker's Move up gets the player's keys");
+  // A key of another row moves over: its main key gets this row's old one.
+  bindAction(r.tk, "sword", { key: "ArrowDown" });
+  assert.deepEqual(r.tk.config.controls.sword, ["ArrowDown"]);
+  assert.deepEqual(r.tk.config.controls.move.down, ["KeyX", "KeyS"], "Move down got the sword's old key");
+  // A second key of another row is just dropped there.
+  bindAction(r.tk, "action", { key: "KeyW" });
+  assert.deepEqual(r.tk.config.controls.move.up, ["KeyK"]);
+  assert.deepEqual(r.host.gameKeys?.interact, ["KeyW"], "the Action row is PS Maker's Interact too");
+  bindAction(r.tk, "left", { button: 3 });
+  assert.equal(r.tk.config.controls.gamepad.useItem2, 3, "no pad button for walking: nothing changes");
+  resetPlayerControls(r.tk);
+  assert.deepEqual(r.tk.config.controls.move.up, ["ArrowUp", "KeyW"]);
+  assert.deepEqual(r.host.gameKeys, {}, "PS Maker's own keys again");
   delete (globalThis as { localStorage?: unknown }).localStorage;
 });

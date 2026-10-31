@@ -4,6 +4,7 @@ import { mapSceneOf, PhaserHost, type PluginContextLike } from "../host/phaserHo
 import { installPublicApi } from "./publicApi.ts";
 import { capturePageErrors } from "./pageErrors.ts";
 import { applyProjectUi } from "./projectUi.ts";
+import { applyGameKeys } from "../core/playerControls.ts";
 import { applyProjectTranslations, useLanguageFonts } from "./projectTranslations.ts";
 import { hookRunningScenes } from "./storyHooks.ts";
 
@@ -98,6 +99,8 @@ export function startSession(ctx: PluginContextLike, mapId: string, reason?: str
       tk.logger.error("Applying the project's toolkit settings failed:", err);
     }
   }
+  // The player's own walking and Interact keys, on this map too.
+  applyGameKeys(tk);
   return tk.session ?? session;
 }
 

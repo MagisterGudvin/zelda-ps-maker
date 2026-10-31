@@ -733,7 +733,9 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   // only 3 px in 3 runs of 0.33 (cause not found; with the pause 5 runs of 5 moved 32-57 px).
   await wait(300);
   await ev(() => (window.__pad.axes = [1, 0, 0, 0]));
-  await wait(500);
+  await wait(250);
+  const stickKeys = await ev(() => ({ keys: window.game.playerMovementKeys?.getState?.() ?? null, paused: window.game.isPaused, lock: window.ZeldaMakerToolkit.session.player.isLocked?.() ?? null, screen: window.ZeldaMakerToolkit.session.screens.current?.name ?? null }));
+  await wait(250);
   await ev(() => (window.__pad.axes = [0, 0, 0, 0]));
   await wait(200);
   const a1 = await body();
@@ -765,6 +767,11 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   }
   const opened = await screenNow();
   await page.screenshot({ path: path.join(OUT, "controls.png") });
+  // The sword: the fifth row (under the four walking rows).
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(120);
+  }
   await page.keyboard.press("z");
   await wait(300);
   await page.keyboard.press("j");
@@ -784,7 +791,7 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
     await wait(350);
   }
   const closed = await screenNow();
-  expect(a1.x - a0.x > 20, `the stick moved the player ${a1.x - a0.x}`);
+  expect(a1.x - a0.x > 20, `the stick moved the player ${a1.x - a0.x}; meanwhile ${JSON.stringify(stickKeys)}`);
   expect(swung, "A did not swing the sword");
   expect(paused.screen === "pause" && !options, `View: ${JSON.stringify(paused)}, PS Maker options ${options}`);
   expect(opened.screen === "controls", `controls ${JSON.stringify(opened)}`);
@@ -845,6 +852,108 @@ await check("translations (Zelda: Translations): in a Russian browser the demo p
   expect(toEn.focus === "language" && en === "en" && toEn.texts.includes("Settings") && toEn.texts.includes("Music") && toEn.texts.includes("Language: English"), `to English: ${en}, ${JSON.stringify(toEn)}`);
   expect(back === "ru" && toRu.texts.includes("Настройки") && toRu.texts.includes("Язык: Русский"), `back: ${back}, ${toRu.texts.join(", ")}`);
   return `PS Maker dialogue "Житель: Береги себя!" (the project keeps "${source.split("\n")[0]}"); Settings → Language → English ("Settings", "Language: English") → Russian`;
+});
+await check("the player's own keys for PS Maker's walking and Interact (Controls screen): Move up → K walks up through PS Maker's own movement and the arrow no longer does; Action → F talks to the villager (PS Maker's interact trigger) and turns PS Maker's dialogue pages; Reset brings the keys back", async () => {
+  const y = () => ev(() => window.game.scene.getScenes(true).find((m) => m.map).player.body.center.y);
+  const press = async (key, n = 1, ms = 140) => {
+    for (let i = 0; i < n; i++) {
+      await page.keyboard.press(key);
+      await wait(ms);
+    }
+  };
+  // Pause → Settings (4th) → Controls (5th).
+  // Menu buttons are pressed with the Action key (Z, or the player's own).
+  const trace = [];
+  const note = async (what) => trace.push(`${what}:${JSON.stringify(await screenNow())}`);
+  const openControls = async (ok = "z") => {
+    await press("Escape", 1, 400);
+    await note("esc");
+    await press("ArrowDown", 3);
+    await note("down3");
+    await press(ok, 1, 400);
+    await note(ok);
+    await press("ArrowDown", 4);
+    await press(ok, 1, 400);
+    await note(`${ok}2`);
+  };
+  // Where walking up is free (the gamepad check walks right from here).
+  const spot = [130, 64];
+  // Measured with the toolkit's simulation paused (Zelda: Pause Combat): no enemy knocks the player
+  // back meanwhile; PS Maker's walking and the key hand-over are not the simulation.
+  const held = async (key) => {
+    await ev(() => window.ZeldaMakerToolkit.session.setPaused("script", true));
+    const path = [Math.round(await y())];
+    await page.keyboard.down(key);
+    for (let i = 0; i < 4; i++) {
+      await wait(100);
+      path.push(Math.round(await y()));
+    }
+    const st = await ev(() => { const p = window.game.scene.getScenes(true).find((m) => m.map).player; return { keys: window.game.playerMovementKeys?.getState?.() ?? null, vy: Math.round(p.body.velocity.y), map: window.ZeldaMakerToolkit.session?.mapId, hp: window.ZeldaMakerToolkit.toolkit.state.player.hp }; });
+    await page.keyboard.up(key);
+    for (let i = 0; i < 3; i++) {
+      await wait(100);
+      path.push(Math.round(await y()));
+    }
+    await ev(() => window.ZeldaMakerToolkit.session.setPaused("script", false));
+    return { ...st, path };
+  };
+  await tp(spot[0], spot[1] + 20);
+  await wait(300);
+  const b0 = await y();
+  const stBase = await held("ArrowUp");
+  const base = b0 - (await y());
+  await openControls();
+  const screen = (await screenNow()).screen;
+  await press("z", 1, 300);
+  await press("k", 1, 400);
+  await press("ArrowDown", 8);
+  await press("z", 1, 300);
+  await press("f", 1, 400);
+  const keys = await ev(() => ({ up: window.ZeldaMakerToolkit.toolkit.config.controls.move.up, action: window.ZeldaMakerToolkit.toolkit.config.controls.action }));
+  await page.screenshot({ path: path.join(OUT, "controls-walking.png") });
+  await press("Escape", 3, 350);
+  await tp(spot[0], spot[1] + 20);
+  await wait(300);
+  const y0 = await y();
+  const stK = await held("k");
+  const y1 = await y();
+  await tp(spot[0], spot[1] + 20);
+  await wait(300);
+  const y1b = await y();
+  const stArrow = await held("ArrowUp");
+  const y2 = await y();
+  // Talk to the villager with F (PS Maker's interact trigger around him), and read it all with F.
+  await tp(80, 140);
+  await hold("k", 120);
+  await press("f", 1, 600);
+  const talking = (await screenNow()).screen;
+  let open = true;
+  let psDialogue = false;
+  for (let i = 0; i < 24 && open; i++) {
+    await press("f", 1, 450);
+    const st = await ev(() => ({ toolkit: window.ZeldaMakerToolkit.session.screens.current !== null || window.ZeldaMakerToolkit.session.isPaused("message"), ps: window.game.scene.getScenes(true).find((m) => m.map)?.playingDialogue === true }));
+    psDialogue ||= st.ps;
+    open = st.toolkit || st.ps;
+  }
+  // Reset: the first button under the 13 rows.
+  await openControls("f");
+  await press("ArrowDown", 13);
+  const onReset = (await screenNow()).focus;
+  await press("f", 1, 300);
+  await press("Escape", 3, 350);
+  const back = await ev(() => ({ up: window.ZeldaMakerToolkit.toolkit.config.controls.move.up[0], action: window.ZeldaMakerToolkit.toolkit.config.controls.action[0] }));
+  await tp(spot[0], spot[1] + 20);
+  await wait(300);
+  const y3 = await y();
+  await held("ArrowUp");
+  const y4 = await y();
+  expect(screen === "controls" && keys.up[0] === "KeyK" && keys.action[0] === "KeyF", `controls ${screen}, keys ${JSON.stringify(keys)}`);
+  expect(base > 10, `the arrow walked ${base} px up before (${JSON.stringify(stBase)})`);
+  expect(y0 - y1 > 10, `K walked ${y0 - y1} px up (the arrow before: ${base}); PS Maker while K was held: ${JSON.stringify(stK)}`);
+  expect(Math.abs(y2 - y1b) < 1, `the arrow still walked ${y1b - y2} px; PS Maker: ${JSON.stringify(stArrow)}`);
+  expect(talking === "dialogue" && !open, `F: ${talking}, still open ${open}`);
+  expect(onReset === "reset" && back.up === "ArrowUp" && back.action === "KeyZ" && y3 - y4 > 10, `reset (${onReset}): ${JSON.stringify(back)}, arrow walks ${y3 - y4} px; ${trace.join(" | ")}`);
+  return `arrow before → ${Math.round(base)} px; K → ${Math.round(y0 - y1)} px up, arrow → ${Math.round(y1b - y2)} px; F talked to the villager${psDialogue ? " and turned PS Maker's dialogue" : ""}; Reset → arrow walks ${Math.round(y3 - y4)} px`;
 });
 await check("a lifted pot stays on the player's head on every drawn frame while walking (it does not lag a frame behind and look blurred)", async () => {
   await tp(56, 182);

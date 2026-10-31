@@ -2,8 +2,8 @@ import type { ToolkitConfig } from "../core/config.ts";
 import type { Logger } from "../core/logger.ts";
 import { type AABB, type Facing, makeBox, overlaps } from "../core/math.ts";
 import { SpatialHash } from "../core/spatialHash.ts";
-import type { DebugDraw, EntityView, HostAdapter, HudSink, OverlayLayer, Renderer, ViewSpec } from "./types.ts";
-import { KeyboardInput } from "./keyboardInput.ts";
+import type { DebugDraw, EntityView, GameControl, HostAdapter, HudSink, OverlayLayer, Renderer, ViewSpec } from "./types.ts";
+import { GAME_KEY_MARK, KeyboardInput, normalizeKey } from "./keyboardInput.ts";
 import { GamepadBridge, gamepadMapping, padFamily, type PadSnapshot } from "./gamepadBridge.ts";
 import { resolveTexture } from "./textures.ts";
 import { ensureProjectFont } from "./projectFonts.ts";
@@ -30,6 +30,15 @@ export function mapSceneOf(ctx: PluginContextLike): any {
   const s = ctx.player?.scene;
   return s && s.sys && s.add ? s : ctx.scene;
 }
+
+/** PS Maker's default keys of the controls the player can change (features/controls/controls.ts: builtInControls). */
+const PS_MAKER_CONTROL_KEYS: Record<GameControl, string[]> = {
+  moveUp: ["KeyW", "ArrowUp"],
+  moveDown: ["KeyS", "ArrowDown"],
+  moveLeft: ["KeyA", "ArrowLeft"],
+  moveRight: ["KeyD", "ArrowRight"],
+  interact: ["KeyZ", "Enter"],
+};
 
 const OVERLAY_DEPTH = 100000;
 const DEBUG_DEPTH = 200000;
@@ -457,7 +466,10 @@ export class PhaserHost implements HostAdapter, DepthSource {
   /** PS Maker's movement keys for the d-pad and the stick: the first key of each project control (moveUp...). */
   private moveKeys(): { up: string; down: string; left: string; right: string } {
     const b = (this.psMakerStory() as { controls?: { bindings?: Record<string, string[]> } } | null)?.controls?.bindings ?? {};
-    return { up: b.moveUp?.[0] ?? "ArrowUp", down: b.moveDown?.[0] ?? "ArrowDown", left: b.moveLeft?.[0] ?? "ArrowLeft", right: b.moveRight?.[0] ?? "ArrowRight" };
+    // A direction the player gave a key of their own: that key (it is handed on to PS Maker like a pressed one).
+    const m = this.cfg.controls.move;
+    const pick = (id: GameControl, dir: "up" | "down" | "left" | "right", fallback: string) => (this.gameKeysOwn.has(id) && m[dir][0] ? m[dir][0] : (b[id]?.[0] ?? fallback));
+    return { up: pick("moveUp", "up", "ArrowUp"), down: pick("moveDown", "down", "ArrowDown"), left: pick("moveLeft", "left", "ArrowLeft"), right: pick("moveRight", "right", "ArrowRight") };
   }
 
   /**
@@ -467,12 +479,95 @@ export class PhaserHost implements HostAdapter, DepthSource {
    * before the window's own ones (PS Maker's options menu); sent at the window itself, the
    * browser ran PS Maker's listener first.
    */
-  private sendKey(type: "keydown" | "keyup", code: string): void {
+  private sendKey(type: "keydown" | "keyup", code: string, mark = false, repeat = false): void {
     const g = globalThis as unknown as { document?: { body?: EventTarget | null }; dispatchEvent?: (e: Event) => boolean; KeyboardEvent?: typeof KeyboardEvent };
     if (typeof g.KeyboardEvent !== "function") return;
     const target: EventTarget | null = g.document?.body ?? (typeof g.dispatchEvent === "function" ? (g as unknown as EventTarget) : null);
-    target?.dispatchEvent(new g.KeyboardEvent(type, { code, key: keyOfCode(code), bubbles: true, cancelable: true }));
+    const event = new g.KeyboardEvent(type, { code, key: keyOfCode(code), bubbles: true, cancelable: true, repeat });
+    if (mark) Object.defineProperty(event, GAME_KEY_MARK, { value: true });
+    target?.dispatchEvent(event);
   }
+
+  /** Player key (normalized) → the PS Maker key sent in its place; PS Maker keys the player moved away from. */
+  private readonly gameKeyFor = new Map<string, string>();
+  private readonly gameKeysFreed = new Set<string>();
+  /** Controls the player gave keys of their own. */
+  private readonly gameKeysOwn = new Set<GameControl>();
+  private gameKeysListening = false;
+
+  /**
+   * The player's own keys for PS Maker's walking and Interact. PS Maker reads them from `keydown` /
+   * `keyup` on `window` (Game.ts: handleMovementKeyDown — which skips an event whose default was
+   * prevented, so does Phaser's keyboard — and handleMovementKeyUp; the controls'
+   * keys: the project's bindings, else builtInControls). So on `window`, before them (capture
+   * phase), a player's key is taken (default prevented, counted by the toolkit itself) and PS
+   * Maker gets its own key for it (an event marked for the toolkit to skip); a PS Maker key the
+   * player moved away from is taken too, so it no longer walks.
+   */
+  setPlayerGameKeys(keys: Partial<Record<GameControl, string[]>>): void {
+    this.gameKeyFor.clear();
+    this.gameKeysFreed.clear();
+    this.gameKeysOwn.clear();
+    const bindings = (this.psMakerStory() as { controls?: { bindings?: Record<string, string[]> } } | null)?.controls?.bindings ?? {};
+    for (const id of Object.keys(PS_MAKER_CONTROL_KEYS) as GameControl[]) {
+      const mine = (keys[id] ?? []).map(normalizeKey);
+      if (!mine.length) continue;
+      this.gameKeysOwn.add(id);
+      const ps = Array.isArray(bindings[id]) ? bindings[id] : PS_MAKER_CONTROL_KEYS[id];
+      // PS Maker's key to send: one the player still uses, else its first.
+      const target = ps.find((k) => mine.includes(normalizeKey(k))) ?? ps[0];
+      if (!target) continue;
+      for (const k of mine) if (!ps.some((p) => normalizeKey(p) === k)) this.gameKeyFor.set(k, target);
+      for (const p of ps) if (!mine.includes(normalizeKey(p))) this.gameKeysFreed.add(normalizeKey(p));
+    }
+    if (this.gameKeyFor.size || this.gameKeysFreed.size) this.listenGameKeys();
+  }
+
+  private listenGameKeys(): void {
+    const win = globalThis as unknown as { addEventListener?: (t: string, f: (e: KeyboardEvent) => void, c: boolean) => void };
+    if (this.gameKeysListening || typeof win.addEventListener !== "function") return;
+    win.addEventListener("keydown", this.onGameKey, true);
+    win.addEventListener("keyup", this.onGameKey, true);
+    this.gameKeysListening = true;
+  }
+
+  private gameKeysClaim: (() => boolean) | null = null;
+
+  /**
+   * While `wants()` is true (a toolkit screen that takes the keys is open), PS Maker gets none of its
+   * walking and Interact keys: they are the toolkit's (a press in the pause menu must not also talk
+   * to the NPC in front, through PS Maker's interact). Releases still reach PS Maker.
+   */
+  claimGameKeys(wants: () => boolean): () => void {
+    this.gameKeysClaim = wants;
+    this.listenGameKeys();
+    return () => {
+      if (this.gameKeysClaim === wants) this.gameKeysClaim = null;
+    };
+  }
+
+  /** PS Maker's walking and Interact keys now (normalized): the project's bindings, else its defaults. */
+  private psGameKeys(): Set<string> {
+    const bindings = (this.psMakerStory() as { controls?: { bindings?: Record<string, string[]> } } | null)?.controls?.bindings ?? {};
+    const out = new Set<string>();
+    for (const id of Object.keys(PS_MAKER_CONTROL_KEYS) as GameControl[]) for (const k of Array.isArray(bindings[id]) ? bindings[id] : PS_MAKER_CONTROL_KEYS[id]) out.add(normalizeKey(k));
+    return out;
+  }
+
+  private readonly onGameKey = (e: KeyboardEvent): void => {
+    if (this.disposed || (e as unknown as Record<string, unknown>)[GAME_KEY_MARK] || typeof e.code !== "string") return;
+    const target = e.target as { isContentEditable?: boolean; matches?: (q: string) => boolean } | null;
+    if (target?.isContentEditable || target?.matches?.("input, textarea, select")) return;
+    const code = normalizeKey(e.code);
+    const to = this.gameKeyFor.get(code);
+    const held = e.type === "keydown" && this.gameKeysClaim?.() === true && (!!to || this.psGameKeys().has(code));
+    if (!to && !this.gameKeysFreed.has(code) && !held) return;
+    e.preventDefault();
+    if (e.type === "keydown") this.input.inject(e);
+    else this.input.injectUp(e);
+    // A release always goes on (a key held when the menu opened must not stay down for PS Maker).
+    if (to && !held) this.sendKey(e.type === "keydown" ? "keydown" : "keyup", to, true, e.repeat === true);
+  };
 
   private usesMouse(code: string): boolean {
     const c = this.cfg.controls;
@@ -1143,6 +1238,12 @@ export class PhaserHost implements HostAdapter, DepthSource {
     this.frameListener = null;
     this.shutdownListener = null;
     this.pads.releaseAll();
+    const win = globalThis as unknown as { removeEventListener?: (t: string, f: (e: KeyboardEvent) => void, c: boolean) => void };
+    if (this.gameKeysListening) {
+      win.removeEventListener?.("keydown", this.onGameKey, true);
+      win.removeEventListener?.("keyup", this.onGameKey, true);
+      this.gameKeysListening = false;
+    }
     this.input.dispose();
     this.setPlayerOverlay(null);
     for (const img of this.overlayImgs) img.destroy();

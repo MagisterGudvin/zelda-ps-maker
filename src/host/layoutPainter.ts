@@ -539,9 +539,20 @@ export class LayoutPainter {
     const family = fonts[e.font || layout.theme.font] ?? "monospace";
     const color = e.color || layout.theme.textColor;
     const gold = e.selectedColor || "#ffd23a";
+    // More rows than fit: the list scrolls with the selection; small arrows say there are more.
+    const fit = Math.max(1, Math.floor((b.h + 0.5) / e.rowHeight));
+    const first = data.row >= fit ? Math.min(data.row - fit + 1, data.rows.length - fit) : 0;
+    const arrow = (up: boolean) => {
+      const x = this.sx(b.x + b.w - 4);
+      const y = this.sy(up ? b.y + 1 : b.y + fit * e.rowHeight - 1);
+      const d = this.k * 2;
+      this.gfx(true).fillStyle(0xffd23a, this.a).fillTriangle(x - d, up ? y + d : y - d, x + d, up ? y + d : y - d, x, y);
+    };
+    if (first > 0) arrow(true);
+    if (first + fit < data.rows.length) arrow(false);
     data.rows.forEach((r, i) => {
-      const y = b.y + i * e.rowHeight;
-      if (y + e.rowHeight > b.y + b.h + 0.5) return;
+      if (i < first || i >= first + fit) return;
+      const y = b.y + (i - first) * e.rowHeight;
       const cells: [string, number, number][] = [[r.label, 0, -1]];
       if (e.keyColumn > 0) cells.push([r.key, e.keyColumn, 0]);
       if (e.padColumn > 0) cells.push([r.pad, e.padColumn, 1]);

@@ -8,6 +8,12 @@ export interface EmitterLike {
   off(event: string, fn: (...args: any[]) => void, context?: unknown): unknown;
 }
 
+/**
+ * Marks a key event the host sent to PS Maker in place of the player's own key (its walking and
+ * Interact keys, setPlayerGameKeys): the toolkit already counted the player's key, so it skips this one.
+ */
+export const GAME_KEY_MARK = "__zeldaGameKey";
+
 /** PS Maker's names of the mouse buttons (features/controls: mouseButtonKeys), usable as keys. */
 export const MOUSE_CODES = ["MouseLeft", "MouseMiddle", "MouseRight"] as const;
 
@@ -72,7 +78,7 @@ export class KeyboardInput implements InputSource {
   private pausedUntil = -1;
 
   private readonly onDown = (event: KeyboardEvent) => {
-    if (!event || typeof event.code !== "string") return;
+    if (!event || typeof event.code !== "string" || (event as unknown as Record<string, unknown>)[GAME_KEY_MARK]) return;
     // A real key (not one the gamepad bridge sent): the keyboard is the device now.
     if (event.isTrusted !== false) {
       if (this.device.kind !== "keyboard") this.device = { kind: "keyboard", family: this.device.family };
@@ -100,7 +106,7 @@ export class KeyboardInput implements InputSource {
   };
 
   private readonly onUp = (event: KeyboardEvent) => {
-    if (!event || typeof event.code !== "string") return;
+    if (!event || typeof event.code !== "string" || (event as unknown as Record<string, unknown>)[GAME_KEY_MARK]) return;
     const code = normalizeKey(event.code);
     this.down.delete(code);
     this.pendingRelease.add(code);
@@ -155,6 +161,11 @@ export class KeyboardInput implements InputSource {
    */
   inject(event: KeyboardEvent): void {
     this.onDown(event);
+  }
+
+  /** A key release the toolkit took from the page (see inject). */
+  injectUp(event: KeyboardEvent): void {
+    this.onUp(event);
   }
 
   /** True when this key code is bound to the action. */

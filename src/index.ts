@@ -9,7 +9,7 @@ import { startRestoreWatcher } from "./editor/saveRestore.ts";
 const plugin = definePlugin({
   name: "Zelda Maker Toolkit",
   description: "Real-time action-adventure toolkit (sword, items, enemies, puzzles, dungeons, HUD, saves) in the style of classic top-down adventures.",
-  version: "0.35.0",
+  version: "0.36.0",
   events: ZELDA_ACTIONS,
 });
 

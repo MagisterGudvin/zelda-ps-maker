@@ -242,6 +242,11 @@ export class FakeHost implements HostAdapter {
   hideOptionsButton(hidden: boolean): void {
     this.optionsButtonHidden = hidden;
   }
+  /** The player's walking and Interact keys handed to PS Maker (only the controls the player changed). */
+  gameKeys: Record<string, string[]> | null = null;
+  setPlayerGameKeys(keys: Record<string, string[] | undefined>): void {
+    this.gameKeys = Object.fromEntries(Object.entries(keys).filter(([, v]) => v)) as Record<string, string[]>;
+  }
 
   /** A pending gamepad button capture (rebinding): tests call `padCaptured(button)`. */
   padCapture: ((button: number) => void) | null = null;

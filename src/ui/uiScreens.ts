@@ -1,7 +1,7 @@
 import type { Session } from "../core/session.ts";
 import { ADJUSTABLE_ACTIONS, isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type KeybindsElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
-import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
-import { bindAction, resetPlayerControls } from "../core/playerControls.ts";
+import { padButtonLabel } from "../host/gamepadBridge.ts";
+import { bindAction, isMoveDir, KEY_ROWS, resetPlayerControls, rowKeys, type KeyRow } from "../core/playerControls.ts";
 import { setPlayerLanguage } from "../core/playerLanguage.ts";
 import { keyLabel } from "./keyLabels.ts";
 
@@ -50,12 +50,15 @@ export class UiScreenSystem {
   private readonly layerNames: string[] = [];
   private readonly offPointer: () => void;
   private readonly offMenuKeys: () => void;
+  private readonly offGameKeys: () => void;
 
   constructor(session: Session) {
     this.s = session;
     this.offPointer = session.host.hud?.setScreenPointer?.((type, x, y) => this.pointer(type, x, y)) ?? (() => {});
     // Escape (the Menu key) belongs to PS Maker's options menu unless a screen wants it.
     this.offMenuKeys = session.host.claimMenuKeys?.(() => this.wantsMenuKey()) ?? (() => {});
+    // An open screen has the walking and Interact keys too (not PS Maker), unless PS Maker's dialogue (from a button's event) is up.
+    this.offGameKeys = session.host.claimGameKeys?.(() => this.current !== null && !this.s.host.isDialogueOpen?.()) ?? (() => {});
   }
 
   /** The open screen (the top one), or null. */
@@ -290,21 +293,21 @@ export class UiScreenSystem {
     if (kb) {
       if (this.binding) return;
       // The rows first; down past the last row goes to the buttons, up from the buttons comes back.
-      const onRows = top.cursor < PAD_ACTIONS.length;
+      const onRows = top.cursor < KEY_ROWS.length;
       if (onRows) {
         const cols = [kb.keyColumn > 0 ? 0 : -1, kb.padColumn > 0 ? 1 : -1].filter((c) => c >= 0);
         if (!cols.includes(top.col)) top.col = cols[0] ?? 0;
         if (input.pressed("up") && top.cursor > 0) this.moved(cur.layout, () => top.cursor--);
         else if (input.pressed("down")) {
-          if (top.cursor < PAD_ACTIONS.length - 1) this.moved(cur.layout, () => top.cursor++);
-          else if (ids.length) this.moved(cur.layout, () => ((top.cursor = PAD_ACTIONS.length), (top.focus = ids[0])));
+          if (top.cursor < KEY_ROWS.length - 1) this.moved(cur.layout, () => top.cursor++);
+          else if (ids.length) this.moved(cur.layout, () => ((top.cursor = KEY_ROWS.length), (top.focus = ids[0])));
         } else if ((input.pressed("left") || input.pressed("right")) && cols.length > 1) this.moved(cur.layout, () => (top.col = top.col === 0 ? 1 : 0));
         if (input.pressed("action")) this.startBinding(top);
         else if (role !== "title" && (input.pressed("sword") || input.pressed("inventory") || input.pressed("menu"))) this.close();
         return;
       }
       if (input.pressed("up") && top.focus && nextButton(this.boxes(cur.layout), ids, top.focus, "up") === top.focus) {
-        this.moved(cur.layout, () => (top.cursor = PAD_ACTIONS.length - 1));
+        this.moved(cur.layout, () => (top.cursor = KEY_ROWS.length - 1));
         return;
       }
     }
@@ -336,7 +339,7 @@ export class UiScreenSystem {
   }
 
   /** Waiting for the player's new key (the key column) or gamepad button (the gamepad column). */
-  private binding: { action: PadAction; col: number; ms: number } | null = null;
+  private binding: { action: KeyRow; col: number; ms: number } | null = null;
 
   /** What a key bindings element shows now (null: the open screen has none). */
   keybindsView(): { rows: { action: string; label: string; key: string; pad: string }[]; row: number; col: number; waiting: boolean; waitText: string } | null {
@@ -347,8 +350,9 @@ export class UiScreenSystem {
     const i18n = this.s.i18n;
     const family = this.s.host.input.device?.kind === "gamepad" ? this.s.host.input.device.family : (this.s.host.padFamily?.() ?? this.s.host.input.device?.family ?? "xbox");
     return {
-      rows: PAD_ACTIONS.map((a) => ({ action: a, label: i18n.t(`controls.${a}`), key: keyLabel(c[a][0], i18n), pad: padButtonLabel(c.gamepad[a], family) })),
-      row: top.cursor < PAD_ACTIONS.length ? top.cursor : -1,
+      // Walking moves with the d-pad (and the stick) on a gamepad.
+      rows: KEY_ROWS.map((a) => ({ action: a, label: i18n.t(`controls.${a}`), key: keyLabel(rowKeys(c, a)[0] ?? "", i18n), pad: padButtonLabel(isMoveDir(a) ? DPAD[a] : c.gamepad[a], family) })),
+      row: top.cursor < KEY_ROWS.length ? top.cursor : -1,
       col: top.col,
       waiting: this.binding !== null,
       waitText: i18n.t("controls.waiting"),
@@ -356,8 +360,9 @@ export class UiScreenSystem {
   }
 
   private startBinding(top: Open): void {
-    const action = PAD_ACTIONS[top.cursor];
-    if (!action) return;
+    const action = KEY_ROWS[top.cursor];
+    // Walking keeps the d-pad on a gamepad.
+    if (!action || (top.col !== 0 && isMoveDir(action))) return;
     const host = this.s.host;
     this.binding = { action, col: top.col, ms: 0 };
     this.sound(this.current?.layout.screen.soundPress ?? "");
@@ -560,6 +565,7 @@ export class UiScreenSystem {
     this.cancelBinding?.();
     this.offPointer();
     this.offMenuKeys();
+    this.offGameKeys();
     this.layerNames.length = 0;
     for (const t of this.stack) t.message?.done(null);
     if (this.stack.length) {
@@ -575,3 +581,6 @@ function volumeStep(value: string): number {
   const n = Math.round(Number(value));
   return Number.isFinite(n) && n >= 1 && n <= 100 ? n : 10;
 }
+
+/** The d-pad buttons of the standard mapping (walking on a gamepad). */
+const DPAD = { up: 12, down: 13, left: 14, right: 15 } as const;

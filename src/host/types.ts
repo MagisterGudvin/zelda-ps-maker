@@ -7,6 +7,9 @@ import type { AABB, Facing } from "../core/math.ts";
  * Phaser, or the fake host used by unit tests). Nothing outside `src/host`
  * touches Phaser directly.
  */
+/** PS Maker controls the player can give keys of their own (features/controls: builtInControls). */
+export type GameControl = "moveUp" | "moveDown" | "moveLeft" | "moveRight" | "interact";
+
 export interface HostAdapter {
   readonly input: InputSource;
   readonly renderer: Renderer;
@@ -50,6 +53,13 @@ export interface HostAdapter {
   setAudioVolume?(channel: "music" | "sound", percent: number): boolean;
   /** Optional: the game fills the screen. */
   isFullscreen?(): boolean;
+  /**
+   * Optional: the player's own keys for PS Maker's walking and Interact controls (undefined = PS
+   * Maker's as they are). The host hands PS Maker its own key for each of the player's.
+   */
+  setPlayerGameKeys?(keys: Partial<Record<GameControl, string[]>>): void;
+  /** Optional: while `wants()` is true, PS Maker gets none of its walking and Interact keys (the toolkit's screen has them). Returns the unsubscribe. */
+  claimGameKeys?(wants: () => boolean): () => void;
   /** Optional: hides (or shows again) PS Maker's options button over the game (its gear). */
   hideOptionsButton?(hidden: boolean): void;
   /**
