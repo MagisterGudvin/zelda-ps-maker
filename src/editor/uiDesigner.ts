@@ -163,9 +163,14 @@ export class UiDesigner {
     this.raf = win.requestAnimationFrame?.(loop) ?? 0;
   }
 
-  /** Called a few times a second with the map's setup and whether the action's settings are open. */
+  /**
+   * Called a few times a second with the map's setup and whether the action's settings are open.
+   * The game window frame and the HUD in it are drawn only while a UI Layout is open (the designer
+   * is at work); otherwise the map is shown as it is.
+   */
   update(setup: DesignerSetup | null, editing: boolean): void {
     if (this.drag) return;
+    if (!editing) setup = null;
     // "This map only" ticked or another shared HUD added: the panel's note changes.
     const resharing = setup?.sharing !== this.setup?.sharing || setup?.screen !== this.setup?.screen;
     this.setup = setup;
