@@ -117,4 +117,4 @@
 {"player":{"maxMagic":64,"startMagic":64,"magicRegenPerSecond":2},"items":{"fireRod":{"magicCost":6,"damage":5}}}
 ```
 
-HUD внизу экрана, без шкалы магии — в дизайнере `Zelda: UI Layout` (`ui.position` и `ui.showMagic` убраны в 0.32.1; классический HUD показывает шкалу магии, только когда у игрока есть магия).
+HUD внизу экрана, без шкалы магии — в дизайнере `Zelda: UI Layout` (`ui.position` и `ui.showMagic` убраны в 0.32.1; HUD без макета нет — с 0.35.0).

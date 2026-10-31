@@ -1,6 +1,6 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.34.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.35.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
 Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
@@ -49,7 +49,7 @@
 
 ## Zelda: Start Toolkit
 
-Starts Zelda Maker Toolkit on this map with the main game settings. Put it first in the map's start events (same settings on every map). / Запускает Toolkit на карте (первым в событиях начала карты).
+The game settings of Zelda Maker Toolkit, once for the whole project: put it in Map start of one map (the first). The toolkit then runs on every map (Zelda: Stop Toolkit turns it off on a map). Like it, Set Player Sprites, Set Item Sprites and Set Controls are needed once. / Настройки Toolkit — один раз на проект; Toolkit работает на всех картах.
 
 | Параметр | Тип | По умолчанию | Описание |
 |---|---|---|---|

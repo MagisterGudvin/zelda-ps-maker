@@ -27,6 +27,18 @@ export function getToolkit(): Toolkit {
 export function resetToolkitForTests(): void {
   instance?.stop("test reset");
   instance = null;
+  projectSettingsApplied = false;
+}
+
+/**
+ * Runs the project's settings actions (projectStart.ts) — set by the actions module, which this
+ * module cannot import. Called once, when the toolkit first starts on a map.
+ */
+let projectSettingsRunner: ((ctx: PluginContextLike) => void) | null = null;
+let projectSettingsApplied = false;
+
+export function setProjectSettingsRunner(run: (ctx: PluginContextLike) => void): void {
+  projectSettingsRunner = run;
 }
 
 /** The map id when the author did not set one: the PS Maker map of the scene (GameMap.map.id). */
@@ -77,7 +89,16 @@ export function startSession(ctx: PluginContextLike, mapId: string, reason?: str
     },
   );
   tk.logger.info(`Started on map "${mapId}".`);
-  return session;
+  // The first start of the game: the project's settings, wherever they are (Start Toolkit, Set Player Sprites...).
+  if (!projectSettingsApplied && projectSettingsRunner) {
+    projectSettingsApplied = true;
+    try {
+      projectSettingsRunner(ctx);
+    } catch (err) {
+      tk.logger.error("Applying the project's toolkit settings failed:", err);
+    }
+  }
+  return tk.session ?? session;
 }
 
 /**

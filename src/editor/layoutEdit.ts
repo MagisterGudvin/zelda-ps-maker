@@ -1,3 +1,4 @@
+import { projectStartAction, type ProjectLike } from "./projectStart.ts";
 import { createDefaultConfig } from "../core/config.ts";
 import { layoutScale } from "../host/layoutPainter.ts";
 import type { PsStory } from "../host/psmakerAssets.ts";
@@ -101,6 +102,8 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
       if (a?.type === "movePlayerAction" && a.moveType === "absolute-position" && !spawn && typeof a.position?.x === "number" && typeof a.position?.y === "number") spawn = { x: a.position.x, y: a.position.y };
     }
   }
+  // The toolkit runs on every map of a project with a Start Toolkit (on any map; projectStart.ts).
+  start ??= projectStartAction(story as ProjectLike | null);
   const sp = start?.pluginParams ?? {};
   if (!opened && !start) return null;
   const shared = projectUi(story as Parameters<typeof projectUi>[0]).hud;
@@ -124,10 +127,11 @@ export function designerSetup(map: MapLike & { storyEvents?: { id?: string; name
   if (sharing === "project") own = null;
   const parsed = parseLayout(raw);
   const empty = { ...classicLayout(), elements: [] };
-  const layout = parsed.layout ?? (screen ? empty : classicLayout());
-  // Under a screen the game shows this map's HUD: its own ("This map only"), else the project's, else the classic one.
+  // No HUD made yet: nothing (a HUD UI Layout opened without data starts from the classic template).
+  const layout = parsed.layout ?? (screen || !own ? empty : classicLayout());
+  // Under a screen the game shows this map's HUD: its own ("This map only"), else the project's (none: nothing).
   let under: UiLayout | null = null;
-  if (screen && start) {
+  if (screen && start && (hud || shared)) {
     const own = hud && layoutAction(hud.action).thisMapOnly ? layoutAction(hud.action).raw : null;
     under = parseLayout(own ?? shared?.raw ?? (hud ? layoutAction(hud.action).raw : "")).layout ?? classicLayout();
   }

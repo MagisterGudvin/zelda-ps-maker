@@ -119,16 +119,16 @@ test("demo story: a new project id, library kept, old maps and events dropped, u
   assert.deepEqual(source, sourceStory());
 });
 
-test("demo story: the title screen made in the UI Designer (toolkit on the title map) and the progress variable", async () => {
+test("demo story: the title screen made in the UI Designer and the progress variable; Start Toolkit and Set Player Sprites once in the project", async () => {
   const { story } = buildDemoStory({ source: sourceStory(), plugin: await plugin(), maps: MAPS, seed: 7 });
   const title = story.maps.find((m: Any) => m.id === story.player.startingMap);
   const field = story.maps[0];
   assert.deepEqual(title.setupActions.map((a: Any) => [a.type, a.mode ?? ""]), [["movePlayerAction", ""], ["setPlayerVisibilityAction", "hide"], ["togglePlayerMovementAction", "disable"]]);
   assert.ok(!title.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), "no PS Maker Add UI menu");
-  assert.deepEqual(title.initialActions.map((a: Any) => a.actionName), ["Zelda: Start Toolkit", "Zelda: UI Layout", "Zelda: Open UI Screen"]);
-  const ui = title.initialActions[1].pluginParams;
+  assert.deepEqual(title.initialActions.map((a: Any) => a.actionName), ["Zelda: UI Layout", "Zelda: Open UI Screen"], "no Start Toolkit of its own: the toolkit runs on every map");
+  const ui = title.initialActions[0].pluginParams;
   assert.equal(ui.name, "title");
-  assert.equal(title.initialActions[2].pluginParams.name, "title");
+  assert.equal(title.initialActions[1].pluginParams.name, "title");
   const layout = parseLayout(ui.layout).layout!;
   assert.equal(layout.screen.role, "title");
   const buttons = layout.elements.filter((e): e is Extract<typeof e, { type: "button" }> => e.type === "button");
@@ -146,7 +146,10 @@ test("demo story: the title screen made in the UI Designer (toolkit on the title
   assert.deepEqual(run("New game")[0].destination, { mapId: field.id, position: MAPS.field.spawn });
   // Toolkit progress in PS Maker saves.
   assert.deepEqual(story.variables[0], { id: "zelda-progress", name: "Zelda progress", type: "string", defaultValue: "" });
-  for (const m of story.maps) assert.equal(m.initialActions.find((a: Any) => a.actionName === "Zelda: Start Toolkit").pluginParams.progressVariable, "zelda-progress");
+  const once = (name: string) => story.maps.flatMap((m: Any) => m.initialActions.filter((a: Any) => a.actionName === name).map(() => m.id));
+  assert.deepEqual(once("Zelda: Start Toolkit"), [field.id], "Start Toolkit once, on the first map");
+  assert.deepEqual(once("Zelda: Set Player Sprites"), [field.id], "Set Player Sprites once");
+  assert.equal(field.initialActions.find((a: Any) => a.actionName === "Zelda: Start Toolkit").pluginParams.progressVariable, "zelda-progress");
 });
 
 test("demo story: own UI pictures in Images; dialogue layout, button style and menus on them; HUD and screens on them; a talking villager", async () => {
@@ -165,7 +168,7 @@ test("demo story: own UI pictures in Images; dialogue layout, button style and m
   let pictures = 0;
   for (const m of story.maps.filter((x: Any) => x.initialActions.some((a: Any) => a.actionName === "Zelda: UI Layout"))) {
     const names = m.initialActions.map((a: Any) => a.actionName).filter(Boolean);
-    assert.ok(names.indexOf("Zelda: UI Layout") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: UI Layout after Start Toolkit`);
+    if (names.includes("Zelda: Start Toolkit")) assert.ok(names.indexOf("Zelda: UI Layout") > names.indexOf("Zelda: Start Toolkit"), `${m.name}: UI Layout after Start Toolkit`);
     for (const a of m.initialActions.filter((x: Any) => x.actionName === "Zelda: UI Layout")) {
       const { layout } = parseLayout(a.pluginParams.layout);
       const keys = [...layout!.elements.flatMap(pictureKeys), layout!.theme.panel, layout!.theme.cursor];
@@ -226,11 +229,12 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
     const note = screenOf("notification");
     assert.equal(note.screen.role, "notification");
     assert.ok(note.elements.some((e) => e.type === "text" && e.text === "{note}"));
-    // The player's controls screen, opened from the pause menu: key bindings, Reset, Back.
+    // The player's controls screen, opened from the settings: key bindings, Reset, Back.
     const controls = screenOf("controls");
     assert.ok(controls.elements.some((e) => e.type === "keybinds"));
     assert.ok(controls.elements.some((e) => e.type === "button" && e.action.kind === "resetControls"));
-    assert.ok(screenOf("pause").elements.some((e) => e.type === "button" && e.action.kind === "open" && e.action.id === "controls"));
+    assert.ok(screenOf("settings").elements.some((e) => e.type === "button" && e.action.kind === "open" && e.action.id === "controls"));
+    assert.deepEqual(screenOf("pause").elements.filter((e) => e.type === "button").map((e) => (e as Any).action.kind), ["close", "save", "load", "event", "event"], "pause: continue, save, load, settings, main menu");
     // The pause screen (Escape): its buttons run project events that exist.
     const screen = screenOf("pause");
     assert.ok(screen.screen.role === "menu" && screen.screen.pause);
@@ -314,6 +318,6 @@ test("demo translations: every text of the demo has its Russian translation; the
   assert.equal(bye.actions[0].type, "dialogueAction");
   const settings = parseLayout(projectUi(story).screens.find((s) => s.name === "settings")!.raw).layout!;
   assert.equal(settings.screen.role, "settings");
-  assert.deepEqual(settings.elements.filter((e) => e.type === "button").map((e) => (e as Any).action.kind), ["music", "sound", "fullscreen", "language", "open", "save", "close"], "the settings screen: volumes, fullscreen, language, controls, save, back");
+  assert.deepEqual(settings.elements.filter((e) => e.type === "button").map((e) => (e as Any).action.kind), ["music", "sound", "fullscreen", "language", "open", "close"], "the settings screen: volumes, fullscreen, language, controls, back (saving is in the pause menu)");
   assert.equal(story.gameUI.optionsMenu.showOpenOptionsButton, false, "no PS Maker gear over the game");
 });

@@ -89,16 +89,24 @@ const story = { characters: [], spritesheetAnimations: [], gameConfig: { width: 
 const start = { id: "s", actionName: "Zelda: Start Toolkit", pluginParams: { hearts: 5, language: "en" } };
 const spawn = { type: "movePlayerAction", moveType: "absolute-position", position: { x: 200, y: 100 } };
 
-test("designer setup: the game window around the player's start; no UI Layout = the classic HUD to look at", () => {
-  assert.equal(designerSetup({ initialActions: [] }, story as any, 0), null, "no Start Toolkit, no HUD");
-  assert.equal(designerSetup({ initialActions: [{ ...start, pluginParams: { hud: false } }] }, story as any, 0)?.layout.elements.length, 9, "an old unticked Show HUD (removed) hides nothing");
+test("designer setup: the game window around the player's start; no UI Layout = no HUD; the project's Start Toolkit counts on every map", () => {
+  assert.equal(designerSetup({ initialActions: [] }, story as any, 0), null, "no Start Toolkit in the project: no game window");
   const st = designerSetup({ initialActions: [start, spawn] }, story as any, 0)!;
   assert.deepEqual(st.frame, { x: 40, y: 10, w: 320, h: 180 });
   assert.equal(st.action, null);
-  assert.equal(st.layout.elements.length, 9);
+  assert.equal(st.layout.elements.length, 0, "no HUD made in the UI Designer: nothing");
   assert.equal(boardScale(st, st.layout), 1, "one layout pixel per map pixel");
-  assert.equal(st.values.maxHealth, 10);
-  assert.equal(st.values["t:hud.life"], "- LIFE -");
+  assert.equal(st.values.maxHealth ?? 10, 10);
+  // Another map of a project whose Start Toolkit is on the first map.
+  const project = { ...story, maps: [{ id: "first", initialActions: [{ ...start, pluginParams: { hearts: 5 } }] }] };
+  const other = designerSetup({ id: "second", initialActions: [spawn] }, project as any, 0)!;
+  assert.ok(other, "the game window on a map without its own Start Toolkit");
+  assert.deepEqual(other.frame, { x: 40, y: 10, w: 320, h: 180 });
+  // A HUD UI Layout opened without data: the classic template to start from.
+  const ui = { id: "u", actionName: "Zelda: UI Layout", pluginParams: { layout: "" } };
+  const opened = designerSetup({ initialActions: [start, spawn, ui] }, story as any, 0, "u")!;
+  assert.equal(opened.layout.elements.length, 9);
+  assert.equal(opened.values["t:hud.life"], "- LIFE -");
 });
 
 test("designer setup: the map's UI Layout action and its scale; a broken one is shown as classic with the reason", () => {

@@ -170,17 +170,19 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     theme: hudLayout.theme,
     screen: screen("menu"),
     elements: [
-      { id: "panel", type: "image", x: -60, y: -61, w: 120, h: 122, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
-      { id: "title", type: "text", x: -60, y: -54, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
-      button("continue", "Continue", -37, { kind: "close", id: "" }),
+      { id: "panel", type: "image", x: -60, y: -72, w: 120, h: 144, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -60, y: -65, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
+      button("continue", "Continue", -48, { kind: "close", id: "" }),
+      // Saving and loading are PS Maker's own (its Save game action, its load menu).
+      button("save", "Save game", -26, { kind: "save", id: "" }),
+      button("load", "Load game", -4, { kind: "load", id: "" }),
       // PS Maker's "Open game options menu" in an event: the toolkit opens the settings screen instead.
-      button("settings", "Settings", -15, { kind: "event", id: "zelda-pause-settings" }),
-      button("mainMenu", "Main menu", 7, { kind: "event", id: "zelda-pause-title" }),
-      button("controls", "Controls", 29, { kind: "open", id: "controls" }),
+      button("settings", "Settings", 18, { kind: "event", id: "zelda-pause-settings" }),
+      button("mainMenu", "Main menu", 40, { kind: "event", id: "zelda-pause-title" }),
     ],
   };
   // The settings (role Settings), in place of PS Maker's options menu: volumes (left and right change
-  // them), fullscreen, the language of the translation sheet, the controls, saving.
+  // them), fullscreen, the language of the translation sheet, the controls (saving is in the pause menu).
   const row = (id, text, y, action) => ({ ...button(id, text, y, action), x: -70, w: 140 });
   const volumeBar = (id, value, y) => ({ id, type: "bar", x: 20, y, w: 50, h: 6, anchor: "c", show: always, value, max: "100", dir: "right", fillColor: "#ffd23a", backColor: "#1f1a24", shape: "rect", border: "#f2e4bb", borderWidth: 1, text: "" });
   const settingsLayout = {
@@ -189,17 +191,16 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     theme: hudLayout.theme,
     screen: screen("settings"),
     elements: [
-      { id: "panel", type: "image", x: -80, y: -84, w: 160, h: 168, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
-      { id: "title", type: "text", x: -80, y: -77, w: 160, h: 10, anchor: "c", show: always, text: "Settings", font: "", size: 10, color: "", align: "center" },
-      { ...row("music", "Music", -62, { kind: "music", id: "", value: "10" }), w: 84 },
-      volumeBar("musicBar", "musicVolume", -56),
-      { ...row("sound", "Sounds", -42, { kind: "sound", id: "", value: "10" }), w: 84 },
-      volumeBar("soundBar", "soundVolume", -36),
-      row("fullscreen", "Fullscreen: {fullscreen.text}", -22, { kind: "fullscreen", id: "" }),
-      row("language", "Language: {language}", -2, { kind: "language", id: "" }),
-      row("controls", "Controls", 18, { kind: "open", id: "controls" }),
-      { ...row("save", "Save game", 38, { kind: "save", id: "" }), show: { when: "compare", id: "settings.save", op: "==", value: 1 } },
-      row("back", "Back", 58, { kind: "close", id: "" }),
+      { id: "panel", type: "image", x: -80, y: -74, w: 160, h: 148, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -80, y: -67, w: 160, h: 10, anchor: "c", show: always, text: "Settings", font: "", size: 10, color: "", align: "center" },
+      { ...row("music", "Music", -52, { kind: "music", id: "", value: "10" }), w: 84 },
+      volumeBar("musicBar", "musicVolume", -46),
+      { ...row("sound", "Sounds", -32, { kind: "sound", id: "", value: "10" }), w: 84 },
+      volumeBar("soundBar", "soundVolume", -26),
+      row("fullscreen", "Fullscreen: {fullscreen.text}", -12, { kind: "fullscreen", id: "" }),
+      row("language", "Language: {language}", 8, { kind: "language", id: "" }),
+      row("controls", "Controls", 28, { kind: "open", id: "controls" }),
+      row("back", "Back", 48, { kind: "close", id: "" }),
     ],
   };
   // The player's own keys and gamepad buttons (opened from the pause menu).
@@ -417,6 +418,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       if (actionName === "Zelda: Create Wave Room" && slotOf[p.spawnEnemy]) p.spawnEnemy = slotOf[p.spawnEnemy];
       zelda.push(pluginAction(actionName, p));
       if (actionName === "Zelda: Start Toolkit") {
+        // Once for the project, like Start Toolkit itself.
         if (sprites.attack) zelda.push(pluginAction("Zelda: Set Player Sprites", Object.fromEntries(Object.entries(sprites).filter(([, id]) => id))));
         // The HUD and the screens are made once, on the first map: the other maps use them from the project.
         if (key === Object.keys(maps)[0]) {
@@ -430,10 +432,10 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
           zelda.push(pluginAction("Zelda: UI Layout", { name: "notification", layout: JSON.stringify(notificationLayout) }));
           zelda.push(pluginAction("Zelda: Translations", { data: JSON.stringify(demoTranslations()) }));
         }
-        if (needsSlots)
-          for (const [template, slot, look] of WAVE_LOOKS) zelda.push(pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] }));
       }
     }
+    // The wave enemies' looks (Define Enemy), first on the map that has waves.
+    if (needsSlots) zelda.unshift(...WAVE_LOOKS.map(([template, slot, look]) => pluginAction("Zelda: Define Enemy", { slot, basedOn: template, look: character[look] })));
     if (!sprites.attack && key === "field") warnings.push('The player has no "Sword Attack" sheet: the sword is drawn by the Toolkit.');
 
     return {
@@ -474,9 +476,8 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
       button("exit", "Exit", 46, { kind: "event", id: titleEvent("zelda-title-exit", "Title: exit", [{ id: makeId(), name: "Exit game", type: "exitGameAction" }]) }),
     ],
   };
-  const startParams = maps[first].onLoad.find(([n]) => n === "Zelda: Start Toolkit")[1];
+  // No Start Toolkit on the title map either: the field's counts for the whole project.
   const titleActions = [
-    pluginAction("Zelda: Start Toolkit", { ...startParams, progressVariable: PROGRESS_VARIABLE.id }),
     pluginAction("Zelda: UI Layout", { name: "title", layout: JSON.stringify(titleLayout) }),
     pluginAction("Zelda: Open UI Screen", { name: "title" }),
   ];
@@ -614,6 +615,7 @@ const DEMO_RU = [
   ["text", "Sounds", "Звуки"],
   ["text", "Fullscreen: {fullscreen.text}", "Полный экран: {fullscreen.text}"],
   ["text", "Save game", "Сохранить игру"],
+  ["text", "Load game", "Загрузить игру"],
   ["text", "Reset", "Сбросить"],
   ["text", "Back", "Назад"],
   ["text", SIGN_TEXT, "Стрелки: ходьба. X: меч, удерживайте для кругового удара. Z: открыть, поднять, говорить.\n\nC и B: две кнопки предметов. Q/E: сменить предмет на C. I: все предметы (C или B ставит предмет на эту кнопку). V: поднять щит (он в сундуке ниже). Esc: пауза."],

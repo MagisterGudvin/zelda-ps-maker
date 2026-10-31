@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { classicLayout } from "../../src/ui/uiLayout.ts";
 import assert from "node:assert/strict";
 import { createDefaultConfig, mergeConfig } from "../../src/core/config.ts";
 import { createRig } from "../helpers/fakeHost.ts";
@@ -69,8 +70,11 @@ test("inventory: capacities, quick-item cycling, keys, heart containers", () => 
   assert.deepEqual(messages, ["You got Power Glove!"]);
 });
 
-test("HUD model: the classic layout and its values (hearts, counters, the active item)", () => {
+test("HUD model: no HUD until one is made in the UI Designer; the classic template's values (hearts, counters, the active item)", () => {
   const rig = createRig();
+  rig.step();
+  assert.deepEqual(rig.host.hud.last!.layout.elements, [], "no UI Layout with the role HUD: nothing on screen");
+  rig.tk.hudLayout = classicLayout();
   rig.tk.inventory.give("bombs", 4, { silent: true });
   rig.tk.state.player.hp = 3;
   rig.tk.bus.emit("zelda:custom:refresh", {});

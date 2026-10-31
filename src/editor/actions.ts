@@ -11,7 +11,9 @@ import { createObject, placePickup } from "../interactions/spawnObject.ts";
 import type { ObjectConfig } from "../interactions/objectTypes.ts";
 import { createDataItem, type DataItemSpec } from "../items/builtinItems.ts";
 import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/health.ts";
-import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
+import { deriveMapId, ensureSession, getToolkit, sessionMismatch, setProjectSettingsRunner, startSession } from "./runtime.ts";
+import { projectSettingsActions, setToolkitOff, type ProjectLike } from "./projectStart.ts";
+import { mapSceneOf } from "../host/phaserHost.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
 import { setSpriteImage, spriteImages } from "../host/textures.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
@@ -232,7 +234,7 @@ const DIFFICULTY_PRESETS = ["casual", "casual", "alttp", "hardcore"];
 
 const startToolkit = defineEvent({
   name: "Zelda: Start Toolkit",
-  description: "Starts Zelda Maker Toolkit on this map with the main game settings. Put it first in the map's start events (same settings on every map). / Запускает Toolkit на карте (первым в событиях начала карты).",
+  description: "The game settings of Zelda Maker Toolkit, once for the whole project: put it in Map start of one map (the first). The toolkit then runs on every map (Zelda: Stop Toolkit turns it off on a map). Like it, Set Player Sprites, Set Item Sprites and Set Controls are needed once. / Настройки Toolkit — один раз на проект; Toolkit работает на всех картах.",
   parameterDefs: {
     difficulty: choice("Difficulty", "Easy: longer invulnerability and sword, shield blocks magic, own bombs harmless. Hard: short invulnerability, fewer drops. / Сложность.", [["casual", "Easy"], ["alttp", "Normal"], ["hardcore", "Hard"]], "alttp"),
     hearts: num("Hearts", "Starting and maximum hearts. / Сердца в начале игры.", 3),
@@ -253,6 +255,7 @@ const startToolkit = defineEvent({
       // 0.5.0–0.5.3 saved Difficulty as a number (projects still carry it).
       const d = old.difficulty;
       const preset = typeof d === "number" ? (DIFFICULTY_PRESETS[Math.round(d)] ?? "alttp") : textOf(d) || "alttp";
+      setToolkitOff(ctx ? mapSceneOf(ctx as never) : null, false);
       // The project (its PS Maker story id) for what the player chose in this game (keys, language),
       // and its translations, before the language is set.
       const story = (ctx as { scene?: { story?: { metadata?: { storyId?: string }; storyName?: string } } } | undefined)?.scene?.story;
@@ -364,7 +367,9 @@ const stopToolkit = defineEvent({
   name: "Zelda: Stop Toolkit",
   description: "Removes all toolkit objects from this map (progress is kept). / Убирает объекты Toolkit с карты (прогресс сохраняется).",
   parameterDefs: {},
-  execute(_params, _ctx) {
+  execute(_params, ctx) {
+    // The toolkit does not start again on this map by itself (it runs on every map otherwise).
+    setToolkitOff(ctx ? mapSceneOf(ctx as never) : null, true);
     getToolkit().stop("Stop Toolkit action");
   },
 });
@@ -1429,3 +1434,18 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   setItemSprites,
   setSound,
 ].map((e) => withUi(endsAction(e)));
+
+// The toolkit's first start on a map of the game runs the project's settings actions found on
+// other maps (projectStart.ts), so they are needed only once in the project.
+setProjectSettingsRunner((ctx) => {
+  const scene = (ctx as { scene?: { story?: ProjectLike; map?: { id?: string } } }).scene;
+  for (const a of projectSettingsActions(scene?.story, scene?.map?.id ?? "")) {
+    const def = ZELDA_ACTIONS.find((d) => d.name === a.actionName);
+    try {
+      def?.execute(structuredClone(a.pluginParams) as never, { ...ctx, endAction: () => {} } as never);
+    } catch (err) {
+      getToolkit().logger.error(`Running the project's "${a.actionName}" failed:`, err);
+    }
+  }
+});
+

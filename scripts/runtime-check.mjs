@@ -656,7 +656,7 @@ await check("I opens the inventory screen (UI Designer, role Inventory): the ite
   expect(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
   return `${inv.items} items, "${inv.name}", cursor ${inv.cursor} → ${moved.cursor}`;
 });
-await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker's options menu; its Settings button (an event with PS Maker's \"Open game options menu\") opens the settings screen made in the UI Designer instead of PS Maker's menu: left/right change PS Maker's music volume, Save game saves the Toolkit's progress; no PS Maker gear; Escape goes back, then closes", async () => {
+await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker's options menu; its Save game saves the Toolkit's progress; its Settings button (an event with PS Maker's \"Open game options menu\") opens the settings screen made in the UI Designer instead of PS Maker's menu, where left/right change PS Maker's music volume; no PS Maker gear; Escape goes back, then closes", async () => {
   const player = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return `${Math.round(b.x)},${Math.round(b.y)}`; });
   const psOptions = () => button("Save game").isVisible();
   const gear = () => ev(() => { const g = document.querySelector("button.open-options-button"); return g ? getComputedStyle(g).display !== "none" : false; });
@@ -668,9 +668,20 @@ await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker'
   const at = await player();
   await page.keyboard.press("ArrowDown");
   await wait(300);
-  const moved = await screenNow();
+  const onSave = (await screenNow()).focus;
   const still = (await player()) === at;
   await page.screenshot({ path: path.join(OUT, "pause.png") });
+  // Save game, in the pause menu (PS Maker's own Save game action).
+  await page.keyboard.press("z");
+  await wait(1500);
+  const progress = await ev(() => JSON.parse(window.game.variables.get("zelda-progress").value || "{}"));
+  const saves = await ev(() => Object.keys(localStorage).filter((k) => /save/i.test(k)).length);
+  // Down past Load game to Settings.
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(150);
+  }
+  const moved = await screenNow();
   await page.keyboard.press("z");
   await wait(600);
   const settings = await screenNow();
@@ -688,16 +699,6 @@ await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker'
   await page.keyboard.press("ArrowRight");
   await wait(300);
   const m2 = await music();
-  // Down to Save game: sound, fullscreen, language, controls, save.
-  for (let i = 0; i < 5; i++) {
-    await page.keyboard.press("ArrowDown");
-    await wait(150);
-  }
-  const onSave = (await screenNow()).focus;
-  await page.keyboard.press("z");
-  await wait(1500);
-  const progress = await ev(() => JSON.parse(window.game.variables.get("zelda-progress").value || "{}"));
-  const saves = await ev(() => Object.keys(localStorage).filter((k) => /save/i.test(k)).length);
   const volume = await ev(() => window.game.audioSettings?.scaleSoundVolume?.(0.5));
   await page.keyboard.press("Escape");
   await wait(500);
@@ -716,7 +717,7 @@ await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker'
   expect(typeof volume === "number", "game.audioSettings.scaleSoundVolume is missing");
   expect(back.screen === "pause" && closed.screen === null && !closed.paused, `back ${JSON.stringify(back)}, closed ${JSON.stringify(closed)}`);
   expect(!gearShown, "PS Maker's gear is shown");
-  return `Escape → pause → Settings → the toolkit's settings (music ${m0} → ${m1} → ${m2}, saved; ${saves} save keys) → Escape → pause → Escape → game; no gear`;
+  return `Escape → pause → Save game (${saves} save keys) → Settings → the toolkit's settings (music ${m0} → ${m1} → ${m2}) → Escape → pause → Escape → game; no gear`;
 });
 await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick walks the player through PS Maker's own movement, A swings the sword, View opens the pause menu; the Controls screen rebinds the sword key, Reset brings X back", async () => {
   const body = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return { x: b.center.x, y: b.center.y }; });
@@ -753,13 +754,15 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   const options = await button("Save game").isVisible();
   await ev(() => (navigator.getGamepads = () => []));
   await wait(100);
-  // Controls: the last button of the pause menu.
-  for (let i = 0; i < 3; i++) {
-    await page.keyboard.press("ArrowDown");
-    await wait(150);
+  // Controls: pause → Settings (fourth button) → Controls (fifth).
+  for (const downs of [3, 4]) {
+    for (let i = 0; i < downs; i++) {
+      await page.keyboard.press("ArrowDown");
+      await wait(150);
+    }
+    await page.keyboard.press("z");
+    await wait(400);
   }
-  await page.keyboard.press("z");
-  await wait(400);
   const opened = await screenNow();
   await page.screenshot({ path: path.join(OUT, "controls.png") });
   await page.keyboard.press("z");
@@ -775,10 +778,11 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   await page.keyboard.press("z");
   await wait(300);
   const reset = await ev(() => window.ZeldaMakerToolkit.toolkit.config.controls.sword[0]);
-  await page.keyboard.press("Escape");
-  await wait(300);
-  await page.keyboard.press("Escape");
-  await wait(400);
+  // Back: controls → settings → pause → the game.
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press("Escape");
+    await wait(350);
+  }
   const closed = await screenNow();
   expect(a1.x - a0.x > 20, `the stick moved the player ${a1.x - a0.x}`);
   expect(swung, "A did not swing the sword");
@@ -790,12 +794,14 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
 });
 await check("translations (Zelda: Translations): in a Russian browser the demo plays in Russian — PS Maker's own Dialogue (the villager's goodbye) too, while the project keeps its English; the settings screen's Language button switches to English and back", async () => {
   const lang = () => ev(() => window.ZeldaMakerToolkit.toolkit.i18n.language);
-  // Pause → Settings → Language (fourth button) → Z; back to the game.
+  // Pause → Settings (fourth button) → Language (fourth button) → Z; back to the game.
   const pressLanguage = async () => {
     await page.keyboard.press("Escape");
     await wait(400);
-    await page.keyboard.press("ArrowDown");
-    await wait(150);
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press("ArrowDown");
+      await wait(150);
+    }
     await page.keyboard.press("z");
     await wait(400);
     for (let i = 0; i < 3; i++) {
@@ -920,9 +926,15 @@ await check("PS Maker Change map trigger takes the player to the dungeon", async
   await page.waitForFunction(() => window.ZeldaMakerToolkit.session?.mapId === "zelda-demo-dungeon", null, { timeout: 8000 });
   await wait(1000);
 });
-await check("the dungeon has no UI Layout of its own: it shows the project's shared HUD (made on the field) and its pause menu opens with Escape", async () => {
+await check("the dungeon has no UI Layout, Start Toolkit or Set Player Sprites of its own: the toolkit runs with the project's settings and player animations, shows the project's shared HUD (made on the field) and its pause menu opens with Escape", async () => {
   const keys = await ev(() => [...new Set(window.game.scene.getScene("ZeldaMakerToolkitHUD").children.list.filter((o) => o.visible && o.texture?.key?.startsWith("zelda-ui-")).map((o) => o.texture.key))].sort());
   const own = await ev(() => window.game.scene.getScenes(true).find((m) => m.map).map.initialActions.some((a) => a.actionName === "Zelda: UI Layout"));
+  // No Start Toolkit and no Set Player Sprites in the dungeon: the field's count for the whole project.
+  const project = await ev(() => {
+    const names = window.game.scene.getScenes(true).find((m) => m.map).map.initialActions.map((a) => a.actionName);
+    const tk = window.ZeldaMakerToolkit.toolkit;
+    return { start: names.includes("Zelda: Start Toolkit"), sprites: names.includes("Zelda: Set Player Sprites"), attack: tk.config.player.sprites.attack, progress: tk.progressVariable };
+  });
   await page.keyboard.press("Escape");
   await wait(400);
   const screen = await ev(() => window.ZeldaMakerToolkit.session.screens.current?.name ?? null);
@@ -930,6 +942,7 @@ await check("the dungeon has no UI Layout of its own: it shows the project's sha
   await wait(400);
   const closed = await ev(() => window.ZeldaMakerToolkit.session.screens.current);
   expect(!own, "the dungeon has its own UI Layout");
+  expect(!project.start && !project.sprites && !!project.attack && project.progress === "zelda-progress", `once per project: ${JSON.stringify(project)}`);
   for (const k of ["zelda-ui-hud-bar", "zelda-ui-heart-full", "zelda-ui-digits", "zelda-ui-item-box"]) expect(keys.includes(k), `${k} not drawn in the dungeon (${keys.join(", ")})`);
   expect(screen === "pause" && closed === null, `pause ${screen}, then ${JSON.stringify(closed)}`);
   return `shared HUD in the demo's pictures, pause opened and closed`;
@@ -981,10 +994,10 @@ await check("back on the field (the map wakes up): enemies again, opened chest a
 await check("pause menu → Main menu: the title map wakes up with its title screen again (HUD hidden); New game goes back to the field", async () => {
   await page.keyboard.press("Escape");
   await wait(400);
-  await page.keyboard.press("ArrowDown");
-  await wait(200);
-  await page.keyboard.press("ArrowDown");
-  await wait(200);
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(200);
+  }
   const focus = (await screenNow()).focus;
   await page.keyboard.press("z");
   await page.waitForFunction(() => window.ZeldaMakerToolkit?.session?.mapId === "zelda-demo-title", null, { timeout: 15000 });

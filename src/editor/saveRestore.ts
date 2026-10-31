@@ -1,6 +1,7 @@
-import { getToolkit } from "./runtime.ts";
-import { MAP_BUILDING_ACTIONS } from "./mapReplay.ts";
+import { deriveMapId, getToolkit, startSession } from "./runtime.ts";
+import { isReplaying, MAP_BUILDING_ACTIONS } from "./mapReplay.ts";
 import { PhaserHost } from "../host/phaserHost.ts";
+import { isToolkitOff, projectStartAction, type ProjectLike } from "./projectStart.ts";
 
 /**
  * Loading a PS Maker save. `loadGame` recreates the game and every map scene from its saved
@@ -28,6 +29,7 @@ interface MapScene {
   /** PS Maker's MapStartup: needsStart = !hasSnapshot || savedSetup.length > 0 (MapStartup.ts). */
   mapStartup?: { needsStart?: boolean; hasSavedStartup?: boolean } | null;
   player?: unknown;
+  story?: ProjectLike;
   sys?: { isActive?(): boolean };
 }
 
@@ -75,7 +77,18 @@ export function startRestoredMap(scene: MapScene, actions: readonly ActionDef[],
   return list.length;
 }
 
-/** Watches the game (browser only) for map scenes restored from a save. */
+/**
+ * The toolkit on every map: a project with a Start Toolkit (on any map) runs the toolkit on the
+ * map the player is on, also on maps with no Zelda action, unless Stop Toolkit turned it off there.
+ * A map's own Zelda actions start it as soon as they run; this covers the others.
+ */
+export function startOnMap(scene: MapScene, game: unknown): boolean {
+  if (!scene.player || runningOn(scene) || isReplaying() || isToolkitOff(scene) || !projectStartAction(scene.story)) return false;
+  startSession({ game, scene, player: scene.player }, deriveMapId(scene));
+  return true;
+}
+
+/** Watches the game (browser only): map scenes restored from a save, and maps the toolkit is not running on yet. */
 export function startRestoreWatcher(actions: readonly ActionDef[], win: any = globalThis): void {
   if (!win || typeof win.document === "undefined" || typeof win.setInterval !== "function") return;
   win[REGISTRY_KEY]?.stop?.();
@@ -87,6 +100,9 @@ export function startRestoreWatcher(actions: readonly ActionDef[], win: any = gl
       seen.add(scene);
       if (isRestoredMap(scene) && !runningOn(scene)) startRestoredMap(scene, actions, win.game);
     }
+    // The map the player is on now (PS Maker keeps left maps asleep, not in the active list).
+    const here = scenes.find((s) => s && typeof s === "object" && s.map && s.inEditorMode !== true && s.sceneCreated === true && s.player);
+    if (here) startOnMap(here, win.game);
   };
   const id = win.setInterval(() => {
     try {

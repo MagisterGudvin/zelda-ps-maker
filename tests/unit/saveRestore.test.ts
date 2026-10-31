@@ -104,3 +104,47 @@ test("progress variable: already filled when the toolkit starts (a save loaded o
   void vars;
   again.done();
 });
+
+test("the toolkit once per project: its settings from wherever they are, on every map (also one with no Zelda action); Stop Toolkit turns it off on a map", async () => {
+  const { projectSettingsActions } = await import("../../src/editor/projectStart.ts");
+  const { f, actions, getToolkit, done } = await setup();
+  const zelda = (actionName: string, pluginParams: Record<string, unknown>) => ({ type: `plugin:zelda-maker-toolkit:x`, actionName, pluginName: "Zelda Maker Toolkit", pluginParams });
+  const story = {
+    maps: [
+      { id: "title", initialActions: [zelda("Zelda: Open UI Screen", { name: "title" })] },
+      { id: "field", initialActions: [zelda("Zelda: Start Toolkit", { language: "en", hearts: 5 }), zelda("Zelda: Define Item", { slot: "custom_item_1", name: "Ice Rod", damage: 3 }), zelda("Zelda: Set Controls", { sword: [{ type: "key", key: "KeyJ" }] })] },
+      { id: "dungeon", initialActions: [zelda("Zelda: Start Toolkit", { hearts: 9 }), zelda("Zelda: Define Item", { slot: "custom_item_2", name: "Lamp" })] },
+      { id: "cave", initialActions: [zelda("Zelda: Set Controls", { sword: [{ type: "key", key: "KeyK" }] })] },
+    ],
+  };
+  assert.deepEqual(projectSettingsActions(story, "title").map((a) => `${a.actionName} ${JSON.stringify(a.pluginParams)}`), [
+    'Zelda: Start Toolkit {"language":"en","hearts":5}',
+    'Zelda: Set Controls {"sword":[{"type":"key","key":"KeyJ"}]}',
+    'Zelda: Define Item {"slot":"custom_item_1","name":"Ice Rod","damage":3}',
+    'Zelda: Define Item {"slot":"custom_item_2","name":"Lamp"}',
+  ], "the first Start Toolkit and Set Controls, every Define Item");
+  assert.deepEqual(projectSettingsActions(story, "cave").map((a) => a.actionName), ["Zelda: Start Toolkit", "Zelda: Define Item", "Zelda: Define Item"], "the map's own Set Controls wins on it");
+
+  // The game starts on a map without any Zelda action of its own.
+  const cave = Object.assign(f.scene, { map: { id: "nothing-here", initialActions: [] }, story, sceneCreated: true, player: f.player });
+  let tick = () => {};
+  const win: any = { document: {}, setInterval: (fn: () => void) => ((tick = fn), 1), clearInterval: () => {}, game: f.game };
+  f.game.scene.getScenes = () => [cave];
+  startRestoreWatcher(actions, win);
+  tick();
+  const tk = getToolkit();
+  assert.ok(tk.session, "the toolkit runs on a map with no Zelda action");
+  assert.equal(tk.config.player.maxHealth, 5 * tk.config.player.heartValue, "with the project's Start Toolkit (on another map)");
+  assert.ok(tk.items.has("custom_item_1") && tk.items.has("custom_item_2"), "and its own items");
+  assert.deepEqual(tk.config.controls.sword, ["KeyJ"]);
+  assert.deepEqual(tk.session!.hud ? tk.session!.hud.layout().elements : [], [], "no HUD made in the UI Designer: none on screen");
+
+  actions.find((a) => a.name === "Zelda: Stop Toolkit")!.execute({}, { game: f.game, scene: cave, player: f.player });
+  assert.equal(tk.session, null);
+  tick();
+  assert.equal(tk.session, null, "Stop Toolkit: it does not start there again by itself");
+  actions.find((a) => a.name === "Zelda: Start Toolkit")!.execute({}, { game: f.game, scene: cave, player: f.player });
+  assert.ok(tk.session, "a Start Toolkit there starts it again");
+  startRestoreWatcher(actions, {});
+  done();
+});

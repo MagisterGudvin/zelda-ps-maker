@@ -583,7 +583,7 @@ export class UiDesigner {
           ? `Game window · the shared HUD from map "${st.sharedMap}"; this map's UI Layout is a second one (click to see it)`
           : st.action
             ? `Game window · ${what} (click it to edit)`
-            : "Game window · classic Zelda HUD (add Zelda: UI Layout after Start Toolkit to design your own)";
+            : "Game window · no HUD yet (add Zelda: UI Layout and design it: the classic Zelda HUD is its starting template)";
     this.label.setText(text).setPosition(f.x, f.y - 1).setVisible(true);
   }
 

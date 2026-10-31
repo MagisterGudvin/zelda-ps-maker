@@ -12,6 +12,9 @@ const MAX_MESSAGES = 3;
  * host's HUD sink. Re-renders only when an event changed something or a
  * message is on screen.
  */
+/** No HUD made in the UI Designer: nothing on screen. */
+const NO_HUD: UiLayout = { ...classicLayout(), elements: [] };
+
 export class HudSystem {
   readonly name = "hud";
   private readonly s: Session;
@@ -112,17 +115,13 @@ export class HudSystem {
     return { x: s.player.box.x, y: s.player.box.y, walls: s.host.mapWalls?.() ?? [], dots };
   }
 
-  /** The layout the HUD shows: the designer's (Zelda: UI Layout) or the classic one. */
+  /**
+   * The layout the HUD shows: the one made in the UI Designer (Zelda: UI Layout, role HUD). Without
+   * one there is no HUD (its classic look is the designer's starting template).
+   */
   layout(): UiLayout {
-    const own = this.s.toolkit.hudLayout;
-    if (own) return own;
-    // The magic meter only once the player has magic.
-    const magic = this.s.state.player.maxMagic > 0;
-    if (this.classic?.magic !== magic) this.classic = { magic, layout: classicLayout({ magic }) };
-    return this.classic.layout;
+    return this.s.toolkit.hudLayout ?? NO_HUD;
   }
-
-  private classic: { magic: boolean; layout: UiLayout } | null = null;
 
   /** The values a layout shows, from the toolkit state and the project variables. */
   values(layout: UiLayout): LayoutValues {

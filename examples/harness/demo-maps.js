@@ -107,8 +107,8 @@ export const MAPS = {
       { x: 192, y: 168, w: 16, h: 56 },
     ],
     npcs: [],
+    // No Start Toolkit here: the field's runs for the whole project (the toolkit runs on every map).
     onLoad: [
-      ["Zelda: Start Toolkit", { difficulty: "alttp", hearts: 3, swordDamage: 2, shieldMode: "hold", language: "auto", debugHitboxes: false, diagnostics: false }],
       ["Zelda: Enter Dungeon", { dungeonId: "dungeon_1", completeOnBoss: true }],
       ["Zelda: Set Respawn Point", { position: { x: 40, y: 200 } }],
       // 8. Block + pressure plate opens the puzzle shutter.

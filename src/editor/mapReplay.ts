@@ -82,9 +82,10 @@ export function recordMapAction(name: string, execute: Execute, params: unknown,
   if (!scene || typeof scene !== "object" || sceneOf(session) !== scene) return;
   // PS Maker's endAction must not be called again: the stored context has none.
   const entry: Entry = { name, execute, params: clone(params), ctx: { ...ctx, endAction: undefined } as PluginContextLike };
-  // A new session (Start Toolkit, or the first action of a map without it) begins the map's list.
-  if (session !== sessionBefore) scripts.set(scene, [entry]);
-  else scripts.get(scene)?.push(entry);
+  // A new session (Start Toolkit, or the first action of a map without it) begins the map's list;
+  // so does the first action on a map the toolkit was started on by itself (saveRestore.ts).
+  if (session !== sessionBefore || !scripts.has(scene)) scripts.set(scene, [entry]);
+  else scripts.get(scene)!.push(entry);
   watch(scene);
 }
 
