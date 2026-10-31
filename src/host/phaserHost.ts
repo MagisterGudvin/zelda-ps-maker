@@ -850,6 +850,65 @@ export class PhaserHost implements HostAdapter, DepthSource {
   }
 
   /** PS Maker's map zoom (GameMap.CAMERA_ZOOM: map.zoom or gameConfig.zoom), else the camera's. */
+  /** Runs one of PS Maker's own actions on this map's story runner (as runStoryEvent). */
+  runBuiltInAction(action: { type: string; [k: string]: unknown }): Promise<unknown> | null {
+    const runner = this.scene?.storyRunner;
+    if (!runner || typeof runner.playActions !== "function") return null;
+    const full = { id: `zmt-${action.type}-${++this.dialogueSeq}`, name: action.type, ...action };
+    try {
+      return Promise.resolve(runner.playActions([full])).catch((err: unknown) => this.logger.warn(`PS Maker action "${action.type}" failed:`, err));
+    } catch (err) {
+      this.logger.warn(`PS Maker action "${action.type}" failed:`, err);
+      return null;
+    }
+  }
+
+  /**
+   * The player's volumes as PS Maker's options menu shows and sets them (OptionsMenuRenderer.svelte):
+   * `game.audioSettings.musicVolumePercent` / `soundVolumePercent` (PlayerAudioSettings, kept in
+   * the browser by PS Maker), set through `game.musicManager.setPlayerMusicVolume` (the music
+   * playing now follows) and `game.audioSettings.setSoundVolume`.
+   */
+  audioVolumes(): { music: number; sound: number } | null {
+    const a = this.game?.audioSettings;
+    if (!a || typeof a.musicVolumePercent !== "number" || typeof a.soundVolumePercent !== "number") return null;
+    return { music: a.musicVolumePercent, sound: a.soundVolumePercent };
+  }
+
+  setAudioVolume(channel: "music" | "sound", percent: number): boolean {
+    const g = this.game;
+    const v = Math.max(0, Math.min(100, Math.round(percent)));
+    if (channel === "music" && typeof g?.musicManager?.setPlayerMusicVolume === "function") g.musicManager.setPlayerMusicVolume(v);
+    else if (channel === "music" && typeof g?.audioSettings?.setMusicVolume === "function") g.audioSettings.setMusicVolume(v);
+    else if (channel === "sound" && typeof g?.audioSettings?.setSoundVolume === "function") g.audioSettings.setSoundVolume(v);
+    else return false;
+    return true;
+  }
+
+  /** PS Maker's fullscreen is the page's (utils/fullscreen.ts: document.fullscreenElement). */
+  isFullscreen(): boolean {
+    return !!(globalThis as { document?: { fullscreenElement?: unknown } }).document?.fullscreenElement;
+  }
+
+  /**
+   * PS Maker draws its options button (the gear, SystemMenusOverlay.svelte: button.open-options-button)
+   * while Game UI → Options menu → "Options button in game" is ticked. With the toolkit's own
+   * settings screen it would open the options menu that screen replaces, so it is hidden by a style
+   * rule on the page (the project's setting is not changed).
+   */
+  hideOptionsButton(hidden: boolean): void {
+    const doc = (globalThis as { document?: any }).document;
+    if (!doc?.head || !doc.createElement) return;
+    const id = "zelda-maker-toolkit-hide-options-button";
+    const el = doc.getElementById?.(id);
+    if (hidden && !el) {
+      const style = doc.createElement("style");
+      style.id = id;
+      style.textContent = "button.open-options-button { display: none !important; }";
+      doc.head.appendChild(style);
+    } else if (!hidden && el) el.remove();
+  }
+
   mapZoom(): number {
     const z = Number(this.scene?.CAMERA_ZOOM ?? this.scene?.cameras?.main?.zoom ?? 0);
     return Number.isFinite(z) && z > 0 ? z : 0;

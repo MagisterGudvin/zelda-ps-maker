@@ -1,4 +1,5 @@
 import type { PluginEvent } from "@ps-maker/plugin-api";
+import { ITEM_SPRITE_SLOTS } from "./fields.ts";
 
 /**
  * How the actions look in the PS Maker editor, kept apart from what they do:
@@ -119,7 +120,7 @@ const STATS_UI: Record<string, FieldUi> = {
 // ---- per action ---------------------------------------------------------------------------
 
 /** Set Player Sprites fields that pick an animation. */
-const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "death", "shield", "bow", "boomerang", "bomb", "item", "lift", "carry", "throw", "push", "itemGet"];
+const PLAYER_ANIM_SLOTS = ["attack", "spin", "charge", "chargeWalk", "hurt", "death", "shield", "bow", "boomerang", "bomb", "item", "dig", "powder", "rod", "hookshot", "jump", "dash", "lift", "carry", "throw", "push", "itemGet"];
 
 export const ACTION_UI: Record<string, ActionUi> = {
   "Zelda: Start Toolkit": {
@@ -370,6 +371,7 @@ export const ACTION_UI: Record<string, ActionUi> = {
       damageType: (p) => Number(p.damage) > 0 && !(Number(p.heal) > 0),
       area: (p) => Number(p.damage) > 0 && !(Number(p.heal) > 0),
       stunMs: (p) => Number(p.damage) > 0 && !(Number(p.heal) > 0),
+      shot: (p) => Number(p.damage) > 0 && !(Number(p.heal) > 0),
     },
     preview: (p, show) => join([show("slot"), set(p.name) && String(p.name)], ": "),
   },
@@ -388,9 +390,10 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (_p, show) => join([show("slot"), `based on ${show("basedOn") ?? "soldier"}`], ": "),
   },
   "Zelda: Set Player Sprites": {
-    keywords: ["sprite", "animation", "attack", "mana seed", "shield", "bow", "lift", "carry", "push", "death"],
+    keywords: ["sprite", "animation", "attack", "mana seed", "shield", "bow", "lift", "carry", "push", "death", "shovel", "hookshot", "jump", "dash", "feather", "boots"],
     fields: {
-      ...Object.fromEntries(["shield", "bow", "boomerang", "bomb", "item"].map((k) => [k, { group: "Items and shield" }])),
+      ...Object.fromEntries(["shield", "bow", "boomerang", "bomb", "item", "dig", "powder", "rod", "hookshot"].map((k) => [k, { group: "Items and shield" }])),
+      ...Object.fromEntries(["jump", "dash"].map((k) => [k, { group: "Jump and dash" }])),
       ...Object.fromEntries(["lift", "carry", "throw", "push", "itemGet"].map((k) => [k, { group: "Lifting, pushing, chests" }])),
       weaponAttack: { group: "Weapon layer" },
       weaponSpin: { group: "Weapon layer" },
@@ -412,6 +415,15 @@ export const ACTION_UI: Record<string, ActionUi> = {
     preview: (p, show) => {
       const others = PLAYER_ANIM_SLOTS.filter((k) => k !== "attack" && set(p[k])).length;
       return join([show("attack") && `attack: ${show("attack")}`, others > 0 && `+${others} more`]);
+    },
+  },
+  "Zelda: Set Item Sprites": {
+    keywords: ["sprite", "icon", "item", "picture", "arrow", "bomb", "boomerang", "hookshot", "pickup", "rupee", "heart", "image"],
+    fields: Object.fromEntries(ITEM_SPRITE_SLOTS.map(([id, , group]) => [id, { group }])),
+    collapsed: ["In the world", "Pickups"],
+    preview: (p) => {
+      const n = ITEM_SPRITE_SLOTS.filter(([id]) => set(p[id])).length;
+      return n ? `${n} pictures of your own` : "built-in pictures";
     },
   },
   "Zelda: Set Sound": {

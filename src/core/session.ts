@@ -161,6 +161,8 @@ export class Session {
       this.step(step);
       steps++;
     }
+    // Drawn every frame, ticks or not: a carried object stays on the player's head.
+    if (!this.isPaused()) this.interactions?.followPlayer();
   }
 
   private readonly linkedLast = new Map<string, number | string>();

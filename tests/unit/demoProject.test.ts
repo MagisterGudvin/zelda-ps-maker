@@ -195,7 +195,7 @@ test("demo HUD: the toolkit draws all of it, like the map (scale 0), no Add UI H
   // The HUD and the pause screen are on the first map only; the dungeon uses them from the project.
   const shared = projectUi(story);
   assert.equal(shared.hud?.mapId, story.maps[0].id);
-  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "controls", "message", "inventory", "dialogue", "notification", "title"]);
+  assert.deepEqual(shared.screens.map((x) => x.name), ["pause", "controls", "settings", "message", "inventory", "dialogue", "notification", "title"]);
   for (const m of story.maps.filter((x: Any) => x.id !== story.player.startingMap)) {
     assert.ok(!m.initialActions.some((a: Any) => a.type === "addUiComponentsAction"), `${m.name}: no Add UI HUD`);
     assert.ok(!m.initialActions.some((a: Any) => a.actionName === "Zelda: HUD Variables"), `${m.name}: no HUD Variables`);
@@ -312,6 +312,8 @@ test("demo translations: every text of the demo has its Russian translation; the
   }
   const bye = story.globalStoryEvents.find((e: Any) => e.id === "zelda-villager-bye");
   assert.equal(bye.actions[0].type, "dialogueAction");
-  const pause = projectUi(story).screens.find((s) => s.name === "pause")!;
-  assert.ok(parseLayout(pause.raw).layout!.elements.some((e) => e.type === "button" && e.action.kind === "language"), "a language button in the pause menu");
+  const settings = parseLayout(projectUi(story).screens.find((s) => s.name === "settings")!.raw).layout!;
+  assert.equal(settings.screen.role, "settings");
+  assert.deepEqual(settings.elements.filter((e) => e.type === "button").map((e) => (e as Any).action.kind), ["music", "sound", "fullscreen", "language", "open", "save", "close"], "the settings screen: volumes, fullscreen, language, controls, save, back");
+  assert.equal(story.gameUI.optionsMenu.showOpenOptionsButton, false, "no PS Maker gear over the game");
 });

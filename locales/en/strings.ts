@@ -87,4 +87,7 @@ export const en: Record<string, string> = {
   "msg.puzzle_solved": "Something opened somewhere...",
   "msg.puzzle_failed": "Wrong order! The switches reset.",
   "msg.dungeon_completed": "Dungeon cleared!",
+  "settings.on": "On",
+  "settings.off": "Off",
+  "msg.game_saved": "Game saved.",
 };

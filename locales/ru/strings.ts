@@ -87,4 +87,7 @@ export const ru: Record<string, string> = {
   "msg.puzzle_solved": "Где-то что-то открылось...",
   "msg.puzzle_failed": "Неверный порядок! Переключатели сброшены.",
   "msg.dungeon_completed": "Подземелье пройдено!",
+  "settings.on": "Вкл",
+  "settings.off": "Выкл",
+  "msg.game_saved": "Игра сохранена.",
 };

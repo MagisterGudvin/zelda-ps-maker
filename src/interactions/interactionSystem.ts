@@ -174,14 +174,27 @@ export class InteractionSystem implements SessionSystem {
     this.updateCarriedBomb();
   }
 
+  /**
+   * What is carried stays on the head on every drawn frame. PS Maker moves the player each frame,
+   * the toolkit ticks at a fixed rate (60 a second): on a frame without a tick (fast screens, uneven
+   * frame times) the object would be drawn a frame behind the player, and look doubled and blurry.
+   */
+  followPlayer(): void {
+    if (!this.carried && !this.carriedBomb) return;
+    if (!this.s.host.readPlayerBox(this.frameBox)) return;
+    if (this.carried) this.updateCarried(this.frameBox);
+    if (this.carriedBomb) this.updateCarriedBomb(this.frameBox);
+  }
+
+  private readonly frameBox = makeBox();
+
   /** Over the head; a bomb that went off in the hands is gone (its blast hurt the player, bombsHurtPlayer). */
-  private updateCarriedBomb(): void {
+  private updateCarriedBomb(p: AABB = this.s.player.box): void {
     const bomb = this.carriedBomb!;
     if (bomb.removed) {
       this.carriedBomb = null;
       return;
     }
-    const p = this.s.player.box;
     const head = this.s.host.readPlayerTop?.();
     bomb.x = p.x;
     bomb.y = typeof head === "number" ? Math.min(head + CARRY_OVERLAP - bomb.hh, p.y - p.hh - bomb.hh) : p.y - CARRY_OFFSET_Y;
@@ -217,9 +230,8 @@ export class InteractionSystem implements SessionSystem {
     this.updateCarried();
   }
 
-  private updateCarried(): void {
+  private updateCarried(p: AABB = this.s.player.box): void {
     const obj = this.carried!;
-    const p = this.s.player.box;
     // Rest on the head (PS Maker frames are taller than the body), drawn in front of the player.
     const head = this.s.host.readPlayerTop?.();
     obj.x = p.x;

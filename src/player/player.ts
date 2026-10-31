@@ -21,7 +21,7 @@ const DEATH_ANIM_MS = 1000;
  */
 const WALK_GRACE_MS = 120;
 /** Item ids with their own animation slot (others use `item`). */
-const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb"> = { bow: "bow", bomb_arrow: "bow", boomerang: "boomerang", bomb: "bomb" };
+const ITEM_SLOTS: Record<string, "bow" | "boomerang" | "bomb" | "dig" | "powder" | "rod"> = { bow: "bow", bomb_arrow: "bow", boomerang: "boomerang", bomb: "bomb", shovel: "dig", magic_powder: "powder", fire_rod: "rod" };
 
 /**
  * Wraps the PS Maker player Actor. Movement stays under PS Maker's control;
@@ -92,6 +92,9 @@ export class PlayerSystem implements SessionSystem, Damageable {
     const sp = () => session.config.player.sprites;
     this.offs.push(
       session.bus.on("zelda:item:used", ({ itemId }) => {
+        // Items with an ongoing animation of their own (while it lasts) play no one-shot.
+        const ongoing = ({ hookshot: "hookshot", boots: "dash", feather: "jump" } as const)[itemId as "hookshot"];
+        if (ongoing && sp()[ongoing]) return;
         const slot = ITEM_SLOTS[itemId];
         const useMs = session.toolkit.items.get(itemId)?.useMs ?? 0;
         this.playPose((slot && sp()[slot]) || sp().item, Math.max(POSE_MIN_MS, useMs));
@@ -214,9 +217,15 @@ export class PlayerSystem implements SessionSystem, Damageable {
     } else {
       if (this.pose) this.requestOverlay(this.pose.lock ? OVERLAY_PRIORITY.itemGet : OVERLAY_PRIORITY.action, buildOverlay(cfg, this.pose.anim, "", this.facing, this.pose.ms, this.pose.durationMs));
       if (this.hurtMs >= 0 && this.knockMs > 0) this.requestOverlay(OVERLAY_PRIORITY.hurt, buildOverlay(cfg, sp.hurt, "", this.facing, this.hurtMs));
-      // Ongoing states: carrying (walks), pushing a block, holding the shield up.
-      const pose = this.s.interactions?.isCarrying() ? sp.carry : this.s.interactions?.isPushing() ? sp.push : this.shieldRaised() ? sp.shield : "";
-      if (pose) this.requestOverlay(OVERLAY_PRIORITY.pose, buildOverlay(cfg, pose, "", this.facing, pose === sp.push ? this.clockMs : this.isMoving ? this.walkMs : 0));
+      // Ongoing states: in the air, dashing, the hookshot out, carrying (walks), pushing a block, holding the shield up.
+      const moves = this.s.moves;
+      const jump = moves && sp.jump ? moves.jumpMs : -1;
+      if (jump >= 0) this.requestOverlay(OVERLAY_PRIORITY.pose, buildOverlay(cfg, sp.jump, "", this.facing, jump, cfg.items.feather.jumpMs));
+      else {
+        const pose = moves?.isDashing && sp.dash ? sp.dash : this.locks.has("hookshot") && sp.hookshot ? sp.hookshot : this.s.interactions?.isCarrying() ? sp.carry : this.s.interactions?.isPushing() ? sp.push : this.shieldRaised() ? sp.shield : "";
+        const walkLike = pose === sp.carry || pose === sp.shield;
+        if (pose) this.requestOverlay(OVERLAY_PRIORITY.pose, buildOverlay(cfg, pose, "", this.facing, walkLike ? (this.isMoving ? this.walkMs : 0) : this.clockMs));
+      }
     }
     this.updateShieldView();
     const req = this.overlayReq;

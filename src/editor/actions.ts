@@ -13,18 +13,20 @@ import { createDataItem, type DataItemSpec } from "../items/builtinItems.ts";
 import { changeHealth, changeMagic, setHealth, setMaxHealth } from "../player/health.ts";
 import { deriveMapId, ensureSession, getToolkit, sessionMismatch, startSession } from "./runtime.ts";
 import { assetId, resolveNpc, resolvePosition } from "./paramResolvers.ts";
+import { setSpriteImage, spriteImages } from "../host/textures.ts";
 import { classicLayout, parseLayout, pictureKeys } from "../ui/uiLayout.ts";
 import { layoutKind, useLayoutFonts } from "./projectUi.ts";
 import { applyPlayerControls, rememberProjectControls } from "../core/playerControls.ts";
 import { loadPlayerLanguage } from "../core/playerLanguage.ts";
-import { applyProjectTranslations, translateRunningScenes, type StoryLike } from "./projectTranslations.ts";
+import { applyProjectTranslations, type StoryLike } from "./projectTranslations.ts";
+import { hookRunningScenes } from "./storyHooks.ts";
 import { SOUND_EVENTS } from "../ui/sound.ts";
 import { OBJECT_TYPES } from "../interactions/objectTypes.ts";
 import { withUi } from "./ui.ts";
 import { isReplayedSession, isReplaying, recordMapAction } from "./mapReplay.ts";
 import { animFromPick, characterFromParam, characterPlan, mapObjectLook, sheetNames, toSheetDef, type PsSheet, type PsStory } from "../host/psmakerAssets.ts";
 import type { Facing } from "../core/math.ts";
-import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, eventField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
+import { ABILITY_OPTIONS, animation, areaOf, mapObjectField, audio, bool, boolOr, buildThen, buildWhen, choice, CUSTOM_ENEMY_SLOTS, CUSTOM_ITEM_SLOTS, DUNGEON_OPTIONS, enemyStats, eventField, GROUP_OPTIONS, img, inMapNpc, ITEM_OPTIONS, ITEM_SPRITE_SLOTS, keys, mapArea, mapPath, mapPos, multi, multiOf, npc, num, numOr, pathOf, playerAnim, pointOf, RESOURCE_OPTIONS, SPRITE_FIELDS, STAT_FIELDS, str, TEMPLATE_OPTIONS, templateOf, textOf, THEN_FIELDS, variable, WHEN_FIELDS } from "./fields.ts";
 
 type Ctx = PluginContext;
 
@@ -257,7 +259,7 @@ const startToolkit = defineEvent({
       tk.projectKey = story?.metadata?.storyId || story?.storyName || tk.projectKey;
       applyProjectTranslations(tk, story as StoryLike | undefined);
       loadPlayerLanguage(tk);
-      translateRunningScenes((ctx as { scene?: unknown } | undefined)?.scene, tk);
+      hookRunningScenes((ctx as { scene?: unknown } | undefined)?.scene, tk);
       tk.applyPreset(preset);
       // Only fields PS Maker actually passed: an action saved by an older version keeps
       // its difficulty preset values instead of being reset to these defaults.
@@ -819,6 +821,12 @@ const setPlayerSprites = defineEvent({
     throw: playerAnim("Throw", "Optional: throwing what you carry. / Бросить."),
     push: playerAnim("Push", "Optional: leaning on a block to push it. / Толкать блок."),
     itemGet: playerAnim("Item get", "Optional: holding up an item from a chest for a second (the player stands still meanwhile). / Достать предмет из сундука."),
+    dig: playerAnim("Shovel", "Optional: digging with the shovel; empty = Use item. / Копать лопатой."),
+    powder: playerAnim("Magic Powder", "Optional: sprinkling Magic Powder; empty = Use item. / Посыпать порошком."),
+    rod: playerAnim("Fire Rod", "Optional: casting with the Fire Rod; empty = Use item. / Жезл."),
+    hookshot: playerAnim("Hookshot", "Optional: while the hookshot is out and pulls the player; empty = Use item (once). / Крюк-кошка."),
+    jump: playerAnim("Jump", "Optional: in the air with Roc's Feather (frames spread over the jump). / Прыжок."),
+    dash: playerAnim("Dash", "Optional: running with the Pegasus Boots (loops). / Рывок."),
     weaponAttack: animation("Weapon layer: attack", "Optional: a separate weapon sheet drawn over the body (when the weapon is not in the body frames). / Слой оружия: удар."),
     weaponSpin: animation("Weapon layer: spin", "Optional. / Слой оружия: круговой."),
     weaponCharge: animation("Weapon layer: charging", "Optional. / Слой оружия: зарядка."),
@@ -861,6 +869,12 @@ const setPlayerSprites = defineEvent({
               lift: pick(params.lift),
               throw: pick(params.throw),
               itemGet: pick(params.itemGet),
+              dig: pick(params.dig),
+              powder: pick(params.powder),
+              rod: pick(params.rod),
+              hookshot: loop(params.hookshot),
+              jump: pick(params.jump),
+              dash: loop(params.dash),
               weaponBehind: behind,
               hidePlayer: boolOr(params.hidePlayer, true),
               offsetX: numOr(params.offsetX, 0),
@@ -871,6 +885,22 @@ const setPlayerSprites = defineEvent({
         },
         "Set Player Sprites",
       );
+    });
+  },
+});
+
+const setItemSprites = defineEvent({
+  name: "Zelda: Set Item Sprites",
+  description: "Your own pictures (project Images) for the toolkit's items: their icons (inventory, HUD item buttons, chests, item get), what flies and lies in the world (arrows, bombs, boomerang, fireball, hookshot, powder, the dug hole) and the pickups. Empty = the built-in picture. Put it in Map start after Start Toolkit (on every map, like Set Player Sprites). / Свои картинки предметов.",
+  parameterDefs: Object.fromEntries(ITEM_SPRITE_SLOTS.map(([id, label]) => [id, img(label, `Picture in place of the built-in "${id}". / Картинка вместо встроенной.`)])),
+  execute(params, ctx) {
+    run("Zelda: Set Item Sprites", ctx, params, (s) => {
+      const p = params as Record<string, unknown>;
+      for (const [id] of ITEM_SPRITE_SLOTS) setSpriteImage(id, assetId(p[id]));
+      for (const [id, image] of spriteImages()) {
+        if (s.host.textureSize && !s.host.textureSize(image)) s.logger.warnOnce(`item-sprite-${image}`, `Set Item Sprites: picture "${image}" (${id}) is not loaded; the built-in one is shown.`);
+      }
+      s.hud?.markDirty();
     });
   },
 });
@@ -1256,6 +1286,7 @@ const defineItem = defineEvent({
     stunMs: num("Stun (ms)", "Freeze hit enemies; 1000 = one second.", 0),
     heal: num("Heal", "Half-hearts restored per use (makes it a healing item). / Лечение.", 0),
     give: bool("Give now", "Also give the item to the player.", false),
+    shot: img("Shot picture", "Optional: the picture of its shot (Damage > 0) or of its burst (Area attack); empty = the built-in fireball or explosion. / Картинка выстрела или удара."),
   },
   execute(params, ctx) {
     run("Zelda: Define Item", ctx, params, (_s, tk) => {
@@ -1272,8 +1303,8 @@ const defineItem = defineEvent({
         cost: Math.max(0, numOr(params.cost, 1)),
         effect: heal > 0 ? "heal" : damage > 0 ? (boolOr(params.area, false) ? "area" : "projectile") : "none",
         amount: heal,
-        projectile: { damage, damageType: type, stunMs },
-        area: { damage, damageType: type, stunMs },
+        projectile: { damage, damageType: type, stunMs, ...(assetId(params.shot) ? { sprite: assetId(params.shot) } : {}) },
+        area: { damage, damageType: type, stunMs, ...(assetId(params.shot) ? { sprite: assetId(params.shot) } : {}) },
       };
       tk.items.register(createDataItem(spec));
       if (boolOr(params.give, false)) tk.inventory.give(spec.id, 1, { silent: true });
@@ -1395,5 +1426,6 @@ export const ZELDA_ACTIONS: PluginEvent<any>[] = [
   defineItem,
   defineEnemy,
   setPlayerSprites,
+  setItemSprites,
   setSound,
 ].map((e) => withUi(endsAction(e)));

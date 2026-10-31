@@ -180,6 +180,11 @@ export function sampleValues(layout: UiLayout, startParams: Record<string, unkno
     else if (key === "health" || key === "maxHealth") out[key] = hearts * heart;
     else if (key === "heartValue") out[key] = heart;
     else if (key === "language") out[key] = i18n.languageName();
+    else if (/^\d+(\.\d+)?$/.test(key)) out[key] = Number(key);
+    else if (key === "musicVolume" || key === "soundVolume") out[key] = 80;
+    else if (key === "fullscreen") out[key] = 0;
+    else if (key === "fullscreen.text") out[key] = i18n.t("settings.off");
+    else if (key === "settings.save" || key === "settings.exit") out[key] = 1;
     else if (key === "hearts" || key === "maxHearts" || key === "fullHearts") out[key] = hearts;
     else if (key === "magic" || key === "maxMagic") out[key] = 1;
     else if (key === "magicPercent") out[key] = 100;

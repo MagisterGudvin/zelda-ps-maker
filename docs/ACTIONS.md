@@ -1,8 +1,8 @@
 # Справочник действий PS Maker / Action reference
 
-Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.33.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
+Сгенерировано из `dist/zelda-maker-toolkit.ps-maker.js` (Zelda Maker Toolkit 0.34.0) скриптом `scripts/gen-actions-doc.mjs`. Не редактируйте вручную.
 
-Всего действий: **39**. Все имена начинаются с `Zelda: `.
+Всего действий: **40**. Все имена начинаются с `Zelda: `.
 
 ## Оглавление
 
@@ -44,6 +44,7 @@
 - [Zelda: Define Item](#zelda-define-item)
 - [Zelda: Define Enemy](#zelda-define-enemy)
 - [Zelda: Set Player Sprites](#zelda-set-player-sprites)
+- [Zelda: Set Item Sprites](#zelda-set-item-sprites)
 - [Zelda: Set Sound](#zelda-set-sound)
 
 ## Zelda: Start Toolkit
@@ -508,6 +509,7 @@ Adds a usable item without code: a shot (Damage > 0), a burst around the player 
 | `stunMs` (Stun (ms)) | number | `0` | Freeze hit enemies; 1000 = one second. |
 | `heal` (Heal) | number | `0` | Half-hearts restored per use (makes it a healing item). / Лечение. |
 | `give` (Give now) | boolean | `false` | Also give the item to the player. |
+| `shot` (Shot picture) | image | — | Optional: the picture of its shot (Damage > 0) or of its burst (Area attack); empty = the built-in fireball or explosion. / Картинка выстрела или удара. |
 
 ## Zelda: Define Enemy
 
@@ -550,6 +552,12 @@ Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, 
 | `throw` (Throw) | player-animation-picker | `""` | Optional: throwing what you carry. / Бросить. |
 | `push` (Push) | player-animation-picker | `""` | Optional: leaning on a block to push it. / Толкать блок. |
 | `itemGet` (Item get) | player-animation-picker | `""` | Optional: holding up an item from a chest for a second (the player stands still meanwhile). / Достать предмет из сундука. |
+| `dig` (Shovel) | player-animation-picker | `""` | Optional: digging with the shovel; empty = Use item. / Копать лопатой. |
+| `powder` (Magic Powder) | player-animation-picker | `""` | Optional: sprinkling Magic Powder; empty = Use item. / Посыпать порошком. |
+| `rod` (Fire Rod) | player-animation-picker | `""` | Optional: casting with the Fire Rod; empty = Use item. / Жезл. |
+| `hookshot` (Hookshot) | player-animation-picker | `""` | Optional: while the hookshot is out and pulls the player; empty = Use item (once). / Крюк-кошка. |
+| `jump` (Jump) | player-animation-picker | `""` | Optional: in the air with Roc's Feather (frames spread over the jump). / Прыжок. |
+| `dash` (Dash) | player-animation-picker | `""` | Optional: running with the Pegasus Boots (loops). / Рывок. |
 | `weaponAttack` (Weapon layer: attack) | animation | `""` | Optional: a separate weapon sheet drawn over the body (when the weapon is not in the body frames). / Слой оружия: удар. |
 | `weaponSpin` (Weapon layer: spin) | animation | `""` | Optional. / Слой оружия: круговой. |
 | `weaponCharge` (Weapon layer: charging) | animation | `""` | Optional. / Слой оружия: зарядка. |
@@ -562,6 +570,46 @@ Player animations from PS Maker (e.g. Mana Seed Sword Attack) for sword, items, 
 | `offsetY` (Offset Y) | number | `0` | Move the animation, pixels. / Сдвиг по Y. |
 | `pivotX` (Swing center X) | number | `0` | Move the point the sword swings around, pixels. / Центр взмаха по X. |
 | `pivotY` (Swing center Y) | number | `0` | e.g. 4 to swing from lower on the body. / Центр взмаха по Y. |
+
+## Zelda: Set Item Sprites
+
+Your own pictures (project Images) for the toolkit's items: their icons (inventory, HUD item buttons, chests, item get), what flies and lies in the world (arrows, bombs, boomerang, fireball, hookshot, powder, the dug hole) and the pickups. Empty = the built-in picture. Put it in Map start after Start Toolkit (on every map, like Set Player Sprites). / Свои картинки предметов.
+
+| Параметр | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| `icon_sword` (Sword) | image | — | Picture in place of the built-in "icon_sword". / Картинка вместо встроенной. |
+| `icon_shield` (Shield) | image | — | Picture in place of the built-in "icon_shield". / Картинка вместо встроенной. |
+| `icon_mirror_shield` (Mirror Shield) | image | — | Picture in place of the built-in "icon_mirror_shield". / Картинка вместо встроенной. |
+| `icon_bomb` (Bombs) | image | — | Picture in place of the built-in "icon_bomb". / Картинка вместо встроенной. |
+| `icon_bow` (Bow) | image | — | Picture in place of the built-in "icon_bow". / Картинка вместо встроенной. |
+| `icon_boomerang` (Boomerang) | image | — | Picture in place of the built-in "icon_boomerang". / Картинка вместо встроенной. |
+| `icon_fire_rod` (Fire Rod) | image | — | Picture in place of the built-in "icon_fire_rod". / Картинка вместо встроенной. |
+| `icon_healing_spell` (Healing Spell) | image | — | Picture in place of the built-in "icon_healing_spell". / Картинка вместо встроенной. |
+| `icon_boots` (Pegasus Boots) | image | — | Picture in place of the built-in "icon_boots". / Картинка вместо встроенной. |
+| `icon_feather` (Roc's Feather) | image | — | Picture in place of the built-in "icon_feather". / Картинка вместо встроенной. |
+| `icon_shovel` (Shovel) | image | — | Picture in place of the built-in "icon_shovel". / Картинка вместо встроенной. |
+| `icon_magic_powder` (Magic Powder) | image | — | Picture in place of the built-in "icon_magic_powder". / Картинка вместо встроенной. |
+| `icon_hookshot` (Hookshot) | image | — | Picture in place of the built-in "icon_hookshot". / Картинка вместо встроенной. |
+| `icon_glove` (Power Glove) | image | — | Picture in place of the built-in "icon_glove". / Картинка вместо встроенной. |
+| `sword` (Sword blade (without an attack animation)) | image | — | Picture in place of the built-in "sword". / Картинка вместо встроенной. |
+| `arrow` (Arrow) | image | — | Picture in place of the built-in "arrow". / Картинка вместо встроенной. |
+| `bomb_arrow` (Bomb arrow) | image | — | Picture in place of the built-in "bomb_arrow". / Картинка вместо встроенной. |
+| `bomb` (Bomb) | image | — | Picture in place of the built-in "bomb". / Картинка вместо встроенной. |
+| `explosion` (Explosion) | image | — | Picture in place of the built-in "explosion". / Картинка вместо встроенной. |
+| `boomerang` (Boomerang (flying)) | image | — | Picture in place of the built-in "boomerang". / Картинка вместо встроенной. |
+| `fireball` (Fireball) | image | — | Picture in place of the built-in "fireball". / Картинка вместо встроенной. |
+| `hookshot_head` (Hookshot head) | image | — | Picture in place of the built-in "hookshot_head". / Картинка вместо встроенной. |
+| `hookshot_chain` (Hookshot chain link) | image | — | Picture in place of the built-in "hookshot_chain". / Картинка вместо встроенной. |
+| `powder_cloud` (Magic Powder cloud) | image | — | Picture in place of the built-in "powder_cloud". / Картинка вместо встроенной. |
+| `obj_dug` (Dug hole (shovel)) | image | — | Picture in place of the built-in "obj_dug". / Картинка вместо встроенной. |
+| `pickup_heart` (Heart) | image | — | Picture in place of the built-in "pickup_heart". / Картинка вместо встроенной. |
+| `pickup_rupee` (Rupee) | image | — | Picture in place of the built-in "pickup_rupee". / Картинка вместо встроенной. |
+| `pickup_magic` (Magic jar) | image | — | Picture in place of the built-in "pickup_magic". / Картинка вместо встроенной. |
+| `pickup_bomb` (Bombs) | image | — | Picture in place of the built-in "pickup_bomb". / Картинка вместо встроенной. |
+| `pickup_arrow` (Arrows) | image | — | Picture in place of the built-in "pickup_arrow". / Картинка вместо встроенной. |
+| `pickup_key` (Small key) | image | — | Picture in place of the built-in "pickup_key". / Картинка вместо встроенной. |
+| `pickup_bigkey` (Big Key) | image | — | Picture in place of the built-in "pickup_bigkey". / Картинка вместо встроенной. |
+| `pickup_container` (Heart container) | image | — | Picture in place of the built-in "pickup_container". / Картинка вместо встроенной. |
 
 ## Zelda: Set Sound
 

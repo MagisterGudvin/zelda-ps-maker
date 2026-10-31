@@ -35,6 +35,11 @@ export class MoveAbilities implements SessionSystem {
     return this.airMs > 0 || this.pulled;
   }
 
+  /** How far into the jump the player is (ms since leaving the ground), -1 on the ground. */
+  get jumpMs(): number {
+    return this.airMs > 0 ? this.s.config.items.feather.jumpMs - this.airMs : -1;
+  }
+
   /** Pulled by the hookshot: off the ground too (over pits), without the jump's hop. */
   private pulled = false;
 

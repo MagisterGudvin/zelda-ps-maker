@@ -9,10 +9,8 @@ import { parseTable, translateDialogue, Translator, withDialogueLayout, type Ima
  * every map.
  *
  * PS Maker's own Dialogue, Choices, Show Image and Change Image are translated as they run, not in
- * the project data: each map scene's story runner looks its built-in actions up through
- * `storyRunner.dependencies.getBuiltInAction(type)` (StoryRunner.ts, createStoryRunner.ts; the
- * name survives in the exported game), and the toolkit hands it the same action definition whose
- * `execute` gets a translated copy of the action. The action in the project stays as written.
+ * the project data (`translatedAction`, through storyHooks.ts). The action in the project stays as
+ * written.
  */
 
 export const TRANSLATIONS_ACTION = "Zelda: Translations";
@@ -65,10 +63,6 @@ export function applyProjectTranslations(tk: Toolkit, story: StoryLike | null | 
   tk.i18n.useTranslations(table ? new Translator(table, Array.isArray(story?.images) ? story!.images : []) : null);
 }
 
-type ActionDef = { execute?: (action: Record<string, unknown>, ctx: unknown) => void; [k: string]: unknown };
-type Deps = { getBuiltInAction?: (type: string) => ActionDef | undefined; __zeldaTranslations?: true };
-const TRANSLATED = new Set(["dialogueAction", "choicesAction", "showImageAction", "changeImageAction"]);
-
 /** A PS Maker action as it reads in the game's language (the same object when nothing changes). */
 export function translatedAction(tk: Toolkit, action: Record<string, unknown>): Record<string, unknown> {
   const tr = tk.i18n.translator;
@@ -95,38 +89,6 @@ export function translatedAction(tk: Toolkit, action: Record<string, unknown>): 
     }
   }
   return action;
-}
-
-/**
- * Translates PS Maker's own actions on a map scene as they run (once per scene). False when the
- * scene has no story runner to hook (then its dialogues show as written).
- */
-export function translateStoryRunner(scene: unknown, tk: Toolkit): boolean {
-  const deps = (scene as { storyRunner?: { dependencies?: Deps } } | null)?.storyRunner?.dependencies;
-  if (!deps || typeof deps.getBuiltInAction !== "function") return false;
-  if (deps.__zeldaTranslations) return true;
-  const original = deps.getBuiltInAction;
-  const wrapped = new WeakMap<ActionDef, ActionDef>();
-  deps.getBuiltInAction = (type: string) => {
-    const def = original(type);
-    if (!def || !TRANSLATED.has(type) || typeof def.execute !== "function") return def;
-    let w = wrapped.get(def);
-    if (!w) {
-      const execute = def.execute;
-      w = { ...def, execute: (action: Record<string, unknown>, ctx: unknown) => execute(translatedAction(tk, action), ctx) };
-      wrapped.set(def, w);
-    }
-    return w;
-  };
-  deps.__zeldaTranslations = true;
-  return true;
-}
-
-/** Every map scene running now (PS Maker keeps a scene per visited map). */
-export function translateRunningScenes(scene: unknown, tk: Toolkit): void {
-  const game = (scene as { game?: { scene?: { getScenes?: (active: boolean) => unknown[] } } } | null)?.game;
-  for (const sc of game?.scene?.getScenes?.(false) ?? []) translateStoryRunner(sc, tk);
-  translateStoryRunner(scene, tk);
 }
 
 /** The project fonts the languages use for the toolkit's texts: their CSS family, loaded. */

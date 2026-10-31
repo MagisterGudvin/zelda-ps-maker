@@ -297,3 +297,40 @@ function fillOptions(target: { label: string; value: string }[], items: readonly
   target.splice(0, target.length, ...next);
   return true;
 }
+
+/** Built-in sprites Set Item Sprites can replace: [sprite id, label, group]. */
+export const ITEM_SPRITE_SLOTS: readonly (readonly [string, string, "Item icons" | "In the world" | "Pickups"])[] = [
+  ["icon_sword", "Sword", "Item icons"],
+  ["icon_shield", "Shield", "Item icons"],
+  ["icon_mirror_shield", "Mirror Shield", "Item icons"],
+  ["icon_bomb", "Bombs", "Item icons"],
+  ["icon_bow", "Bow", "Item icons"],
+  ["icon_boomerang", "Boomerang", "Item icons"],
+  ["icon_fire_rod", "Fire Rod", "Item icons"],
+  ["icon_healing_spell", "Healing Spell", "Item icons"],
+  ["icon_boots", "Pegasus Boots", "Item icons"],
+  ["icon_feather", "Roc's Feather", "Item icons"],
+  ["icon_shovel", "Shovel", "Item icons"],
+  ["icon_magic_powder", "Magic Powder", "Item icons"],
+  ["icon_hookshot", "Hookshot", "Item icons"],
+  ["icon_glove", "Power Glove", "Item icons"],
+  ["sword", "Sword blade (without an attack animation)", "In the world"],
+  ["arrow", "Arrow", "In the world"],
+  ["bomb_arrow", "Bomb arrow", "In the world"],
+  ["bomb", "Bomb", "In the world"],
+  ["explosion", "Explosion", "In the world"],
+  ["boomerang", "Boomerang (flying)", "In the world"],
+  ["fireball", "Fireball", "In the world"],
+  ["hookshot_head", "Hookshot head", "In the world"],
+  ["hookshot_chain", "Hookshot chain link", "In the world"],
+  ["powder_cloud", "Magic Powder cloud", "In the world"],
+  ["obj_dug", "Dug hole (shovel)", "In the world"],
+  ["pickup_heart", "Heart", "Pickups"],
+  ["pickup_rupee", "Rupee", "Pickups"],
+  ["pickup_magic", "Magic jar", "Pickups"],
+  ["pickup_bomb", "Bombs", "Pickups"],
+  ["pickup_arrow", "Arrows", "Pickups"],
+  ["pickup_key", "Small key", "Pickups"],
+  ["pickup_bigkey", "Big Key", "Pickups"],
+  ["pickup_container", "Heart container", "Pickups"],
+];

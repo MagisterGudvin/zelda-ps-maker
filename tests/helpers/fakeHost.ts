@@ -219,6 +219,30 @@ export class FakeHost implements HostAdapter {
   describe(): string[] {
     return ["fake host"];
   }
+  /** PS Maker's audio settings, its own actions run, its fullscreen and gear. */
+  audio = { music: 100, sound: 100 };
+  builtIns: { type: string; [k: string]: unknown }[] = [];
+  fullscreen = false;
+  optionsButtonHidden = false;
+  audioVolumes(): { music: number; sound: number } {
+    return { ...this.audio };
+  }
+  setAudioVolume(channel: "music" | "sound", percent: number): boolean {
+    this.audio[channel] = percent;
+    return true;
+  }
+  runBuiltInAction(action: { type: string; [k: string]: unknown }): Promise<unknown> {
+    this.builtIns.push(action);
+    if (action.type === "toggleFullscreenAction") this.fullscreen = !this.fullscreen;
+    return Promise.resolve();
+  }
+  isFullscreen(): boolean {
+    return this.fullscreen;
+  }
+  hideOptionsButton(hidden: boolean): void {
+    this.optionsButtonHidden = hidden;
+  }
+
   /** A pending gamepad button capture (rebinding): tests call `padCaptured(button)`. */
   padCapture: ((button: number) => void) | null = null;
   capturePadButton(cb: ((button: number) => void) | null): void {

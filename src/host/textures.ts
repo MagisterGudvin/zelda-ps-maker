@@ -443,12 +443,33 @@ export interface TextureManagerLike {
   createCanvas(key: string, width: number, height: number): { context: CanvasRenderingContext2D; refresh(): unknown } | null;
 }
 
+/** Built-in sprite id → project image (Zelda: Set Item Sprites): drawn instead of the built-in picture. */
+const projectImages = new Map<string, string>();
+
+/** Draws a project image (its id, loaded by PS Maker) in place of a built-in sprite; "" = the built-in one again. */
+export function setSpriteImage(builtin: string, imageId: string): void {
+  if (imageId) projectImages.set(builtin, imageId);
+  else projectImages.delete(builtin);
+}
+
+/** The built-in sprites a project image replaces now. */
+export function spriteImages(): ReadonlyMap<string, string> {
+  return projectImages;
+}
+
+/** Built-in sprites with a picture of their own (for the editor's lists). */
+export function isBuiltinSprite(id: string): boolean {
+  return id in DEFS;
+}
+
 /**
- * Resolves a sprite id to a texture key: an existing (author) texture wins;
- * built-in ids are generated on first use and cached by the TextureManager.
+ * Resolves a sprite id to a texture key: a project image set for it (Set Item Sprites), then an
+ * existing (author) texture; built-in ids are generated on first use and cached by the TextureManager.
  */
 export function resolveTexture(textures: TextureManagerLike, id: string): string | null {
   if (!id) return null;
+  const own = projectImages.get(id);
+  if (own && textures.exists(own)) return own;
   if (textures.exists(id)) return id;
   const def = DEFS[id];
   if (!def) return null;

@@ -323,3 +323,26 @@ test("a placed bomb can be picked up (Z) and thrown (Z): it flies and goes off w
   assert.ok(r.tk.state.player.hp < hp, "the blast in the hands hurt the player");
   assert.ok(!r.session.interactions!.isCarrying());
 });
+
+test("a carried pot stays on the head on every drawn frame, also on frames without a toolkit tick (fast screens)", () => {
+  const r = createRig();
+  const p = r.host.player!;
+  r.step();
+  r.host.walk(1, 0);
+  r.step();
+  createObject(r.session, "pot", p.x + 14, p.y, { id: "pot_frames" });
+  r.host.input.tap("action");
+  r.step();
+  assert.ok(r.session.interactions!.isCarrying());
+  const pot = r.session.world.get("pot_frames")!;
+  const offset = () => (pot.view as unknown as { x: number }).x - p.x;
+  const before = offset();
+  // 120 Hz: PS Maker moves the player every 8 ms, the toolkit ticks every 16.7 ms.
+  const seen = new Set<number>();
+  for (let i = 0; i < 30; i++) {
+    r.host.walk(1, 0);
+    r.session.update(1000 / 120);
+    seen.add(Math.round(offset() * 100) / 100);
+  }
+  assert.deepEqual([...seen], [before], "the pot never lags behind the player");
+});

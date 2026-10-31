@@ -43,6 +43,7 @@ const ROLE_OPTIONS: readonly Opt[] = [
   ["hud", "HUD (always on screen)"],
   ["none", "Plain screen (Open UI Screen, buttons)"],
   ["menu", "Pause menu (Escape opens and closes it)"],
+  ["settings", "Settings (in place of PS Maker's options menu)"],
   ["message", "Message box (signs, items received)"],
   ["dialogue", "Dialogue box (Zelda: Dialogue, NPCs)"],
   ["notification", "Notifications (short notes over the game)"],
@@ -53,7 +54,9 @@ const ROLE_HINTS: Record<string, string> = {
   hud: "Always on screen. Like every role, the first HUD by map order is the HUD of every map; tick \"This map only\" in the action's settings to keep one for its map.",
   dialogue: "Zelda: Dialogue shows what an NPC says here: {speaker}, {message} (tick \"Wrap lines\"), a Picture whose picture is {portrait}, a Choice list for its answers. Z, X or Escape: next page; arrows and Z (or a click) pick an answer; the event waits until it closes.",
   notification: "Each short note (\"You got 5 bombs\", \"Saved\", hints the message box does not show) is drawn with this layout while it lasts: texts show {note}. Several notes stack one height apart. The game plays on.",
-  menu: "Escape (the Menu key) opens and closes it; PS Maker's options menu opens from a button that runs an event with \"Open options menu\".",
+  menu: "Escape (the Menu key) opens and closes it. Its Settings button: Open a screen → the settings screen.",
+  settings:
+    "In place of PS Maker's options menu: PS Maker's \"Open game options menu\" action (title screen, events) opens this screen, Escape too when there is no pause menu, and PS Maker's gear button is hidden. Buttons: Music / Sound volume (left and right change it, Z steps up), Fullscreen, Change the language, Save game, Load game, Exit game, Open a screen (controls), Close. Texts: {musicVolume}, {soundVolume} (0–100; a bar with Max 100), {fullscreen.text}, {language}. Show a Save or Exit button only when {settings.save} / {settings.exit} is 1 (the action that opened it may leave them out).",
   message: "Texts show {message} (tick \"Wrap lines\"); {message.ready} is 1 when the page waits for a key, {message.more} while more pages follow. Z, X or Escape: next page.",
   inventory: "Add an Inventory grid: arrows move its cursor, Z or C puts the item on the first item button, B on the second. Texts show {inv.name}, {inv.description}, {inv.count}. I, X or Escape close it.",
   title: "Open it with Open UI Screen on the title map. Buttons run PS Maker events: change map (new game), open the load menu, the options menu, exit the game. No key closes it.",
@@ -198,12 +201,13 @@ const BY_TYPE: Record<ElementType, FieldDef[]> = {
     { path: "slice", label: "Corner size (9-slice, 0 = stretch)", kind: "num" },
     { path: "color", label: "Colour without a picture", kind: "color" },
     { path: "hoverColor", label: "Colour when selected", kind: "color" },
-    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"], ["resetControls", "Reset the player's controls"], ["language", "Change the language"]] },
+    { path: "action.kind", label: "When pressed", kind: "choice", options: [["none", "Nothing"], ["event", "Run a PS Maker event"], ["open", "Open a screen"], ["close", "Close this screen"], ["variable", "Set a variable"], ["resetControls", "Reset the player's controls"], ["language", "Change the language"], ["music", "Music volume"], ["sound", "Sound volume"], ["fullscreen", "Fullscreen on / off"], ["save", "Save game (PS Maker)"], ["load", "Load game (PS Maker's menu)"], ["exit", "Exit game"]] },
     { path: "action.id", label: "Event", kind: "event" },
     { path: "action.id", label: "Screen", kind: "screen" },
     { path: "action.id", label: "Variable", kind: "var" },
     { path: "action.value", label: "Value", kind: "text" },
     { path: "action.value", label: "Language (code; empty = next)", kind: "text" },
+    { path: "action.value", label: "Volume step (empty = 10)", kind: "text" },
   ],
 };
 
@@ -215,7 +219,7 @@ function applies(f: FieldDef, e: UiElement): boolean {
   if (f.path === "rotation") return ROTATABLE.includes(e.type);
   if (e.type === "button" && f.path.startsWith("action.") && f.path !== "action.kind") {
     const k = e.action.kind;
-    return (f.kind === "event" && k === "event") || (f.kind === "screen" && k === "open") || (f.kind === "var" && k === "variable") || (f.path === "action.value" && (f.label === "Value" ? k === "variable" : k === "language"));
+    return (f.kind === "event" && k === "event") || (f.kind === "screen" && k === "open") || (f.kind === "var" && k === "variable") || (f.path === "action.value" && (f.label === "Value" ? k === "variable" : f.label.startsWith("Language") ? k === "language" : k === "music" || k === "sound"));
   }
   return true;
 }

@@ -656,13 +656,15 @@ await check("I opens the inventory screen (UI Designer, role Inventory): the ite
   expect(closed.screen === null && !closed.paused, `closed ${JSON.stringify(closed)}`);
   return `${inv.items} items, "${inv.name}", cursor ${inv.cursor} → ${moved.cursor}`;
 });
-await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker's options menu; its Settings button opens PS Maker's options menu (game paused), where Save game keeps the Toolkit's progress; Escape closes the options, then the pause menu", async () => {
+await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker's options menu; its Settings button (an event with PS Maker's \"Open game options menu\") opens the settings screen made in the UI Designer instead of PS Maker's menu: left/right change PS Maker's music volume, Save game saves the Toolkit's progress; no PS Maker gear; Escape goes back, then closes", async () => {
   const player = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return `${Math.round(b.x)},${Math.round(b.y)}`; });
-  const options = () => button("Save game").isVisible();
+  const psOptions = () => button("Save game").isVisible();
+  const gear = () => ev(() => { const g = document.querySelector("button.open-options-button"); return g ? getComputedStyle(g).display !== "none" : false; });
+  const music = () => ev(() => window.game.audioSettings.musicVolumePercent);
   await page.keyboard.press("Escape");
   await wait(400);
   const opened = await screenNow();
-  const optionsOnEscape = await options();
+  const optionsOnEscape = await psOptions();
   const at = await player();
   await page.keyboard.press("ArrowDown");
   await wait(300);
@@ -670,33 +672,51 @@ await check("Escape opens the pause menu (UI Designer, role Menu), not PS Maker'
   const still = (await player()) === at;
   await page.screenshot({ path: path.join(OUT, "pause.png") });
   await page.keyboard.press("z");
-  await button("Save game").waitFor({ state: "visible", timeout: 5000 });
-  const t0 = await ev(() => window.ZeldaMakerToolkit.session.tick);
-  await wait(500);
-  const t1 = await ev(() => window.ZeldaMakerToolkit.session.tick);
-  await page.screenshot({ path: path.join(OUT, "options.png") });
-  await button("Save game").click();
+  await wait(600);
+  const settings = await screenNow();
+  const psOptionsOnSettings = await psOptions();
+  // The game stands still under it (the toolkit's screen pause; its HUD keeps drawing).
+  const e0 = await ev(() => window.ZeldaMakerToolkit.session.world.list("enemy").map((e) => `${Math.round(e.x)},${Math.round(e.y)}`).join(" "));
+  await wait(400);
+  const e1 = await ev(() => window.ZeldaMakerToolkit.session.world.list("enemy").map((e) => `${Math.round(e.x)},${Math.round(e.y)}`).join(" "));
+  await page.screenshot({ path: path.join(OUT, "settings.png") });
+  const m0 = await music();
+  await page.keyboard.press("ArrowLeft");
+  await wait(300);
+  const m1 = await music();
+  const focusAfterLeft = (await screenNow()).focus;
+  await page.keyboard.press("ArrowRight");
+  await wait(300);
+  const m2 = await music();
+  // Down to Save game: sound, fullscreen, language, controls, save.
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(150);
+  }
+  const onSave = (await screenNow()).focus;
+  await page.keyboard.press("z");
   await wait(1500);
   const progress = await ev(() => JSON.parse(window.game.variables.get("zelda-progress").value || "{}"));
-  // Toolkit sounds are scaled by the menu's Sound Volume (PlayerAudioSettings.scaleSoundVolume).
+  const saves = await ev(() => Object.keys(localStorage).filter((k) => /save/i.test(k)).length);
   const volume = await ev(() => window.game.audioSettings?.scaleSoundVolume?.(0.5));
   await page.keyboard.press("Escape");
-  await wait(600);
+  await wait(500);
   const back = await screenNow();
-  const optionsAfter = await options();
   await page.keyboard.press("Escape");
   await wait(400);
   const closed = await screenNow();
-  const optionsAtEnd = await options();
+  const gearShown = await gear();
   expect(opened.screen === "pause" && opened.paused && opened.focus === "continue" && !optionsOnEscape, `opened ${JSON.stringify(opened)}, PS Maker options ${optionsOnEscape}`);
   expect(moved.focus === "settings", `down → ${moved.focus}`);
   expect(still, "the player walked while the pause menu was open");
-  expect(t1 === t0, `toolkit ran while the options menu was open (${t0} → ${t1})`);
+  expect(settings.screen === "settings" && settings.focus === "music" && !psOptionsOnSettings, `Settings → ${JSON.stringify(settings)}, PS Maker options ${psOptionsOnSettings}`);
+  expect(settings.paused && e1 === e0, `the game ran under the settings (paused ${settings.paused}, enemies ${e0} → ${e1})`);
+  expect(m1 === m0 - 10 && m2 === m0 && focusAfterLeft === "music", `music ${m0} → ${m1} → ${m2}, focus ${focusAfterLeft}`);
+  expect(onSave === "save" && progress.state?.objects?.["zelda-demo-field/chest@140,200"] === "opened", `save (${onSave}); progress variable: ${JSON.stringify(progress.state?.objects)}`);
   expect(typeof volume === "number", "game.audioSettings.scaleSoundVolume is missing");
-  expect(progress.state?.objects?.["zelda-demo-field/chest@140,200"] === "opened", `progress variable: ${JSON.stringify(progress.state?.objects)}`);
-  expect(back.screen === "pause" && !optionsAfter, `after the options menu: ${JSON.stringify(back)}, options ${optionsAfter}`);
-  expect(closed.screen === null && !closed.paused && !optionsAtEnd, `closed ${JSON.stringify(closed)}, options ${optionsAtEnd}`);
-  return "Escape → pause → Settings → PS Maker options (saved) → Escape → pause → Escape → game";
+  expect(back.screen === "pause" && closed.screen === null && !closed.paused, `back ${JSON.stringify(back)}, closed ${JSON.stringify(closed)}`);
+  expect(!gearShown, "PS Maker's gear is shown");
+  return `Escape → pause → Settings → the toolkit's settings (music ${m0} → ${m1} → ${m2}, saved; ${saves} save keys) → Escape → pause → Escape → game; no gear`;
 });
 await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick walks the player through PS Maker's own movement, A swings the sword, View opens the pause menu; the Controls screen rebinds the sword key, Reset brings X back", async () => {
   const body = () => ev(() => { const b = window.game.scene.getScenes(true).find((m) => m.map).player.body; return { x: b.center.x, y: b.center.y }; });
@@ -768,12 +788,17 @@ await check("gamepad (browser Gamepad API, an Xbox pad stood in for): the stick 
   expect(closed.screen === null, `closed ${JSON.stringify(closed)}`);
   return `stick → ${Math.round(a1.x - a0.x)} px, A → sword, View → pause; Controls: sword X → J → Reset → X`;
 });
-await check("translations (Zelda: Translations): in a Russian browser the demo plays in Russian — PS Maker's own Dialogue (the villager's goodbye) too, while the project keeps its English; the pause menu's Language button switches to English and back", async () => {
+await check("translations (Zelda: Translations): in a Russian browser the demo plays in Russian — PS Maker's own Dialogue (the villager's goodbye) too, while the project keeps its English; the settings screen's Language button switches to English and back", async () => {
   const lang = () => ev(() => window.ZeldaMakerToolkit.toolkit.i18n.language);
+  // Pause → Settings → Language (fourth button) → Z; back to the game.
   const pressLanguage = async () => {
     await page.keyboard.press("Escape");
     await wait(400);
-    for (let i = 0; i < 4; i++) {
+    await page.keyboard.press("ArrowDown");
+    await wait(150);
+    await page.keyboard.press("z");
+    await wait(400);
+    for (let i = 0; i < 3; i++) {
       await page.keyboard.press("ArrowDown");
       await wait(120);
     }
@@ -781,6 +806,8 @@ await check("translations (Zelda: Translations): in a Russian browser the demo p
     await page.keyboard.press("z");
     await wait(400);
     const texts = (await hudTexts()).map((t) => t.text);
+    await page.keyboard.press("Escape");
+    await wait(400);
     await page.keyboard.press("Escape");
     await wait(400);
     return { focus, texts };
@@ -809,9 +836,37 @@ await check("translations (Zelda: Translations): in a Russian browser the demo p
   expect(/Житель/.test(shown) && /Береги себя!/.test(shown) && /Возвращайся, если нужен совет\./.test(shown), `dialogue: ${shown.slice(0, 200)}`);
   expect(source === "Villager: Take care out there!\nCome back if you need advice.", `the project's dialogue changed: ${source}`);
   expect(closedDialogue, "the dialogue did not close");
-  expect(toEn.focus === "language" && en === "en" && toEn.texts.includes("Paused") && toEn.texts.includes("Continue") && toEn.texts.includes("Language: English"), `to English: ${en}, ${JSON.stringify(toEn)}`);
-  expect(back === "ru" && toRu.texts.includes("Пауза") && toRu.texts.includes("Язык: Русский"), `back: ${back}, ${toRu.texts.join(", ")}`);
-  return `PS Maker dialogue "Житель: Береги себя!" (the project keeps "${source.split("\n")[0]}"); Language → English ("Paused", "Language: English") → Russian`;
+  expect(toEn.focus === "language" && en === "en" && toEn.texts.includes("Settings") && toEn.texts.includes("Music") && toEn.texts.includes("Language: English"), `to English: ${en}, ${JSON.stringify(toEn)}`);
+  expect(back === "ru" && toRu.texts.includes("Настройки") && toRu.texts.includes("Язык: Русский"), `back: ${back}, ${toRu.texts.join(", ")}`);
+  return `PS Maker dialogue "Житель: Береги себя!" (the project keeps "${source.split("\n")[0]}"); Settings → Language → English ("Settings", "Language: English") → Russian`;
+});
+await check("a lifted pot stays on the player's head on every drawn frame while walking (it does not lag a frame behind and look blurred)", async () => {
+  await tp(56, 182);
+  await hold("ArrowDown", 120);
+  await page.keyboard.press("z");
+  await wait(500);
+  const lifted = await ev(() => window.ZeldaMakerToolkit.session.interactions.isCarrying());
+  await ev(() => {
+    const scene = window.game.scene.getScenes(true).find((m) => m.map);
+    window.__carry = [];
+    window.__carrySampler = () => {
+      const pot = window.ZeldaMakerToolkit.session.world.list("object").find((e) => e.objState === "carried");
+      if (pot?.view?.img) window.__carry.push(Math.round((pot.view.img.x - scene.player.x) * 100) / 100);
+    };
+    scene.events.on("render", window.__carrySampler);
+  });
+  await hold("ArrowRight", 700);
+  await hold("ArrowLeft", 700);
+  const offsets = await ev(() => {
+    window.game.scene.getScenes(true).find((m) => m.map).events.off("render", window.__carrySampler);
+    return window.__carry;
+  });
+  await page.keyboard.press("z");
+  await wait(600);
+  const distinct = [...new Set(offsets)];
+  expect(lifted, "the pot was not lifted");
+  expect(offsets.length > 20 && distinct.length === 1, `pot x − player x over ${offsets.length} frames: ${distinct.join(", ")}`);
+  return `${offsets.length} frames walking, the pot ${distinct[0]} px from the player's x on every one`;
 });
 await check("walking into a solid toolkit object does not shake the screen (also on fast screens)", async () => {
   // Fewer toolkit ticks than rendered frames, as on a 120-144 Hz screen.

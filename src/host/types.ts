@@ -42,6 +42,16 @@ export interface HostAdapter {
   setVariable?(id: string, value: string | number | boolean): boolean;
   /** Optional: runs a PS Maker event (project or this map's) by id, as its "Run event" action does; resolves when it ended. Null when it cannot. */
   runStoryEvent?(eventId: string): Promise<unknown> | null;
+  /** Optional: runs one of PS Maker's own actions (save, load menu, exit, fullscreen) on the map's story runner. Null when it cannot. */
+  runBuiltInAction?(action: { type: string; [k: string]: unknown }): Promise<unknown> | null;
+  /** Optional: the player's music and sound volume (0–100) of PS Maker's audio settings, null when unknown. */
+  audioVolumes?(): { music: number; sound: number } | null;
+  /** Optional: sets the player's music or sound volume (0–100), as PS Maker's options menu does (kept by PS Maker). */
+  setAudioVolume?(channel: "music" | "sound", percent: number): boolean;
+  /** Optional: the game fills the screen. */
+  isFullscreen?(): boolean;
+  /** Optional: hides (or shows again) PS Maker's options button over the game (its gear). */
+  hideOptionsButton?(hidden: boolean): void;
   /**
    * Optional: while `wants()` is true, the Menu key (controls.menu, Escape) goes to the toolkit and
    * PS Maker does not open its options menu on it. Returns the unsubscribe.

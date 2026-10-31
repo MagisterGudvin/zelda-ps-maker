@@ -223,3 +223,37 @@ test("built-in sprites have crisp edges: no half-transparent pixels", async () =
   assert.deepEqual([...put!].filter((_, i) => i % 4 === 3), [0, 255, 0, 255]);
   crispEdges({} as CanvasRenderingContext2D, 1, 1); // no pixel access: nothing happens
 });
+
+test("the newer abilities have animations of their own: shovel (once), jump (over the jump), dash (loops), hookshot (while it is out)", () => {
+  const rig = poseRig({}, { dig: "shoot", jump: "toss", dash: "pushing", hookshot: "getItem" });
+  faceRight(rig);
+  for (const id of ["shovel", "feather", "boots", "hookshot"]) rig.tk.inventory.give(id, 1, { silent: true });
+  assert.ok(rig.session.items!.use("shovel").ok);
+  rig.step();
+  assert.ok([30, 31, 32, 33].includes(bodyFrame(rig)!), `shovel: its own animation (${bodyFrame(rig)})`);
+  rig.run(800);
+  assert.ok(rig.session.items!.use("feather").ok);
+  const jump = new Set<number | null>();
+  for (let i = 0; i < 20; i++) {
+    rig.step();
+    jump.add(bodyFrame(rig));
+  }
+  assert.ok([...jump].every((f) => f !== null && f >= 80 && f <= 83) && jump.size > 1, `jump: frames spread over the jump (${[...jump]})`);
+  rig.run(1000);
+  assert.equal(rig.host.overlay, null, "landed: PS Maker's sprite again");
+  rig.host.input.press("useItem");
+  assert.ok(rig.session.moves!.startDash("useItem"));
+  const dash = new Set<number | null>();
+  for (let i = 0; i < 40; i++) {
+    rig.step();
+    dash.add(bodyFrame(rig));
+  }
+  rig.host.input.release("useItem");
+  rig.run(600);
+  assert.deepEqual([...dash].sort(), [90, 91, 92, 93], "dash: loops");
+  assert.ok(rig.session.items!.use("hookshot").ok);
+  rig.step(3);
+  assert.ok([100, 101, 102, 103].includes(bodyFrame(rig)!), `hookshot: while it is out (${bodyFrame(rig)})`);
+  rig.run(2000);
+  assert.equal(rig.host.overlay, null, "the hookshot is back");
+});

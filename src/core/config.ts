@@ -139,6 +139,14 @@ export interface ToolkitConfig {
       push: string;
       /** Holding up an item taken from a chest. */
       itemGet: string;
+      /** Items of their own: digging with the shovel, sprinkling Magic Powder, casting with the Fire Rod. */
+      dig: string;
+      powder: string;
+      rod: string;
+      /** Ongoing: while the hookshot is out, in the air (Roc's Feather), dashing (Pegasus Boots). */
+      hookshot: string;
+      jump: string;
+      dash: string;
       death: string;
       /** Directions where the weapon layer is drawn behind the body (typical for Mana Seed: up). */
       weaponBehind: Facing[];
@@ -354,7 +362,7 @@ export function createDefaultConfig(): ToolkitConfig {
       magicRegenPerSecond: 0,
       startItems: ["sword"],
       startCounts: {},
-      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
+      sprites: { attack: "", spin: "", charge: "", hurt: "", weaponAttack: "", weaponSpin: "", weaponCharge: "", chargeWalk: "", shield: "", bow: "", boomerang: "", bomb: "", item: "", lift: "", carry: "", throw: "", push: "", itemGet: "", dig: "", powder: "", rod: "", hookshot: "", jump: "", dash: "", death: "", weaponBehind: ["up"], hidePlayer: true, offsetX: 0, offsetY: 0 },
     },
     sword: {
       enabled: true,

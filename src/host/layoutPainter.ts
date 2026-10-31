@@ -376,7 +376,7 @@ export class LayoutPainter {
   }
 
   private bar(e: Extract<UiElement, { type: "bar" }>, b: Box, values: LayoutValues, fonts: Record<string, string>, layout: UiLayout): void {
-    const max = Number(values[e.max]) || 0;
+    const max = Number(values[e.max] ?? e.max) || 0;
     const f = max > 0 ? Math.max(0, Math.min(1, (Number(values[e.value]) || 0) / max)) : 0;
     const k = this.k;
     const fill = this.picSize(e.fill);

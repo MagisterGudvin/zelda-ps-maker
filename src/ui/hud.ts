@@ -136,6 +136,11 @@ export class HudSystem {
       } else if (key.startsWith("t:")) out[key] = s.i18n.t(key.slice(2));
       else if (key === "heartValue") out[key] = s.config.player.heartValue;
       else if (key === "language") out[key] = s.i18n.languageName();
+      else if (/^\d+(\.\d+)?$/.test(key)) out[key] = Number(key);
+      else if (key === "musicVolume" || key === "soundVolume") out[key] = s.host.audioVolumes?.()?.[key === "musicVolume" ? "music" : "sound"] ?? 100;
+      else if (key === "fullscreen") out[key] = s.host.isFullscreen?.() ? 1 : 0;
+      else if (key === "fullscreen.text") out[key] = s.i18n.t(s.host.isFullscreen?.() ? "settings.on" : "settings.off");
+      else if (key === "settings.save" || key === "settings.exit") out[key] = s.screens?.settingsOffer[key === "settings.save" ? "save" : "exit"] === false ? 0 : 1;
       else if (key === "magic") out[key] = st.player.magic;
       else if (key === "maxMagic") out[key] = st.player.maxMagic;
       else if (key === "dialogue") out[key] = s.isPaused("dialogue") || s.isPaused("message") ? 1 : 0;

@@ -21,7 +21,8 @@ import {
 import { createRig } from "../helpers/fakeHost.ts";
 import { Toolkit } from "../../src/core/toolkit.ts";
 import { setPlayerLanguage } from "../../src/core/playerLanguage.ts";
-import { applyProjectTranslations, findTranslations, translateStoryRunner, translatedAction } from "../../src/editor/projectTranslations.ts";
+import { applyProjectTranslations, findTranslations, translatedAction } from "../../src/editor/projectTranslations.ts";
+import { hookStoryRunner } from "../../src/editor/storyHooks.ts";
 import { parseLayout } from "../../src/ui/uiLayout.ts";
 
 const SOURCE = ["@portrait npc1 happy", "Old man: It's dangerous to go alone!", "Take this.", "", "@name \"Mysterious voice\"", "Wake up…", "{@run_action a1}", "\\@not a command", "<!-- a note -->", "Done: really."].join("\n");
@@ -223,8 +224,8 @@ test("in the game: PS Maker's Dialogue, Choices and images run translated; the p
   const ran: Record<string, unknown>[] = [];
   const def = (type: string) => ({ execute: (a: Record<string, unknown>) => ran.push(a), meta: { category: type } });
   const scene = { storyRunner: { dependencies: { getBuiltInAction: (type: string) => def(type) } } };
-  assert.ok(translateStoryRunner(scene, tk));
-  assert.ok(translateStoryRunner(scene, tk), "once per scene");
+  assert.ok(hookStoryRunner(scene, tk));
+  assert.ok(hookStoryRunner(scene, tk), "once per scene");
   const deps = scene.storyRunner.dependencies;
   for (const a of [dialogue, choices, image, { type: "waitTimerAction" }]) (deps.getBuiltInAction(a.type) as { execute: (a: unknown, c: unknown) => void }).execute(a, {});
   assert.deepEqual(ran[0], { ...dialogue, dialogueSource: "@dialogue_layout ru-layout\nСтражник: Стоять!" }, "the language's dialogue layout, embedded actions kept");
@@ -235,7 +236,7 @@ test("in the game: PS Maker's Dialogue, Choices and images run translated; the p
   assert.equal((deps.getBuiltInAction("dialogueAction") as { meta: unknown }).meta && true, true, "the rest of the definition is kept");
   tk.configure({ language: "en" });
   assert.equal(translatedAction(tk, dialogue), dialogue, "the source language: the same action");
-  assert.equal(translateStoryRunner({}, tk), false, "no story runner: nothing to hook");
+  assert.equal(hookStoryRunner({}, tk), false, "no story runner: nothing to hook");
 });
 
 test("in the game: HUD and screens show their texts translated, a language button switches, {language} shows its name", () => {

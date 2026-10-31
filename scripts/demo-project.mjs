@@ -170,14 +170,36 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
     theme: hudLayout.theme,
     screen: screen("menu"),
     elements: [
-      { id: "panel", type: "image", x: -60, y: -72, w: 120, h: 144, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
-      { id: "title", type: "text", x: -60, y: -65, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
-      button("continue", "Continue", -48, { kind: "close", id: "" }),
-      button("settings", "Settings", -26, { kind: "event", id: "zelda-pause-settings" }),
-      button("mainMenu", "Main menu", -4, { kind: "event", id: "zelda-pause-title" }),
-      button("controls", "Controls", 18, { kind: "open", id: "controls" }),
-      // The next language of the translation sheet (Zelda: Translations), its name on the button.
-      button("language", "Language: {language}", 40, { kind: "language", id: "" }),
+      { id: "panel", type: "image", x: -60, y: -61, w: 120, h: 122, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -60, y: -54, w: 120, h: 10, anchor: "c", show: always, text: "Paused", font: "", size: 10, color: "", align: "center" },
+      button("continue", "Continue", -37, { kind: "close", id: "" }),
+      // PS Maker's "Open game options menu" in an event: the toolkit opens the settings screen instead.
+      button("settings", "Settings", -15, { kind: "event", id: "zelda-pause-settings" }),
+      button("mainMenu", "Main menu", 7, { kind: "event", id: "zelda-pause-title" }),
+      button("controls", "Controls", 29, { kind: "open", id: "controls" }),
+    ],
+  };
+  // The settings (role Settings), in place of PS Maker's options menu: volumes (left and right change
+  // them), fullscreen, the language of the translation sheet, the controls, saving.
+  const row = (id, text, y, action) => ({ ...button(id, text, y, action), x: -70, w: 140 });
+  const volumeBar = (id, value, y) => ({ id, type: "bar", x: 20, y, w: 50, h: 6, anchor: "c", show: always, value, max: "100", dir: "right", fillColor: "#ffd23a", backColor: "#1f1a24", shape: "rect", border: "#f2e4bb", borderWidth: 1, text: "" });
+  const settingsLayout = {
+    v: 1,
+    scale: 0,
+    theme: hudLayout.theme,
+    screen: screen("settings"),
+    elements: [
+      { id: "panel", type: "image", x: -80, y: -84, w: 160, h: 168, anchor: "c", show: always, image: "zelda-ui-panel", mode: "nine", slice: 7, color: "" },
+      { id: "title", type: "text", x: -80, y: -77, w: 160, h: 10, anchor: "c", show: always, text: "Settings", font: "", size: 10, color: "", align: "center" },
+      { ...row("music", "Music", -62, { kind: "music", id: "", value: "10" }), w: 84 },
+      volumeBar("musicBar", "musicVolume", -56),
+      { ...row("sound", "Sounds", -42, { kind: "sound", id: "", value: "10" }), w: 84 },
+      volumeBar("soundBar", "soundVolume", -36),
+      row("fullscreen", "Fullscreen: {fullscreen.text}", -22, { kind: "fullscreen", id: "" }),
+      row("language", "Language: {language}", -2, { kind: "language", id: "" }),
+      row("controls", "Controls", 18, { kind: "open", id: "controls" }),
+      { ...row("save", "Save game", 38, { kind: "save", id: "" }), show: { when: "compare", id: "settings.save", op: "==", value: 1 } },
+      row("back", "Back", 58, { kind: "close", id: "" }),
     ],
   };
   // The player's own keys and gamepad buttons (opened from the pause menu).
@@ -401,6 +423,7 @@ export function buildDemoStory({ source, plugin, maps, name = "Zelda Toolkit Dem
           zelda.push(pluginAction("Zelda: UI Layout", { layout: JSON.stringify(hudLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "pause", layout: JSON.stringify(pauseLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "controls", layout: JSON.stringify(controlsLayout) }));
+          zelda.push(pluginAction("Zelda: UI Layout", { name: "settings", layout: JSON.stringify(settingsLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "message", layout: JSON.stringify(messageLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "inventory", layout: JSON.stringify(inventoryLayout) }));
           zelda.push(pluginAction("Zelda: UI Layout", { name: "dialogue", layout: JSON.stringify(dialogueLayout) }));
@@ -555,6 +578,9 @@ export function demoGameUi(source) {
   g.buttonStyles = [...(g.buttonStyles ?? []).filter((b) => b.id !== BUTTON_STYLE_ID), button];
   for (const menu of [g.optionsMenu, g.loadGameMenu]) if (menu) menu.background = nineSlice("zelda-ui-panel", 7);
   for (const c of g.choiceLayouts ?? []) c.background = nineSlice("zelda-ui-panel", 7);
+  // No PS Maker gear over the game: the settings screen made in the UI Designer replaces its menu
+  // (Game UI → Options menu → "Options button in game" unticked).
+  if (g.optionsMenu) g.optionsMenu.showOpenOptionsButton = false;
   return g;
 }
 
@@ -584,6 +610,10 @@ const DEMO_RU = [
   ["text", "Main menu", "Главное меню"],
   ["text", "Controls", "Управление"],
   ["text", "Language: {language}", "Язык: {language}"],
+  ["text", "Music", "Музыка"],
+  ["text", "Sounds", "Звуки"],
+  ["text", "Fullscreen: {fullscreen.text}", "Полный экран: {fullscreen.text}"],
+  ["text", "Save game", "Сохранить игру"],
   ["text", "Reset", "Сбросить"],
   ["text", "Back", "Назад"],
   ["text", SIGN_TEXT, "Стрелки: ходьба. X: меч, удерживайте для кругового удара. Z: открыть, поднять, говорить.\n\nC и B: две кнопки предметов. Q/E: сменить предмет на C. I: все предметы (C или B ставит предмет на эту кнопку). V: поднять щит (он в сундуке ниже). Esc: пауза."],

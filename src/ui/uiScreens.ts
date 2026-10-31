@@ -1,5 +1,5 @@
 import type { Session } from "../core/session.ts";
-import { isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type KeybindsElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
+import { ADJUSTABLE_ACTIONS, isShown, layoutBoxes, moveInGrid, nextButton, type ButtonElement, type InventoryElement, type KeybindsElement, type ScreenRole, type UiLayout } from "./uiLayout.ts";
 import { PAD_ACTIONS, padButtonLabel, type PadAction } from "../host/gamepadBridge.ts";
 import { bindAction, resetPlayerControls } from "../core/playerControls.ts";
 import { setPlayerLanguage } from "../core/playerLanguage.ts";
@@ -91,7 +91,23 @@ export class UiScreenSystem {
   wantsMenuKey(): boolean {
     const cur = this.current;
     if (cur) return cur.layout.screen.role !== "title";
-    return this.withRole("menu") !== null && !this.s.isPaused() && !this.s.host.isDialogueOpen?.();
+    return (this.withRole("menu") ?? this.withRole("settings")) !== null && !this.s.isPaused() && !this.s.host.isDialogueOpen?.();
+  }
+
+  /**
+   * What the settings screen offers this time, as PS Maker's "Open game options menu" asks
+   * (`settings.save`, `settings.exit` in the layout: 1 or 0). A settings screen opened otherwise
+   * offers both.
+   */
+  settingsOffer = { save: true, exit: true };
+
+  /** Opens the project's settings screen (role Settings) in place of PS Maker's options menu. False without one. */
+  openSettings(offer: { save?: boolean; exit?: boolean } = {}): boolean {
+    const name = this.withRole("settings");
+    if (!name) return false;
+    this.settingsOffer = { save: offer.save !== false, exit: offer.exit !== false };
+    this.s.hud?.markDirty();
+    return this.open(name);
   }
 
   open(name: string): boolean {
@@ -242,8 +258,10 @@ export class UiScreenSystem {
     const cur = this.current;
     if (!cur) {
       if (input.pressed("menu") && !this.s.isPaused()) {
+        // The pause menu; a project with only a settings screen opens that (as PS Maker's options menu).
         const menu = this.withRole("menu");
         if (menu) this.open(menu);
+        else this.openSettings();
       }
       return;
     }
@@ -290,8 +308,12 @@ export class UiScreenSystem {
         return;
       }
     }
+    // A volume or language button: left and right change it.
+    const focused = cur.layout.elements.find((e): e is ButtonElement => e.type === "button" && e.id === top.focus);
+    const adjusts = !grid && !!focused && ADJUSTABLE_ACTIONS.includes(focused.action.kind);
+    if (adjusts && (input.pressed("left") || input.pressed("right"))) this.adjust(focused!, input.pressed("right") ? 1 : -1);
     for (const dir of ["up", "down", "left", "right"] as const) {
-      if (!input.pressed(dir)) continue;
+      if (!input.pressed(dir) || (adjusts && (dir === "left" || dir === "right"))) continue;
       if (grid) {
         const next = moveInGrid(top.cursor, this.gridItems().length, grid.cols, dir);
         if (next !== top.cursor) this.moved(cur.layout, () => (top.cursor = next));
@@ -480,7 +502,58 @@ export class UiScreenSystem {
       case "language":
         setPlayerLanguage(this.s.toolkit, a.value.trim());
         break;
+      case "music":
+      case "sound": {
+        // Pressed: one step up, round to silent after full.
+        const now = this.s.host.audioVolumes?.()?.[a.kind] ?? 100;
+        const step = volumeStep(a.value);
+        this.setVolume(a.kind, now >= 100 ? 0 : Math.min(100, now + step));
+        break;
+      }
+      case "fullscreen":
+        this.builtIn(id, { type: "toggleFullscreenAction", mode: "toggle" });
+        // The page goes fullscreen in a moment; the text follows then.
+        for (const ms of [150, 600]) setTimeout(() => this.s.hud?.markDirty(), ms);
+        break;
+      case "save":
+        if (!this.settingsOffer.save) break;
+        void this.builtIn(id, { type: "saveGameAction" })?.then(() => this.s.bus.emit("zelda:message", { text: this.s.i18n.t("msg.game_saved"), durationMs: this.s.config.ui.messageMs }));
+        break;
+      case "load":
+        this.builtIn(id, { type: "openLoadGameMenuAction" });
+        break;
+      case "exit":
+        if (this.settingsOffer.exit) this.builtIn(id, { type: "exitGameAction" });
+        break;
     }
+  }
+
+  /** Left or right on a volume or language button. */
+  private adjust(b: ButtonElement, dir: 1 | -1): void {
+    const a = b.action;
+    const cur = this.current;
+    if (cur) this.sound(cur.layout.screen.soundMove);
+    if (a.kind === "language") {
+      const codes = this.s.i18n.languages;
+      const i = codes.indexOf(this.s.i18n.language);
+      setPlayerLanguage(this.s.toolkit, codes[(i + dir + codes.length) % codes.length] ?? "");
+      return;
+    }
+    if (a.kind !== "music" && a.kind !== "sound") return;
+    const now = this.s.host.audioVolumes?.()?.[a.kind] ?? 100;
+    this.setVolume(a.kind, Math.max(0, Math.min(100, now + dir * volumeStep(a.value))));
+  }
+
+  private setVolume(channel: "music" | "sound", percent: number): void {
+    if (!this.s.host.setAudioVolume?.(channel, percent)) this.s.logger.warnOnce("volume", "Settings: this game has no PS Maker audio settings to change.");
+    this.s.hud?.markDirty();
+  }
+
+  /** Runs one of PS Maker's own actions for a button. */
+  private builtIn(button: string, action: { type: string; [k: string]: unknown }): Promise<unknown> | null {
+    const run = this.s.host.runBuiltInAction?.(action) ?? null;
+    if (!run) this.s.logger.warnOnce(`builtin-${action.type}`, `Button "${button}": PS Maker's ${action.type} could not be run here.`);
+    return run;
   }
 
   dispose(): void {
@@ -495,4 +568,10 @@ export class UiScreenSystem {
       this.s.player.unlock("screen");
     }
   }
+}
+
+/** A volume button's step: its value (1–100), else 10. */
+function volumeStep(value: string): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n >= 1 && n <= 100 ? n : 10;
 }

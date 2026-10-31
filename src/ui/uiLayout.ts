@@ -171,16 +171,19 @@ export interface MinimapElement extends Base {
 
 /**
  * What a button does: run a PS Maker event, open or close a screen, set a project variable, reset
- * the player's controls, change the game's language (Zelda: Translations).
+ * the player's controls, change the game's language (Zelda: Translations); and what PS Maker's
+ * options menu does (a settings screen): music and sound volume, fullscreen, save, load, exit.
  */
 export interface ButtonAction {
-  kind: "none" | "event" | "open" | "close" | "variable" | "resetControls" | "language";
+  kind: "none" | "event" | "open" | "close" | "variable" | "resetControls" | "language" | "music" | "sound" | "fullscreen" | "save" | "load" | "exit";
   /** Event id, screen name or variable id. */
   id: string;
-  /** The variable's new value; the language code ("" = the next language). */
+  /** The variable's new value; the language code ("" = the next language); the volume step ("" = 10). */
   value: string;
 }
-export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable", "resetControls", "language"];
+export const BUTTON_ACTIONS: readonly ButtonAction["kind"][] = ["none", "event", "open", "close", "variable", "resetControls", "language", "music", "sound", "fullscreen", "save", "load", "exit"];
+/** Buttons whose value the left and right keys change (instead of moving to another button). */
+export const ADJUSTABLE_ACTIONS: readonly ButtonAction["kind"][] = ["music", "sound", "language"];
 
 /**
  * A button of a screen: a picture (another one while it is selected) or a colour, and a text.
@@ -274,8 +277,8 @@ export interface LayoutTheme {
  * (the HUD hidden, no key closes it); or the HUD itself, always on screen (also a layout without a
  * screen name and without a role, as made before 0.27.0).
  */
-export type ScreenRole = "hud" | "none" | "menu" | "message" | "dialogue" | "notification" | "inventory" | "title";
-export const SCREEN_ROLES: readonly ScreenRole[] = ["hud", "none", "menu", "message", "dialogue", "notification", "inventory", "title"];
+export type ScreenRole = "hud" | "none" | "menu" | "settings" | "message" | "dialogue" | "notification" | "inventory" | "title";
+export const SCREEN_ROLES: readonly ScreenRole[] = ["hud", "none", "menu", "settings", "message", "dialogue", "notification", "inventory", "title"];
 export const MESSAGE_KINDS = ["sign", "item", "hint", "info"] as const;
 export type MessageKindName = (typeof MESSAGE_KINDS)[number];
 
